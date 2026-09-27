@@ -1,15 +1,15 @@
-name = "moonbitstack/moonre"
+name = "moonbitstack/moonregex"
 
 version = "0.1.0"
 
 readme = "README.md"
 
-repository = "https://github.com/moonbitstack/moonre"
+repository = "https://github.com/moonbitstack/moonregex"
 
 license = "Apache-2.0"
 
-keywords = [ "regex", "ecma262", "unicode", "pattern", "moonbit" ]
+keywords = [ "regex", "re", "ecma262", "unicode", "moonbit" ]
 
-description = "moonre — ECMA-262 regular expressions for MoonBit: the grammar JavaScript, JSON Schema and OpenAPI all mean when they say regex. The host RegExp on js, parsed and lowered elsewhere."
+description = "moonregex — regular expressions for MoonBit, with Python's `re` interface: compile, search, match, split, findall, sub, and both the Python and ECMA-262 dialects."
 
 preferred_target = "wasm-gc"

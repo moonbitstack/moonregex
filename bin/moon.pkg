@@ -2,5 +2,5 @@
 pkgtype(kind: "executable")
 
 import {
-  "moonbitstack/moonre/lib",
+  "moonbitstack/moonregex/lib",
 }
