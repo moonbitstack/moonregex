@@ -19,8 +19,11 @@ needs this instead.
 
 ## Two dialects, one interface
 
-The API is Python's. The grammar is a parameter, because the two callers who
-need this need different ones:
+The API is Python's `re`, and behind it the [`regex`](https://github.com/mrabarnett/mrab-regex)
+superset — fuzzy matching, recursion, set operations, variable-length lookbehind
+and the rest — gated the way that module gates them, on `(?V0)` and `(?V1)`.
+
+The grammar is a parameter, because the callers who need this need different ones:
 
 | `dialect` | Who asks for it |
 |:--|:--|
