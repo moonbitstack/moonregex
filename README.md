@@ -1,59 +1,40 @@
-# CHANGE-ME
+# moonre
 
-One sentence saying what this is.
+The regular expressions JavaScript means, which is what JSON Schema and OpenAPI
+mean too.
 
-```moonbit
-@lib.greet("moonbit")
-```
+> **Status: planned.** The repository is set up; nothing is
+> implemented yet.
 
-Run `moon run examples/tour` for the whole surface in one go.
+MoonBit's own `@string.Regex` is a different language, and deliberately so —
+core states that it is not ECMA-262 compliant by design and will not carry
+Unicode tables. Anything that has to agree with a JavaScript engine therefore
+needs this, and the answer is the same whichever library asked: JSON Schema's
+`pattern`, OpenAPI's `pattern`, a route matcher, a config field.
 
-## Starting from this template
+## Three targets, three routes to the same answer
 
-1. `gh repo create moonbitstack/<name> --template moonbitstack/moonkit --public`
-2. Replace `CHANGE-ME` everywhere: `moon.mod` (name and repository), the two
-   `moon.pkg` files that import `lib`, and this file's title.
-3. Delete `bin/` if the repository ships no binary; delete `lib/` if it ships
-   only a binary. Most repositories here keep `lib/` and rename it to whatever
-   the package actually is — `base64/`, `sha2/`, `jwt/` — because a package is
-   named after what it does, not after its role.
-4. Fill in `keywords` and `description` in `moon.mod`. The description is what
-   mooncakes shows, so it says what the package is and what it is not.
-5. Write the specification link into every `moon.pkg`.
-
-## What is here and what is not
-
-| Carried | Why |
+| Target | How |
 |:--|:--|
-| `.github/workflows/` | GitHub does not inherit workflows; every repository needs its own copy |
-| `moon.mod`, `lib/`, `bin/`, `examples/tour/` | The module layout, with the library and the binary separated the way cargo separates them |
-| `.gitignore`, `.moonignore` | The second one exists because `.gitignore`'s `!.git*` would otherwise pull the whole object database into a published tarball |
-| `LICENSE` | Apache-2.0, the same across the organisation |
+| `js` | The host's own `RegExp`. It is ECMA-262 by definition and faster than anything written here |
+| `wasm`, `wasm-gc`, `native` | Parse the pattern, lower what can be lowered onto `@string.Regex`, and run the rest here |
 
-**Issue and pull-request templates are not here.** The organisation's `.github`
-repository supplies them to every repository that has none of its own; a copy
-here would shadow that one and then drift from it. A repository adds its own
-only when it needs something the organisation's does not cover.
+The same pattern must give the same answer on all four. That is the point of the
+library and the thing its tests exist to hold.
 
-## The gate
+| Package | What it covers |
+|:--|:--|
+| `parse` | ECMA-262 §22.2's grammar, into a syntax tree |
+| `lower` | What `@string.Regex` can be made to do, expressed in its spelling |
+| `exec` | What it cannot: backreferences, lookaround, and the rest |
+| `prop` | `\p{…}`: the Unicode property tables, generated, with the version recorded |
 
-Every commit passes this, with each exit code seen to be zero:
+## Install
 
 ```bash
-moon clean && moon fmt && moon check --target all --deny-warn \
-  && moon build --target all && moon test --target all
+moon add moonbitstack/moonre
 ```
-
-Before a release, `moon info --target all && git diff --exit-code` as well: the
-generated interface is checked in, and a difference means the interface moved
-without anyone saying so.
-
-## Releasing
-
-Push a signed tag `v<version>`. `release.yml` runs the tests first and publishes
-only if they pass and the organisation variable `MOONCAKES_PUBLISH` is `true`.
-The major version stays at 0.
 
 ## Licence
 
-Apache-2.0.
+Apache-2.0. See [LICENSE](LICENSE).
