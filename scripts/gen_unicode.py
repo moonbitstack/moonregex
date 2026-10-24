@@ -38,6 +38,7 @@ FILES = [
     "CaseFolding.txt",
     "emoji/emoji-data.txt",
     "PropertyValueAliases.txt",
+    "NameAliases.txt",
 ]
 
 # Binary properties worth a table. The rest of PropList / DerivedCoreProperties
@@ -268,6 +269,92 @@ def read_casefold(version):
     return sorted(pairs)
 
 
+def read_names(version):
+    """Every named code point for `\\N{name}`.
+
+    Returns `(names, ranges)`:
+
+    - `names` is a sorted list of `(normalised_name, codepoint)` for the code
+      points named individually in UnicodeData.txt;
+    - `ranges` is a list of `(normalised_prefix, start, end)` for the
+      First/Last ranges (CJK, Tangut, Hangul), whose names are the prefix plus
+      a hex suffix and so are answered algorithmically instead of being
+      expanded.
+
+    UnicodeData.txt spells the First/Last ranges with a `<Name, First>` /
+    `<Name, Last>` placeholder (e.g. `<CJK Ideograph, First>`), which is *not*
+    the name `unicodedata.lookup` accepts — that is the mapped prefix plus the
+    code point in hex (`CJK UNIFIED IDEOGRAPH-4E00`). The placeholder is mapped
+    here; the surrogate and private-use ranges have no name and are skipped.
+    """
+    prefix_map = {
+        "CJK Ideograph": "CJK UNIFIED IDEOGRAPH",
+        "CJK Ideograph Extension A": "CJK UNIFIED IDEOGRAPH EXTENSION A",
+        "CJK Ideograph Extension B": "CJK UNIFIED IDEOGRAPH EXTENSION B",
+        "CJK Ideograph Extension C": "CJK UNIFIED IDEOGRAPH EXTENSION C",
+        "CJK Ideograph Extension D": "CJK UNIFIED IDEOGRAPH EXTENSION D",
+        "CJK Ideograph Extension E": "CJK UNIFIED IDEOGRAPH EXTENSION E",
+        "CJK Ideograph Extension F": "CJK UNIFIED IDEOGRAPH EXTENSION F",
+        "CJK Ideograph Extension G": "CJK UNIFIED IDEOGRAPH EXTENSION G",
+        "CJK Ideograph Extension H": "CJK UNIFIED IDEOGRAPH EXTENSION H",
+        "CJK Ideograph Extension I": "CJK UNIFIED IDEOGRAPH EXTENSION I",
+        "CJK Ideograph Extension J": "CJK UNIFIED IDEOGRAPH EXTENSION J",
+        "Hangul Syllable": "HANGUL SYLLABLE",
+        "Tangut Ideograph": "TANGUT IDEOGRAPH",
+        "Tangut Ideograph Supplement": "TANGUT IDEOGRAPH SUPPLEMENT",
+    }
+    names = []
+    ranges = []
+    first = None  # (prefix, start_cp)
+    for line in fetch(version, "UnicodeData.txt").splitlines():
+        f = line.split(";")
+        if len(f) < 2:
+            continue
+        cp = int(f[0], 16)
+        name = f[1]
+        if name.endswith(", First>"):
+            placeholder = name[1 : -len(", First>")]
+            first = (prefix_map.get(placeholder), cp)
+            continue
+        if name.endswith(", Last>"):
+            placeholder = name[1 : -len(", Last>")]
+            prefix = prefix_map.get(placeholder)
+            if first is None or first[0] != prefix:
+                raise SystemExit(f"unbalanced First/Last pair at {cp:04X}")
+            if prefix is not None:
+                ranges.append((norm(prefix), first[1], cp))
+            first = None
+            continue
+        if name == "<control>":
+            continue
+        names.append((norm(name), cp))
+    if first is not None:
+        raise SystemExit("dangling First range at end of UnicodeData.txt")
+    names.sort()
+    ranges.sort()
+    return names, ranges
+
+
+def read_name_aliases(version):
+    """The control/figment/abbreviation aliases `\\N{name}` also accepts.
+
+    NameAliases.txt gives short and long spellings for characters whose
+    Unicode name is not their common one (controls, and a few others). Returns
+    a sorted list of `(normalised_alias, codepoint)`.
+    """
+    aliases = []
+    for line in fetch(version, "NameAliases.txt").splitlines():
+        line = line.split("#")[0].strip()
+        if not line or ";" not in line:
+            continue
+        fields = [p.strip() for p in line.split(";")]
+        cp = int(fields[0], 16)
+        for alias in fields[1:]:
+            aliases.append((norm(alias), cp))
+    aliases.sort()
+    return aliases
+
+
 def ident(name: str) -> str:
     return re.sub(r"[^0-9a-zA-Z]", "_", name).lower()
 
@@ -306,6 +393,8 @@ def main():
     blocks = read_blocks(v)
     props = read_props(v, ["PropList.txt", "DerivedCoreProperties.txt", "emoji/emoji-data.txt"], BINARY_PROPERTIES)
     fold = read_casefold(v)
+    names, name_ranges = read_names(v)
+    name_aliases = read_name_aliases(v)
 
     out = []
     w = out.append
@@ -373,12 +462,35 @@ def main():
     w(f"let casefold_pairs : Array[(Int, Int)] = [{body}]")
     w("")
 
+    # --- character names -----------------------------------------------------
+    w("// Character names (UnicodeData.txt), normalised and sorted. Stored as a")
+    w("// single `name=data` line-per-entry string (chunked into concatenated")
+    w("// literals so no one line overflows) so the table does not become one")
+    w("// giant array literal, which would overflow the wasm init function.")
+    w("// build_name_table() parses it into the array `char_of_name` searches.")
+    w("// First/Last ranges (CJK, Tangut, …) are kept as ranges, not expanded.")
+    lines = [f"{key}={cp:x}" for key, cp in names]
+    chunks = [lines[i : i + 400] for i in range(0, len(lines), 400)]
+    parts = ['"' + "\\n".join(chunk) + "\\n" + '"' for chunk in chunks]
+    w("let name_data : String = " + " +\n  ".join(parts))
+    w("")
+    w("let name_ranges : Array[(String, Int32, Int32)] = [")
+    for prefix, lo, hi in name_ranges:
+        w(f'  ("{prefix}", 0x{lo:X}, 0x{hi:X}),')
+    w("]")
+    w("")
+    w("let name_aliases : Array[(String, Int32)] = [")
+    for key, cp in name_aliases:
+        w(f'  ("{key}", 0x{cp:X}),')
+    w("]")
+    w("")
+
     text = "\n".join(out).rstrip() + "\n"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding="utf-8")
 
     n_ranges = sum(len(x) for x in list(cats.values()) + list(scripts.values()) + list(blocks.values()) + list(props.values())) + len(fold)
-    print(f"wrote {OUT} ({len(text.splitlines())} lines, {n_ranges} ranges, Unicode {v})")
+    print(f"wrote {OUT} ({len(text.splitlines())} lines, {n_ranges} ranges, {len(names)} names, {len(name_ranges)} name ranges, Unicode {v})")
 
 
 if __name__ == "__main__":

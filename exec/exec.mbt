@@ -1135,7 +1135,7 @@ fn Matcher::run(
       Fail => return (false, sp, saves)
       Commit => raise @parse.Commit
       Fence => pc = pc + 1
-      Prune => return (false, sp, saves)
+      Prune => raise @parse.Prune
       Then => return (false, sp, saves)
       Skip(name~) => {
         let target = match find_mark(self.marks, name) {
@@ -1305,6 +1305,7 @@ pub fn Program::search(
         stop = true
         None
       }
+      @parse.Prune => None
       @parse.Skip(target~) => {
         skip_to = target
         None
@@ -1376,6 +1377,7 @@ pub fn Program::match_at(
     @parse.Accept(start~, end~) =>
       Some(accept_match(start, end, self.ngroups, mat.marks))
     @parse.Commit => None
+    @parse.Prune => None
     @parse.Skip(..) => None
     e => raise e
   }
@@ -1417,6 +1419,7 @@ pub fn Program::fullmatch(
     @parse.Accept(start~, end~) =>
       Some(accept_match(start, end, self.ngroups, mat.marks))
     @parse.Commit => None
+    @parse.Prune => None
     @parse.Skip(..) => None
     e => raise e
   }

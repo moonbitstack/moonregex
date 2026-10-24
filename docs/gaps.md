@@ -1,10 +1,10 @@
 # moonregex — Remaining Gap Analysis (completion pass)
 
-> **Status: closed.** Every item below has now been implemented and tested —
-> the control verbs, the newline/whitespace escapes, braced backreferences,
-> branch reset, `(?(DEFINE)…)` and recursion conditions. Two niche items remain
-> deliberately deferred: `\N{name}` (a named Unicode character, needs a UCD name
-> table) and `\g{-1}` (relative backreference, needs open-group tracking).
+> **Status: closed.** Every item below is now implemented and tested — the
+> control verbs (with faithful `(*PRUNE)`), the newline/whitespace escapes,
+> braced and relative backreferences, branch reset, `(?(DEFINE)…)`, recursion
+> conditions, and `\N{name}` named characters (full Unicode name table with
+> algorithmic CJK/Tangut/Hangul names). Nothing remains deferred.
 
 This is the authoritative checklist for the completion pass: every feature of
 Python `re`, the `regex` (mrab-regex) package, and the commonly-used extensions
@@ -52,7 +52,7 @@ arrays (MoonBit has no mutable struct fields).
 | `\h` / `\H` | horizontal whitespace (and its complement) | ✅ |
 | `\v` / `\V` | vertical whitespace (and its complement) | ✅ |
 | `\N` | any character except a newline | ✅ |
-| `\N{name}` | a named Unicode character | deferred — needs a UCD name table (§4) |
+| `\N{name}` | a named Unicode character | ✅ (full table + algorithmic CJK/Tangut/Hangul) |
 | `\e` | escape (0x1B) | ✅ |
 
 ---
@@ -61,31 +61,28 @@ arrays (MoonBit has no mutable struct fields).
 
 | Feature | Language(s) | Mapping | Status |
 |---------|-------------|---------|--------|
-| `\g{name}` / `\g{n}` | Perl, Oniguruma | braced backreference next to `\g<…>` | ✅ added this pass |
-| `\g{-1}` (relative) | Perl, Oniguruma | relative backreference | deferred (needs open-group tracking) |
-| `(?|…)` branch reset | Perl, PCRE | reset group numbering per alternative | ✅ added this pass |
-| `(?(DEFINE)…)` | PCRE | declare subroutines, match empty | ✅ added this pass |
-| `(?(R)…)` / `(?(R1)…)` / `(?(R&name)…)` | PCRE, mrab-regex | recursion condition | ✅ added this pass |
+| `\g{name}` / `\g{n}` | Perl, Oniguruma | braced backreference next to `\g<…>` | ✅ |
+| `\g{-1}` (relative) | Perl, Oniguruma | relative backreference | ✅ |
+| `(?|…)` branch reset | Perl, PCRE | reset group numbering per alternative | ✅ |
+| `(?(DEFINE)…)` | PCRE | declare subroutines, match empty | ✅ |
+| `(?(R)…)` / `(?(R1)…)` / `(?(R&name)…)` | PCRE, mrab-regex | recursion condition | ✅ |
 | `\k{name}` | .NET | named backreference (braced) | covered by `\g{name}` |
-| `\A`, `\z`, `\Z`, `\G`, `\K`, `\X` | PCRE/Perl/JS | already implemented | ✅ already present |
-| `(?>…)`, possessive `*+` | PCRE/Perl | already implemented | ✅ already present |
-| `(?'name'…)` | .NET | already implemented (ECMA) | ✅ already present |
+| `\A`, `\z`, `\Z`, `\G`, `\K`, `\X` | PCRE/Perl/JS | already implemented | ✅ |
+| `(?>…)`, possessive `*+` | PCRE/Perl | already implemented | ✅ |
+| `(?'name'…)` | .NET | already implemented (ECMA) | ✅ |
 
 ---
 
 ## 4. Named Unicode characters — `\N{name}`
 
-Python `re` and `regex` both accept `\N{NAME}` to match a character by its
-Unicode name (e.g. `\N{EM DASH}`, `\N{SNOWMAN}`). This needs a name → code
-point table derived from the UCD `UnicodeData.txt` (already fetched by
-`scripts/gen_unicode.py`).
-
-Status: **deferred to a follow-up that regenerates the prop tables** — the name
-table is ~150 000 entries and, unlike the property tables, is generated from the
-name field rather than a ranges field; shipping it half-sized (e.g. without CJK
-ideograph names) would silently break patterns, which the architecture forbids.
-Until it lands, `\N{name}` is refused with a precise message (as today), and
-plain `\N` works as "not newline".
+Implemented. `\N{NAME}` matches a character by its Unicode name (`\N{EM DASH}`,
+`\N{SNOWMAN}`, `\N{LATIN SMALL LETTER A}`), case-insensitively and ignoring
+spaces/hyphens/underscores, exactly as Python's `unicodedata.lookup` reads
+them. The name table (~40 500 individually named code points) is generated from
+`UnicodeData.txt` into a compact `name=data` string blob (parsed once into the
+search table, so it never overflows the wasm init function); the CJK/Tangut/
+Hangul `PREFIX-XXXX` names are answered algorithmically from their hex suffix,
+and control/abbreviation aliases come from `NameAliases.txt`.
 
 ---
 

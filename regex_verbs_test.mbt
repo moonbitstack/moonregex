@@ -99,3 +99,31 @@ test "recursion conditions (?(R)…) select branches" {
   assert_true(pat.fullmatch("(a(b)c)") is Some(_))
   assert_true(pat.fullmatch("(a(b)c") is None)
 }
+
+///|
+test "(*PRUNE) aborts the current position without backtracking" {
+  // With FAIL, the `ac` alternative would rescue the match; PRUNE does not.
+  assert_true(@moonregex.search("a(*FAIL)b|ac", "ac") is Some(_))
+  assert_true(@moonregex.search("a(*PRUNE)b|ac", "ac") is None)
+}
+
+///|
+test "relative backreference \\g{-1} names the last group" {
+  assert_true(@moonregex.fullmatch("(a)\\g{-1}", "aa") is Some(_))
+  assert_true(@moonregex.fullmatch("(a)(b)\\g{-1}", "abb") is Some(_))
+  assert_true(@moonregex.fullmatch("(a)(b)\\g{-1}", "aba") is None)
+  assert_true(@moonregex.fullmatch("(a)(b)\\g{-2}", "aba") is Some(_))
+}
+
+///|
+test "\\N{name} matches a named Unicode character" {
+  assert_true(@moonregex.fullmatch("\\N{EM DASH}", "\u{2014}") is Some(_))
+  assert_true(@moonregex.fullmatch("\\N{SNOWMAN}", "\u{2603}") is Some(_))
+  assert_true(@moonregex.fullmatch("\\N{LATIN SMALL LETTER A}", "a") is Some(_))
+  // Control aliases and algorithmic CJK names.
+  assert_true(@moonregex.fullmatch("\\N{TAB}", "\t") is Some(_))
+  assert_true(
+    @moonregex.fullmatch("\\N{CJK UNIFIED IDEOGRAPH-4E00}", "\u{4E00}")
+    is Some(_),
+  )
+}

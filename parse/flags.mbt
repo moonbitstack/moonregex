@@ -189,6 +189,8 @@ pub(all) suberror Refused {
   Accept(start~ : Int32, end~ : Int32)
   /// `(*COMMIT)` / `(*FENCE)`: the whole match fails, no further search.
   Commit
+  /// `(*PRUNE)`: abort this starting position and advance the search.
+  Prune
   /// `(*SKIP)`: fail and resume the search at `target` (the last mark, or the
   /// search start when no mark was set).
   Skip(target~ : Int32)
@@ -214,6 +216,7 @@ pub impl Show for Refused with fn output(self, logger) {
         "pattern has \{groups} groups; pass group= to say which one to take"
       Accept(start~, end~) => "match accepted at \{start}..\{end}"
       Commit => "match committed: no match is possible"
+      Prune => "match pruned at this position"
       Skip(target~) => "match skipped to \{target}"
     },
   )

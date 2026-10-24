@@ -76,4 +76,31 @@ fn main raise {
         "named group: " + m.group(group=@moonregex.Name(n="word")).unwrap(),
       )
   }
+
+  // a named Unicode character and a line break.
+  println(
+    "named char: " +
+    (@moonregex.fullmatch("\\N{EM DASH}", "\u{2014}") is Some(_)).to_string(),
+  )
+  println(
+    "line break: " +
+    (@moonregex.fullmatch("\\R", "\u{2028}") is Some(_)).to_string(),
+  )
+
+  // a control verb: (*COMMIT) aborts the whole match.
+  println(
+    "commit: " + (@moonregex.search("a(*COMMIT)b", "ab") is None).to_string(),
+  )
+
+  // branch reset: (?|(a)|(b)) captures to group 1 either way.
+  println(
+    "branch reset: " +
+    (@moonregex.fullmatch("(?|(a)|(b))", "b") is Some(_)).to_string(),
+  )
+
+  // (?(DEFINE)…) declares a subroutine, then recursion calls it.
+  let grammar = @moonregex.compile("(?(DEFINE)(?P<num>\\d+))(?P>num)")
+  println(
+    "define+recursion: " + (grammar.fullmatch("12345") is Some(_)).to_string(),
+  )
 }

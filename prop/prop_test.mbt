@@ -98,3 +98,12 @@ test "set algebra" {
 test "version is recorded" {
   assert_true(@prop.version() != "")
 }
+
+///|
+test "char_of_name answers character names" {
+  assert_eq(@prop.char_of_name("EM DASH"), Some(0x2014))
+  assert_eq(@prop.char_of_name("SNOWMAN"), Some(0x2603))
+  assert_eq(@prop.char_of_name("LATIN SMALL LETTER A"), Some(0x61))
+  assert_eq(@prop.char_of_name("TAB"), Some(0x09))
+  assert_true(@prop.char_of_name("NOT A REAL NAME") is None)
+}

@@ -251,18 +251,16 @@ Key invariants that keep the layers honest:
 | `(?\|…)` branch reset, `(?(DEFINE)…)`    | ✅ | parse + exec |
 | `\Q…\E` literal quoting                | ✅ | parse |
 | `\R` `\h` `\H` `\v` `\V` `\N` `\e`     | ✅ | parse + exec |
-| Backreferences `\g{name}` `\g{n}`      | ✅ | parse + exec |
+| `\N{name}` named character             | ✅ (full table + algorithmic CJK/Tangut/Hangul) | prop + parse |
+| Backreferences `\g{name}` `\g{n}` `\g{-1}` | ✅ | parse + exec |
 | Fuzzy `{e}`/`{i}`/`{d}`/`{s}` + counts/changes | ✅ counts · ✅ changes | exec |
 | Set algebra `--` `&&` `~~` (V1)        | ✅ | parse |
 | `subf`/`subfn` format substitution     | ✅ (`{}` `{0}` `{name}` `{0[0]}` + `:spec` align/width/precision; types `s d x X o b`) | subf.mbt |
 | `Match.marks()` — `(*MARK:name)` names | ✅ | match.mbt |
 
-The only deliberate, bounded deferral is `\N{name}` (a named Unicode
-character): it needs a UCD name table (~150 000 entries) generated from the
-name field of `UnicodeData.txt`, which is a follow-up to `scripts/gen_unicode.py`
-rather than a half-sized table shipped now. Plain `\N` (not-newline) works.
-Everything else is implemented; unknown control verbs are refused with a
-position rather than ignored.
+The completion pass closed every gap in `docs/gaps.md`; unknown control verbs
+are still refused with a position rather than ignored, but nothing is deferred
+any more.
 
 ---
 

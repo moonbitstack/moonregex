@@ -28,6 +28,7 @@ pub(all) suberror Refused {
   Ambiguous(groups~ : Int32)
   Accept(start~ : Int32, end~ : Int32)
   Commit
+  Prune
   Skip(target~ : Int32)
 } derive(Eq, @debug.Debug)
 pub fn Refused::equal(Self, Self) -> Bool

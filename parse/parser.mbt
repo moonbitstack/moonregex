@@ -958,17 +958,26 @@ fn Parser::name_close(
 }
 
 ///|
-/// Like `name`, but the name is closed by `}` — used by Perl's `\g{name}`.
-fn Parser::name_braced(
+/// Read a group reference up to `close` (`>` or `}`): a name, a number, or a
+/// relative `-n`. Unlike `name`, a leading `-` is accepted.
+fn Parser::gref(
   self : Parser,
   rest : StringView,
+  close : Int32,
 ) -> (StringView, String) raise Refused {
   let mut i = 0
-  while i < rest.length() && is_name_char(rest.at(i).to_int()) {
+  while i < rest.length() {
+    let c = rest.at(i).to_int()
+    if c == close {
+      break
+    }
+    if !(is_name_char(c) || c == '-') {
+      raise self.refuse(rest, "bad character in group reference")
+    }
     i += 1
   }
-  if i == 0 || i >= rest.length() || rest.at(i).to_int() != '}' {
-    raise self.refuse(rest, "missing }, unterminated name")
+  if i == 0 || i >= rest.length() || rest.at(i).to_int() != close {
+    raise self.refuse(rest, "unterminated group reference")
   }
   (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
 }
@@ -1464,40 +1473,74 @@ fn Parser::escape(
         return (after, node, false)
       }
       'g' => {
-        // `\g<name>` / `\g<1>` and the Perl `\g{name}` / `\g{n}`.
+        // `\g<name>` / `\g<1>`, the Perl `\g{name}` / `\g{n}`, and the
+        // relative `\g{-1}` (Oniguruma / Perl): `\g{-n}` names the group
+        // `n - 1` places before the current group count.
         if after.length() == 0 {
           raise self.refuse(rest, "missing delimiter in \\g")
         }
         let open = after.at(0).to_int()
-        let (after, name) = if open == '<' {
-          self.name(after.view(start_offset=1))
+        let close = if open == '<' {
+          '>'.to_int()
         } else if open == '{' {
-          self.name_braced(after.view(start_offset=1))
+          '}'.to_int()
         } else {
           raise self.refuse(rest, "missing < or { in \\g")
         }
-        let slot = match parse_int(name[:]) {
-          Some(n) =>
-            if n > self.groups {
-              raise self.refuse(after, "invalid group reference \{n}")
-            } else {
-              n
+        let (after, name) = self.gref(after.view(start_offset=1), close)
+        let slot = if name.length() > 0 && name.at(0).to_int() == '-' {
+          // A relative reference: `\g{-1}` is the last group opened so far.
+          match parse_int(name[:].view(start_offset=1)) {
+            None =>
+              raise self.refuse(after, "invalid group reference '\{name}'")
+            Some(mag) => {
+              let slot = self.groups - mag + 1
+              if slot < 1 || slot > self.groups {
+                raise self.refuse(after, "invalid group reference '\{name}'")
+              }
+              slot
             }
-          None =>
-            match self.groupindex.get(name) {
-              None => raise self.refuse(after, "unknown group name '\{name}'")
-              Some(slots) => slots[0]
-            }
+          }
+        } else {
+          match parse_int(name[:]) {
+            Some(n) =>
+              if n > self.groups {
+                raise self.refuse(after, "invalid group reference \{n}")
+              } else {
+                n
+              }
+            None =>
+              match self.groupindex.get(name) {
+                None => raise self.refuse(after, "unknown group name '\{name}'")
+                Some(slots) => slots[0]
+              }
+          }
         }
         return (after, Backref(slot~, icase=self.flags.ignorecase), false)
       }
       'N' =>
         if after.length() > 0 && after.at(0).to_int() == '{' {
-          // Named characters need a name table the property package does not
-          // carry yet; refusing is better than guessing.
-          raise self.refuse(
-            rest, "named characters (\\N{...}) are not in the tables yet",
-          )
+          // `\N{name}`: a character named in the Unicode Character Database.
+          let (name, view) = match
+            self.read_until_close(after.view(start_offset=1), '}') {
+            None => raise self.refuse(rest, "missing }, unterminated name")
+            Some(pair) => pair
+          }
+          match @prop.char_of_name(name) {
+            None =>
+              raise self.refuse(
+                rest,
+                "unknown Unicode character name '\{name.to_owned()}'",
+              )
+            Some(code) => {
+              let node = if self.flags.ignorecase {
+                Class(set=@prop.CharSet::single(code).fold())
+              } else {
+                Char(code~)
+              }
+              return (view, node, false)
+            }
+          }
         } else {
           // `\N`: any character except a newline — the superset's spelling.
           return (after, Class(set=not_newline()), false)

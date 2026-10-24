@@ -18,6 +18,8 @@ pub fn block(StringView) -> CharSet?
 
 pub fn category(StringView) -> CharSet?
 
+pub fn char_of_name(StringView) -> Int32?
+
 pub let digit : CharSet
 
 pub fn fold(Char) -> Char

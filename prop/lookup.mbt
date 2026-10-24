@@ -140,6 +140,173 @@ pub fn fold(c : Char) -> Char {
 }
 
 ///|
+/// The name table, built once from the compact `name_data` blob. Building it in
+/// a function (not an array literal) keeps it out of the wasm init function,
+/// whose local-count limit a 40 000-entry literal would overflow.
+let name_table : Array[(String, Int32)] = build_name_table(name_data)
+
+///|
+/// Parse `name_data` — `name=hex` entries, one per line, sorted — into the
+/// array `char_of_name` binary-searches.
+fn build_name_table(data : String) -> Array[(String, Int32)] {
+  let out : Array[(String, Int32)] = []
+  let chars : Array[Char] = []
+  for c in data {
+    chars.push(c)
+  }
+  let n = chars.length()
+  let mut i = 0
+  while i < n {
+    let mut name = ""
+    while i < n && chars[i] != '=' {
+      name = name + chars[i].to_string()
+      i += 1
+    }
+    i += 1 // skip '='
+    let mut v : Int32 = 0
+    while i < n && chars[i] != '\n' {
+      v = v * 16 + hex_val(chars[i])
+      i += 1
+    }
+    i += 1 // skip '\n'
+    out.push((name, v))
+  }
+  out
+}
+
+///|
+fn hex_val(c : Char) -> Int32 {
+  let code = c.to_int()
+  if code >= '0'.to_int() && code <= '9'.to_int() {
+    code - '0'.to_int()
+  } else if code >= 'a'.to_int() && code <= 'f'.to_int() {
+    code - 'a'.to_int() + 10
+  } else {
+    0
+  }
+}
+
+///|
+/// The code point a Unicode character name denotes — the table `\N{name}`
+/// answers from.
+///
+/// Names are matched loosely, the way Python's `unicodedata.lookup` reads
+/// them: case, spaces, hyphens and underscores are ignored. Control and
+/// abbreviation aliases (`NULL`, `TAB`, …) are accepted, and the algorithmic
+/// `PREFIX-XXXX` names of the CJK/Tangut ranges are answered from their hex
+/// suffix rather than a 300 000-entry table.
+pub fn char_of_name(name : StringView) -> Int32? {
+  let key = normalise_name(name)
+  match bin_name(name_aliases, key) {
+    Some(cp) => return Some(cp)
+    None => ()
+  }
+  match bin_name(name_table, key) {
+    Some(cp) => return Some(cp)
+    None => ()
+  }
+  // Algorithmic `PREFIX-XXXX` names for the First/Last ranges.
+  let kchars : Array[Char] = []
+  for c in key {
+    kchars.push(c)
+  }
+  let kn = kchars.length()
+  for (prefix, lo, hi) in name_ranges {
+    let pchars : Array[Char] = []
+    for c in prefix {
+      pchars.push(c)
+    }
+    let pn = pchars.length()
+    if kn > pn {
+      let mut i = 0
+      let mut ok = true
+      while i < pn {
+        if kchars[i] != pchars[i] {
+          ok = false
+        }
+        i += 1
+      }
+      if ok {
+        match hex_digits(kchars, pn) {
+          None => ()
+          Some(v) => if v >= lo && v <= hi { return Some(v) }
+        }
+      }
+    }
+  }
+  None
+}
+
+///|
+/// Binary-search a `(name, code point)` table.
+fn bin_name(table : Array[(String, Int32)], key : String) -> Int32? {
+  let mut lo = 0
+  let mut hi = table.length() - 1
+  while lo <= hi {
+    let mid = (lo + hi) / 2
+    let (n, cp) = table[mid]
+    if n == key {
+      return Some(cp)
+    }
+    if str_lt(n, key) {
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  None
+}
+
+///|
+/// Lexicographic order over code points. MoonBit's `String <` is not
+/// lexicographic, so the name table's binary search cannot rely on it.
+fn str_lt(a : String, b : String) -> Bool {
+  let ca : Array[Char] = []
+  for c in a {
+    ca.push(c)
+  }
+  let cb : Array[Char] = []
+  for c in b {
+    cb.push(c)
+  }
+  let n = if ca.length() < cb.length() { ca.length() } else { cb.length() }
+  let mut i = 0
+  while i < n {
+    let x = ca[i].to_int()
+    let y = cb[i].to_int()
+    if x != y {
+      return x < y
+    }
+    i += 1
+  }
+  ca.length() < cb.length()
+}
+
+///|
+/// Read the hex code point out of `chars[from..]`; `None` if fewer than four
+/// hex digits remain.
+fn hex_digits(chars : Array[Char], from : Int32) -> Int32? {
+  if chars.length() - from < 4 {
+    return None
+  }
+  let mut v : Int32 = 0
+  let mut i = from
+  while i < chars.length() {
+    let c = chars[i].to_int()
+    let d = if c >= '0'.to_int() && c <= '9'.to_int() {
+      c - '0'.to_int()
+    } else if c >= 'a'.to_int() && c <= 'f'.to_int() {
+      c - 'a'.to_int() + 10
+    } else {
+      return None
+    }
+    v = v * 16 + d
+    i += 1
+  }
+  Some(v)
+}
+
+///|
 /// `\w` under the Python and mrab spellings: letters, numbers and the
 /// underscore. Python's own words for it are "alphanumeric (as `str.isalnum`
 /// has it) plus `_`", which is exactly these categories.
