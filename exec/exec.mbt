@@ -98,8 +98,32 @@ pub struct MatchResult {
   /// One span per group, group 0 first; `(-1, -1)` means the group did not
   /// take part.
   spans : Array[(Int32, Int32)]
-  /// The edit budget spent, when the pattern was fuzzy; `None` otherwise.
+  /// The edit budget spent, when the pattern was fuzzy, as
+  /// `(substitutions, insertions, deletions)`; `None` otherwise.
   fuzzy : (Int32, Int32, Int32)?
+  /// The individual edits, when the pattern was fuzzy, as
+  /// `(substitutions, insertions, deletions)` — each a list of
+  /// `(string_offset, pattern_offset)`; `None` otherwise.
+  fuzzy_changes : (
+    Array[(Int32, Int32)],
+    Array[(Int32, Int32)],
+    Array[(Int32, Int32)],
+  )?
+}
+
+///|
+/// The edits a fuzzy match made, reconstructed from the alignment that won.
+priv struct FuzzyOutcome {
+  /// End code-point offset just past the fuzzy run.
+  end : Int32
+  /// Substitutions, insertions and deletions actually used.
+  sub : Int32
+  ins : Int32
+  del : Int32
+  /// Per-edit positions, as `(string_offset, pattern_offset)`.
+  subs : Array[(Int32, Int32)]
+  ins_ch : Array[(Int32, Int32)]
+  del_ch : Array[(Int32, Int32)]
 }
 
 ///|
@@ -420,27 +444,17 @@ fn fuzzy_caps(spec : @parse.FuzzySpec) -> (Int32, Int32, Int32, Int32)? {
 }
 
 ///|
-/// Add `v` to `arr` unless it is already present.
-fn push_state(arr : Array[Int32], v : Int32) -> Array[Int32] {
-  for x in arr {
-    if x == v {
-      return arr
-    }
-  }
-  arr.push(v)
-  arr
-}
-
-///|
 /// Solve a fuzzy match of `target` against the text starting at `sp`, allowing
 /// at most `ins` insertions, `del` deletions and `sub` substitutions, and at
 /// most `err` errors of any kind (`err < 0` means no total cap). Returns the
-/// code-point offset just past the shortest successful match, or `-1`.
+/// alignment (`FuzzyOutcome`) whose end is the longest reach that finishes the
+/// pattern within budget, or `None`.
 ///
 /// The search is a bounded Levenshtein alignment: a state is `(ti, pi, ins,
-/// del, sub)` and we ask whether `pi == target.length()` is reachable. It is
-/// bounded by `target` length and the budgets, so it stays safe and quick for
-/// the short literals fuzzy matching is meant for.
+/// del, sub)` and we ask whether `pi == target.length()` is reachable. Each
+/// reachable cell keeps a single representative state (the one with the fewest
+/// total errors), together with the operation and predecessor that reached it,
+/// so the winning alignment can be walked back into its individual edits.
 fn fuzzy_lit_end(
   chars : Array[Int32],
   sp : Int32,
@@ -450,18 +464,27 @@ fn fuzzy_lit_end(
   del_cap : Int32,
   sub_cap : Int32,
   err_cap : Int32,
-) -> Int32 {
+) -> FuzzyOutcome? {
   let m = target.length()
   if m == 0 {
-    return sp
+    return Some(FuzzyOutcome::{
+      end: sp,
+      sub: 0,
+      ins: 0,
+      del: 0,
+      subs: [],
+      ins_ch: [],
+      del_ch: [],
+    })
   }
-  // Guard against pathological budgets: beyond these, match the literal exactly.
+  // Guard against pathological budgets: beyond these, the fuzzy run cannot
+  // match, so the instruction fails the attempt.
   if m > 64 || ins_cap > 32 || del_cap > 32 || sub_cap > 32 {
-    return -1
+    return None
   }
   let avail = len - sp
   if avail < 0 {
-    return -1
+    return None
   }
   let max_ti = if avail < m + ins_cap { avail } else { m + ins_cap }
   let dl1 = del_cap + 1
@@ -469,110 +492,172 @@ fn fuzzy_lit_end(
   let pack = fn(ins : Int32, del : Int32, sub : Int32) -> Int32 {
     (ins * dl1 + del) * sl1 + sub
   }
-  // dp[ti][pi] holds the set of reachable `(ins, del, sub)` states.
-  let dp : Array[Array[Array[Int32]]] = []
+  let unpack = fn(st : Int32) -> (Int32, Int32, Int32) {
+    let sub0 = st % sl1
+    let rem = st / sl1
+    let del0 = rem % dl1
+    let ins0 = rem / dl1
+    (ins0, del0, sub0)
+  }
+  // `cells[ti][pi]` holds the packed representative state, `-1` meaning
+  // unreachable. `back[ti][pi]` holds `(op, prev)` with `op` ∈ {1 start, 2
+  // match, 3 sub, 4 ins, 5 del} and `prev` the predecessor cell index
+  // `pti * (m + 1) + ppi`, or `-1` for the start.
+  let cells : Array[Array[Int32]] = []
+  let back : Array[Array[(Int32, Int32)]] = []
   let mut ti = 0
   while ti <= max_ti {
-    let row : Array[Array[Int32]] = []
+    let rc : Array[Int32] = []
+    let rb : Array[(Int32, Int32)] = []
     let mut pi = 0
     while pi <= m {
-      row.push([])
+      rc.push(-1)
+      rb.push((-1, -1))
       pi = pi + 1
     }
-    dp.push(row)
+    cells.push(rc)
+    back.push(rb)
     ti = ti + 1
   }
-  dp[0][0] = [pack(0, 0, 0)]
+  cells[0][0] = pack(0, 0, 0)
+  back[0][0] = (1, -1)
+  // A state `a` is better than `b` when it has fewer total errors; ties break
+  // towards the smaller packed value (fewer insertions first).
+  let better = fn(a : Int32, b : Int32) -> Bool {
+    let (ai, ad, as_) = unpack(a)
+    let (bi, bd, bs) = unpack(b)
+    let ta = ai + ad + as_
+    let tb = bi + bd + bs
+    if ta != tb {
+      ta < tb
+    } else {
+      a < b
+    }
+  }
+  let stride = m + 1
   ti = 0
   while ti <= max_ti {
     let mut pi = 0
     while pi <= m {
-      let states = dp[ti][pi]
-      if states.length() == 0 {
+      let st = cells[ti][pi]
+      if st < 0 {
         pi = pi + 1
         continue
       }
-      for st in states {
-        let sub0 = st % sl1
-        let rem = st / sl1
-        let del0 = rem % dl1
-        let ins0 = rem / dl1
-        if pi < m {
-          // Match or substitute one text character.
-          if ti < max_ti {
-            let hit = target[pi].contains(chars[sp + ti])
-            if hit {
-              dp[ti + 1][pi + 1] = push_state(
-                dp[ti + 1][pi + 1],
-                pack(ins0, del0, sub0),
-              )
-            } else if sub0 < sub_cap {
-              dp[ti + 1][pi + 1] = push_state(
-                dp[ti + 1][pi + 1],
-                pack(ins0, del0, sub0 + 1),
-              )
+      let (ins0, del0, sub0) = unpack(st)
+      let prev = ti * stride + pi
+      if pi < m {
+        if ti < max_ti {
+          let hit = target[pi].contains(chars[sp + ti])
+          if hit {
+            // Match: no error.
+            let cand = cells[ti + 1][pi + 1]
+            if cand < 0 || better(st, cand) {
+              cells[ti + 1][pi + 1] = st
+              back[ti + 1][pi + 1] = (2, prev)
+            }
+          } else if sub0 < sub_cap {
+            // Substitute one character.
+            let ns = pack(ins0, del0, sub0 + 1)
+            let cand = cells[ti + 1][pi + 1]
+            if cand < 0 || better(ns, cand) {
+              cells[ti + 1][pi + 1] = ns
+              back[ti + 1][pi + 1] = (3, prev)
             }
           }
           // Insert a text character (pattern stays put).
-          if ti < max_ti && ins0 < ins_cap {
-            dp[ti + 1][pi] = push_state(
-              dp[ti + 1][pi],
-              pack(ins0 + 1, del0, sub0),
-            )
+          if ins0 < ins_cap {
+            let ns = pack(ins0 + 1, del0, sub0)
+            let cand = cells[ti + 1][pi]
+            if cand < 0 || better(ns, cand) {
+              cells[ti + 1][pi] = ns
+              back[ti + 1][pi] = (4, prev)
+            }
           }
-          // Delete a pattern character (text stays put).
-          if del0 < del_cap {
-            dp[ti][pi + 1] = push_state(
-              dp[ti][pi + 1],
-              pack(ins0, del0 + 1, sub0),
-            )
+        }
+        // Delete a pattern character (text stays put).
+        if del0 < del_cap {
+          let ns = pack(ins0, del0 + 1, sub0)
+          let cand = cells[ti][pi + 1]
+          if cand < 0 || better(ns, cand) {
+            cells[ti][pi + 1] = ns
+            back[ti][pi + 1] = (5, prev)
           }
-          // The whole pattern is consumed: only insertions may still absorb
-          // trailing text characters.
-        } else if ti < max_ti && ins0 < ins_cap {
-          dp[ti + 1][pi] = push_state(
-            dp[ti + 1][pi],
-            pack(ins0 + 1, del0, sub0),
-          )
+        }
+      } else if ti < max_ti && ins0 < ins_cap {
+        // Pattern consumed: only trailing insertions remain.
+        let ns = pack(ins0 + 1, del0, sub0)
+        let cand = cells[ti + 1][pi]
+        if cand < 0 || better(ns, cand) {
+          cells[ti + 1][pi] = ns
+          back[ti + 1][pi] = (4, prev)
         }
       }
       pi = pi + 1
     }
     ti = ti + 1
   }
-  // Greedy fuzzy: consume as much text as possible while the pattern fits
-  // within the budget. The longest end that finishes the pattern (and respects
-  // any total error cap) wins; an exact, shorter match is only taken when no
-  // longer alignment fits.
+  // Greedy fuzzy: the longest end that finishes the pattern (and respects any
+  // total error cap) wins.
   let mut best = -1
   let mut t = max_ti
   while t >= 0 {
-    if dp[t][m].length() > 0 {
+    let st = cells[t][m]
+    if st >= 0 {
       if err_cap < 0 {
         best = t
         break
       }
-      for st in dp[t][m] {
-        let sub0 = st % sl1
-        let rem = st / sl1
-        let del0 = rem % dl1
-        let ins0 = rem / dl1
-        if ins0 + del0 + sub0 <= err_cap {
-          best = t
-          break
-        }
-      }
-      if best >= 0 {
+      let (i, d, s) = unpack(st)
+      if i + d + s <= err_cap {
+        best = t
         break
       }
     }
     t = t - 1
   }
   if best < 0 {
-    -1
-  } else {
-    sp + best
+    return None
   }
+  // Walk the back pointers from `(best, m)` to recover the individual edits.
+  let subs : Array[(Int32, Int32)] = []
+  let ins_ch : Array[(Int32, Int32)] = []
+  let del_ch : Array[(Int32, Int32)] = []
+  let mut cti = best
+  let mut cpi = m
+  while cti > 0 || cpi > 0 {
+    let (op, _prev) = back[cti][cpi]
+    match op {
+      2 => {
+        // Exact match: no edit.
+        cti = cti - 1
+        cpi = cpi - 1
+      }
+      3 => {
+        subs.push((sp + cti, cpi))
+        cti = cti - 1
+        cpi = cpi - 1
+      }
+      4 => {
+        ins_ch.push((sp + cti, cpi))
+        cti = cti - 1
+      }
+      5 => {
+        del_ch.push((sp + cti, cpi))
+        cpi = cpi - 1
+      }
+      _ => break
+    }
+  }
+  Some(FuzzyOutcome::{
+    end: sp + best,
+    sub: subs.length(),
+    ins: ins_ch.length(),
+    del: del_ch.length(),
+    subs,
+    ins_ch,
+    del_ch,
+  })
 }
 
 ///|
@@ -698,6 +783,7 @@ fn Matcher::run(
   entry : Int32,
   sp0 : Int32,
   saves0 : Array[Int32],
+  fz : Array[FuzzyOutcome?],
 ) -> (Bool, Int32, Array[Int32]) raise @parse.Refused {
   let mut saves = saves0
   let mut sp = sp0
@@ -748,14 +834,14 @@ fn Matcher::run(
           return (false, sp, saves)
         }
       Split(x~, y~) => {
-        let (ok, esp, ns) = self.run(code, x, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(code, x, sp, clone_saves(saves), fz)
         if ok {
           return (true, esp, ns)
         }
         pc = y
       }
       SplitLazy(x~, y~) => {
-        let (ok, esp, ns) = self.run(code, y, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(code, y, sp, clone_saves(saves), fz)
         if ok {
           return (true, esp, ns)
         }
@@ -808,7 +894,7 @@ fn Matcher::run(
         }
       Atomic(id~) => {
         let sub = program.extra.get(id).unwrap()
-        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         if ok {
           sp = esp
           saves = ns
@@ -819,7 +905,7 @@ fn Matcher::run(
       }
       Lookahead(id~, positive~) => {
         let sub = program.extra.get(id).unwrap()
-        let (ok, _esp, ns) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, _esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         if ok == positive {
           saves = ns
           pc = pc + 1
@@ -833,7 +919,7 @@ fn Matcher::run(
         let mut found_saves = saves
         let mut j = 0
         while j <= sp {
-          let (ok, esp, ns) = self.run(sub, 0, j, clone_saves(saves))
+          let (ok, esp, ns) = self.run(sub, 0, j, clone_saves(saves), fz)
           if ok && esp == sp {
             found = true
             found_saves = ns
@@ -851,7 +937,7 @@ fn Matcher::run(
       CondGroup(slot~, yes_id~, no_id~) => {
         let bid = if saves[2 * slot] >= 0 { yes_id } else { no_id }
         let sub = program.extra.get(bid).unwrap()
-        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         if ok {
           sp = esp
           saves = ns
@@ -862,10 +948,10 @@ fn Matcher::run(
       }
       CondLook(id~, yes_id~, no_id~) => {
         let sub = program.extra.get(id).unwrap()
-        let (ok, _esp, _) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, _esp, _) = self.run(sub, 0, sp, clone_saves(saves), fz)
         let bid = if ok { yes_id } else { no_id }
         let bsub = program.extra.get(bid).unwrap()
-        let (ok2, esp2, ns2) = self.run(bsub, 0, sp, clone_saves(saves))
+        let (ok2, esp2, ns2) = self.run(bsub, 0, sp, clone_saves(saves), fz)
         if ok2 {
           sp = esp2
           saves = ns2
@@ -876,10 +962,10 @@ fn Matcher::run(
       }
       Star(body_id~, greedy~) => {
         let sub = program.extra.get(body_id).unwrap()
-        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         if greedy {
           if ok && esp > sp {
-            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns))
+            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns), fz)
             if ok2 {
               return (true, esp2, ns2)
             }
@@ -895,12 +981,13 @@ fn Matcher::run(
             pc + 1,
             sp,
             clone_saves(saves),
+            fz,
           )
           if okstop {
             return (true, esp_s, ns_s)
           }
           if ok && esp > sp {
-            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns))
+            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns), fz)
             if ok2 {
               return (true, esp2, ns2)
             }
@@ -917,7 +1004,7 @@ fn Matcher::run(
           Some(s) => s
           None => [Match]
         }
-        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         if ok {
           sp = esp
           saves = ns
@@ -927,7 +1014,13 @@ fn Matcher::run(
         }
       }
       RecurseWhole => {
-        let (ok, esp, ns) = self.run(program.code, 0, sp, clone_saves(saves))
+        let (ok, esp, ns) = self.run(
+          program.code,
+          0,
+          sp,
+          clone_saves(saves),
+          fz,
+        )
         if ok {
           sp = esp
           saves = ns
@@ -936,24 +1029,16 @@ fn Matcher::run(
           return (false, sp, saves)
         }
       }
-      FuzzyLit(target~, ins~, del~, sub~, err~) => {
-        let end = fuzzy_lit_end(
-          self.chars,
-          sp,
-          self.len,
-          target,
-          ins,
-          del,
-          sub,
-          err,
-        )
-        if end >= 0 {
-          sp = end
-          pc = pc + 1
-        } else {
-          return (false, sp, saves)
+      FuzzyLit(target~, ins~, del~, sub~, err~) =>
+        match
+          fuzzy_lit_end(self.chars, sp, self.len, target, ins, del, sub, err) {
+          None => return (false, sp, saves)
+          Some(out) => {
+            fz[0] = Some(out)
+            sp = out.end
+            pc = pc + 1
+          }
         }
-      }
       Accept => raise @parse.Accept(start=saves[0], end=sp)
       Fail => return (false, sp, saves)
     }
@@ -963,7 +1048,11 @@ fn Matcher::run(
 }
 
 ///|
-fn make_match(saves : Array[Int32], ngroups : Int32) -> MatchResult {
+fn make_match(
+  saves : Array[Int32],
+  ngroups : Int32,
+  fz : FuzzyOutcome?,
+) -> MatchResult {
   let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
   for g in 0..<(ngroups + 1) {
     let s = saves[2 * g]
@@ -972,7 +1061,11 @@ fn make_match(saves : Array[Int32], ngroups : Int32) -> MatchResult {
       spans[g] = (s, e)
     }
   }
-  MatchResult::{ start: saves[0], end: saves[1], spans, fuzzy: None, }
+  let (fuzzy, fuzzy_changes) = match fz {
+    None => (None, None)
+    Some(o) => (Some((o.sub, o.ins, o.del)), Some((o.subs, o.ins_ch, o.del_ch)))
+  }
+  MatchResult::{ start: saves[0], end: saves[1], spans, fuzzy, fuzzy_changes, }
 }
 
 ///|
@@ -981,7 +1074,7 @@ fn make_match(saves : Array[Int32], ngroups : Int32) -> MatchResult {
 fn accept_match(start : Int32, end : Int32, ngroups : Int32) -> MatchResult {
   let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
   spans[0] = (start, end)
-  MatchResult::{ start, end, spans, fuzzy: None, }
+  MatchResult::{ start, end, spans, fuzzy: None, fuzzy_changes: None, }
 }
 
 ///|
@@ -996,14 +1089,15 @@ pub fn Program::search(
   let chars = to_code_points(text)
   let len = chars.length()
   let end = if endpos < 0 { len } else { endpos }
+  let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
   let mut p = pos
   try {
     while p <= end {
       let init = Array::make(2 * (self.ngroups + 1), -1)
-      let (ok, _esp, saves) = mat.run(self.code, 0, p, init)
+      let (ok, _esp, saves) = mat.run(self.code, 0, p, init, fz)
       if ok {
-        return Some(make_match(saves, self.ngroups))
+        return Some(make_match(saves, self.ngroups, fz[0]))
       }
       p = p + 1
     }
@@ -1023,6 +1117,7 @@ pub fn Program::match_at(
   limit~ : Int32 = 10000000,
 ) -> MatchResult? raise @parse.Refused {
   let chars = to_code_points(text)
+  let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
     chars,
@@ -1033,9 +1128,9 @@ pub fn Program::match_at(
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
-    let (ok, _esp, saves) = mat.run(self.code, 0, pos, init)
+    let (ok, _esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok {
-      Some(make_match(saves, self.ngroups))
+      Some(make_match(saves, self.ngroups, fz[0]))
     } else {
       None
     }
@@ -1057,12 +1152,13 @@ pub fn Program::fullmatch(
   let chars = to_code_points(text)
   let len = chars.length()
   let end = if endpos < 0 { len } else { endpos }
+  let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
-    let (ok, esp, saves) = mat.run(self.code, 0, pos, init)
+    let (ok, esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok && esp == end {
-      Some(make_match(saves, self.ngroups))
+      Some(make_match(saves, self.ngroups, fz[0]))
     } else {
       None
     }

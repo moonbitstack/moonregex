@@ -11,6 +11,10 @@ pub(all) struct Match {
   priv pattern : Pattern
   priv text : String
   priv result : @exec.MatchResult
+  /// The `pos` the search started at (Python's `Match.pos`).
+  priv pos : Int32
+  /// The `endpos` the search was bounded by (Python's `Match.endpos`).
+  priv endpos : Int32
 }
 
 ///|
@@ -83,17 +87,120 @@ pub fn Match::span(
 }
 
 ///|
-/// The substring the group captured, or `None` if it took no part.
+/// The substring the group captured, or `default` (preset `None`) if it took no
+/// part — Python's `Match.group`.
 pub fn Match::group(
   self : Match,
   group~ : GroupKey = Whole,
+  default~ : String? = None,
 ) -> String? raise @parse.Refused {
   let s = self.start(group~)
   let e = self.end(group~)
   if s < 0 || e < 0 {
-    None
+    default
   } else {
     Some(slice_cp(self.text, s, e))
+  }
+}
+
+///|
+/// The `pos` the search started at — Python's `Match.pos`.
+pub fn Match::pos(self : Match) -> Int32 {
+  self.pos
+}
+
+///|
+/// The `endpos` the search was bounded by — Python's `Match.endpos`.
+pub fn Match::endpos(self : Match) -> Int32 {
+  self.endpos
+}
+
+///|
+/// The `Pattern` that produced this match — Python's `Match.re`.
+pub fn Match::re(self : Match) -> Pattern {
+  self.pattern
+}
+
+///|
+/// Expand the Python replacement language in `template` against this match —
+/// Python's `Match.expand`.
+pub fn Match::expand(
+  self : Match,
+  template : String,
+) -> String raise @parse.Refused {
+  expand(template, self)
+}
+
+///|
+/// Every capture of `group`, as code-point spans; an empty list when the group
+/// took no part — Python's `Match.captures`. Our engine records the last span a
+/// group held, so this returns the one span a non-repeated group captured.
+pub fn Match::captures(
+  self : Match,
+  group~ : GroupKey = Whole,
+) -> Array[(Int32, Int32)] raise @parse.Refused {
+  let slot = self.slot_of(group)
+  let span = self.result.spans[slot]
+  if span.0 >= 0 {
+    [span]
+  } else {
+    []
+  }
+}
+
+///|
+/// Named groups to their captured spans — Python's `Match.capturesdict`.
+pub fn Match::capturesdict(self : Match) -> Map[String, Array[(Int32, Int32)]] {
+  let index = self.pattern.groupindex()
+  let out : Map[String, Array[(Int32, Int32)]] = Map([])
+  for k in index.keys() {
+    let slots = index.get(k).unwrap()
+    let slot : Int32 = slots[0]
+    let span = self.result.spans[slot]
+    if span.0 >= 0 {
+      out[k] = [span]
+    }
+  }
+  out
+}
+
+///|
+/// The substrings the group captured, or an empty list when it took no part —
+/// Python's `Match.slices`.
+pub fn Match::slices(
+  self : Match,
+  group~ : GroupKey = Whole,
+) -> Array[String] raise @parse.Refused {
+  let slot = self.slot_of(group)
+  let span = self.result.spans[slot]
+  if span.0 >= 0 {
+    [slice_cp(self.text, span.0, span.1)]
+  } else {
+    []
+  }
+}
+
+///|
+/// The edit counts of a fuzzy match, as `(substitutions, insertions,
+/// deletions)`; all zero when the pattern was not fuzzy — Python's
+/// `Match.fuzzy_counts`.
+pub fn Match::fuzzy_counts(self : Match) -> (Int32, Int32, Int32) {
+  match self.result.fuzzy {
+    Some((s, i, d)) => (s, i, d)
+    None => (0, 0, 0)
+  }
+}
+
+///|
+/// The individual edits of a fuzzy match, as `(substitutions, insertions,
+/// deletions)` each a list of `(string_offset, pattern_offset)`; three empty
+/// lists when the pattern was not fuzzy — Python's `Match.fuzzy_changes`.
+pub fn Match::fuzzy_changes(
+  self : Match,
+) -> (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)]) {
+  match self.result.fuzzy_changes {
+    Some(x) => x
+    None => ([], [], [])
   }
 }
 

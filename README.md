@@ -143,6 +143,43 @@ wins when no edit is needed. A weighted budget (`2i+1d+1s<=3`) and fuzzy groups
 whose inner node is not a literal or class run are matched exactly for now, and
 the syntax is still accepted.
 
+The spent budget is reported on the match: `fuzzy_counts` gives `(sub, ins, del)`
+and `fuzzy_changes` the individual edits, so a caller can see exactly how a near
+miss was aligned.
+
+```moonbit
+let m = @moonregex.search("(?:foo){e<=2}", "fox").unwrap()
+m.fuzzy_counts()   // (1, 0, 0) — one substitution
+```
+
+## The full `regex` surface
+
+Beyond the `re` functions above, `moonregex` carries the whole Python `regex`
+module API so a port is drop-in:
+
+```moonbit
+// Named flag constants (lower-case; Python spells them upper-case).
+@moonregex.compile("hello", flags=@moonregex.i)      // IGNORECASE
+@moonregex.compile("^b",  flags=@moonregex.m)        // MULTILINE
+@moonregex.compile("a.b", flags=@moonregex.s)        // DOTALL
+
+// `Pattern` methods, plus `scanner` for incremental scanning.
+let sc = @moonregex.compile(r"\d+").scanner("a1 b22")
+sc.search()   // Some("1")
+sc.search()   // Some("22")
+
+// `Match` carries what Python's does.
+let m = @moonregex.search(r"(?P<w>\w+) \1", "go go").unwrap()
+m.pos()            // 0
+m.endpos()         // 5
+m.expand(r"\g<w>") // "go"
+m.captures()       // [(0, 5)]
+```
+
+Type aliases `RegexFlag` and `RegexError` mirror `regex.RegexFlag` and
+`regex.error`; `template` and `purge` are kept for compatibility. See
+`docs/architecture.md` for the full interface contract.
+
 ## Examples
 
 `examples/tour` is the canonical demo — `moon run examples/tour` exercises search,

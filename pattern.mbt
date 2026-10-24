@@ -68,7 +68,10 @@ pub fn Pattern::search(
 ) -> Match? raise @parse.Refused {
   match self.program.search(text, pos~, endpos~, limit~) {
     None => None
-    Some(r) => Some(Match::{ pattern: self, text, result: r, })
+    Some(r) => {
+      let e = if endpos < 0 { cp_length(text) } else { endpos }
+      Some(Match::{ pattern: self, text, result: r, pos, endpos: e, })
+    }
   }
 }
 
@@ -82,7 +85,14 @@ pub fn Pattern::match_at(
 ) -> Match? raise @parse.Refused {
   match self.program.match_at(text, pos~, limit~) {
     None => None
-    Some(r) => Some(Match::{ pattern: self, text, result: r, })
+    Some(r) =>
+      Some(Match::{
+        pattern: self,
+        text,
+        result: r,
+        pos,
+        endpos: cp_length(text),
+      })
   }
 }
 
@@ -97,7 +107,10 @@ pub fn Pattern::fullmatch(
 ) -> Match? raise @parse.Refused {
   match self.program.fullmatch(text, pos~, endpos~, limit~) {
     None => None
-    Some(r) => Some(Match::{ pattern: self, text, result: r, })
+    Some(r) => {
+      let e = if endpos < 0 { cp_length(text) } else { endpos }
+      Some(Match::{ pattern: self, text, result: r, pos, endpos: e, })
+    }
   }
 }
 

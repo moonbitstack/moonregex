@@ -490,6 +490,7 @@
             <button data-k="sub">sub_by</button>
             <button data-k="glob">glob</button>
             <button data-k="fuzzy">fuzzy</button>
+            <button data-k="scanner">scanner</button>
           </span>
         </div>
         <pre id="codeblock"></pre>
@@ -622,7 +623,18 @@
 '<span class="c-com">// Some(_) — one substitution, p -&gt; o</span>\n' +
 '\n' +
 '<span class="c-com">// scoped budgets: insertions, deletions, substitutions</span>\n' +
-'@moonregex.search(<span class="c-str">"(?:abc){i&lt;=1}"</span>, <span class="c-str">"xabcd"</span>)  <span class="c-com">// matches "abcd"</span>'
+'@moonregex.search(<span class="c-str">"(?:abc){i&lt;=1}"</span>, <span class="c-str">"xabcd"</span>)  <span class="c-com">// matches "abcd"</span>',
+
+    scanner:
+'<span class="c-com">// scan a text left to right, picking up where you left off</span>\n' +
+'<span class="c-kw">let</span> sc = @moonregex.compile(<span class="c-str">"\\d+"</span>).scanner(<span class="c-str">"a1 b22 c333"</span>)\n' +
+'sc.search().unwrap().group()  <span class="c-com">// "1"</span>\n' +
+'sc.search().unwrap().group()  <span class="c-com">// "22"</span>\n' +
+'sc.search().unwrap().group()  <span class="c-com">// "333"</span>\n' +
+'\n' +
+'<span class="c-com">// a Match carries Python\'s extras: expand, pos, endpos</span>\n' +
+'<span class="c-kw">let</span> mm = @moonregex.search(<span class="c-str">"(?P&lt;w&gt;\\w+) \\1"</span>, <span class="c-str">"go go"</span>).unwrap()\n' +
+'mm.expand(<span class="c-str">"\\g&lt;w&gt;"</span>)  <span class="c-com">// "go"</span>'
   };
 
   var codeEl = document.getElementById("codeblock");

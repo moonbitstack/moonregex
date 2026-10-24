@@ -55,6 +55,7 @@ pub struct MatchResult {
   end : Int32
   spans : Array[(Int32, Int32)]
   fuzzy : (Int32, Int32, Int32)?
+  fuzzy_changes : (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])?
 }
 
 pub struct Program {

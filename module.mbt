@@ -366,3 +366,165 @@ fn is_special(c : Char) -> Bool {
   c == '~' ||
   c == '#'
 }
+
+// ---------------------------------------------------------------------------
+// Flag constants & module aliases (Python `re` / `regex` surface)
+// ---------------------------------------------------------------------------
+
+///|
+/// The error the engine raises for a bad pattern or a run that hit its step
+/// ceiling — the MoonBit spelling of Python's `regex.error` (type names are
+/// upper-case here).
+pub type RegexError = @parse.Refused
+
+///|
+/// The flag type, for callers who build flags by name (the `RegexFlag` alias of
+/// Python's `regex` module).
+pub type RegexFlag = @parse.Flags
+
+// MoonBit constrains `let` bindings to lower-case names and `const` to primitive
+// types, so the Python `re` flag constants (which are upper-case) are exposed
+// here under their lower-case spelling — `i`/`ignorecase`, `m`/`multiline`, and
+// so on — each a `Flags` value, so a caller ports a pattern flag-for-flag.
+
+///|
+pub let i : RegexFlag = @parse.Flags::new(ignorecase=true)
+
+///|
+/// `ignorecase` — Python's `re.IGNORECASE`.
+pub let ignorecase : RegexFlag = i
+
+///|
+pub let m : RegexFlag = @parse.Flags::new(multiline=true)
+
+///|
+/// `multiline` — Python's `re.MULTILINE`.
+pub let multiline : RegexFlag = m
+
+///|
+pub let s : RegexFlag = @parse.Flags::new(dotall=true)
+
+///|
+/// `dotall` — Python's `re.DOTALL`.
+pub let dotall : RegexFlag = s
+
+///|
+pub let x : RegexFlag = @parse.Flags::new(verbose=true)
+
+///|
+/// `verbose` — Python's `re.VERBOSE`.
+pub let verbose : RegexFlag = x
+
+///|
+pub let a : RegexFlag = @parse.Flags::new(ascii=true)
+
+///|
+/// `ascii` — Python's `re.ASCII`.
+pub let ascii : RegexFlag = a
+
+///|
+pub let u : RegexFlag = @parse.Flags::new(unicode=true)
+
+///|
+/// `unicode` — Python's `re.UNICODE`.
+pub let unicode : RegexFlag = u
+
+///|
+pub let f : RegexFlag = @parse.Flags::new(fullcase=true)
+
+///|
+/// `fullcase` — Python's `re.FULLCASE`.
+pub let fullcase : RegexFlag = f
+
+///|
+pub let w : RegexFlag = @parse.Flags::new(word=true)
+
+///|
+/// `word` — `regex.WORD`.
+pub let word : RegexFlag = w
+
+///|
+pub let t : RegexFlag = @parse.Flags::new()
+
+///|
+/// `template` — Python's `re.TEMPLATE` (no implicit flags).
+pub let template_flag : RegexFlag = t
+
+///|
+pub let b : RegexFlag = @parse.Flags::new(bestmatch=true)
+
+///|
+/// `bestmatch` — `regex.BESTMATCH`.
+pub let bestmatch : RegexFlag = b
+
+///|
+pub let e : RegexFlag = @parse.Flags::new(enhancematch=true)
+
+///|
+/// `enhancematch` — `regex.ENHANCEMATCH`.
+pub let enhancematch : RegexFlag = e
+
+///|
+pub let r : RegexFlag = @parse.Flags::new(reverse=true)
+
+///|
+/// `reverse` — `regex.REVERSE`.
+pub let reverse : RegexFlag = r
+
+///|
+pub let p : RegexFlag = @parse.Flags::new(posix=true)
+
+///|
+/// `posix` — `regex.POSIX`.
+pub let posix : RegexFlag = p
+
+///|
+pub let v0 : RegexFlag = @parse.Flags::new(version=@parse.V0)
+
+///|
+/// `version0` — `regex.VERSION0`.
+pub let version0 : RegexFlag = v0
+
+///|
+pub let v1 : RegexFlag = @parse.Flags::new(version=@parse.V1)
+
+///|
+/// `version1` — `regex.VERSION1`.
+pub let version1 : RegexFlag = v1
+
+///|
+/// The `V0` behaviour set, as a `Version` value — `regex.VERSION0`'s target.
+pub let version0_value : @parse.Version = @parse.V0
+
+///|
+/// The `V1` behaviour set, as a `Version` value — `regex.VERSION1`'s target.
+pub let version1_value : @parse.Version = @parse.V1
+
+///|
+/// The version the engine reads a Python pattern under when none is asked for.
+pub let default_version : @parse.Version = @parse.V0
+
+///|
+/// Clear the compiled-pattern cache. `moonregex` compiles on demand and keeps
+/// no cache, so this is a no-op kept for drop-in API compatibility.
+pub fn purge() -> Unit {
+  ()
+}
+
+///|
+/// Compile with no grammar flags, as `re.template` does (deprecated in Python;
+/// kept for compatibility).
+pub fn template(
+  pattern : StringView,
+  dialect~ : @parse.Dialect = @parse.Python,
+  lists? : Map[String, Array[String]],
+  partial~ : Bool = false,
+) -> Pattern raise @parse.Refused {
+  compile(
+    pattern,
+    flags=@parse.flags,
+    dialect~,
+    lists=lists.unwrap_or({}),
+    partial~,
+  )
+}

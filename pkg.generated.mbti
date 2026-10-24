@@ -6,13 +6,31 @@ import {
 }
 
 // Values
+pub let a : @parse.Flags
+
+pub let ascii : @parse.Flags
+
+pub let b : @parse.Flags
+
+pub let bestmatch : @parse.Flags
+
 pub fn compile(StringView, flags? : @parse.Flags, dialect? : @parse.Dialect, lists? : Map[String, Array[String]], partial? : Bool) -> Pattern raise @parse.Refused
+
+pub let default_version : @parse.Version
 
 pub let dialect : @parse.Dialect
 
+pub let dotall : @parse.Flags
+
+pub let e : @parse.Flags
+
 pub let ecma262 : @parse.Dialect
 
+pub let enhancematch : @parse.Flags
+
 pub fn escape(StringView, special_only? : Bool, literal_spaces? : Bool) -> String
+
+pub let f : @parse.Flags
 
 pub fn findall(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, group? : GroupKey, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Array[String?] raise @parse.Refused
 
@@ -20,13 +38,35 @@ pub fn finditer(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dia
 
 pub let flags : @parse.Flags
 
+pub let fullcase : @parse.Flags
+
 pub fn fullmatch(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Match? raise @parse.Refused
+
+pub let i : @parse.Flags
+
+pub let ignorecase : @parse.Flags
 
 pub let lexmatch_dialect : @parse.Dialect
 
+pub let m : @parse.Flags
+
 pub fn match_at(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Match? raise @parse.Refused
 
+pub let multiline : @parse.Flags
+
+pub let p : @parse.Flags
+
+pub let posix : @parse.Flags
+
+pub fn purge() -> Unit
+
 pub let python : @parse.Dialect
+
+pub let r : @parse.Flags
+
+pub let reverse : @parse.Flags
+
+pub let s : @parse.Flags
 
 pub fn search(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Match? raise @parse.Refused
 
@@ -40,6 +80,36 @@ pub fn subn(StringView, String, String, flags? : @parse.Flags, dialect? : @parse
 
 pub fn subn_by(StringView, (Match) -> String raise @parse.Refused, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> (String, Int32) raise @parse.Refused
 
+pub let t : @parse.Flags
+
+pub fn template(StringView, dialect? : @parse.Dialect, lists? : Map[String, Array[String]], partial? : Bool) -> Pattern raise @parse.Refused
+
+pub let template_flag : @parse.Flags
+
+pub let u : @parse.Flags
+
+pub let unicode : @parse.Flags
+
+pub let v0 : @parse.Flags
+
+pub let v1 : @parse.Flags
+
+pub let verbose : @parse.Flags
+
+pub let version0 : @parse.Flags
+
+pub let version0_value : @parse.Version
+
+pub let version1 : @parse.Flags
+
+pub let version1_value : @parse.Version
+
+pub let w : @parse.Flags
+
+pub let word : @parse.Flags
+
+pub let x : @parse.Flags
+
 // Errors
 
 // Types and methods
@@ -52,13 +122,22 @@ pub(all) enum GroupKey {
 pub(all) struct Match {
   // private fields
 }
+pub fn Match::captures(Self, group? : GroupKey) -> Array[(Int32, Int32)] raise @parse.Refused
+pub fn Match::capturesdict(Self) -> Map[String, Array[(Int32, Int32)]]
 pub fn Match::end(Self, group? : GroupKey) -> Int32 raise @parse.Refused
-pub fn Match::group(Self, group? : GroupKey) -> String? raise @parse.Refused
+pub fn Match::endpos(Self) -> Int32
+pub fn Match::expand(Self, String) -> String raise @parse.Refused
+pub fn Match::fuzzy_changes(Self) -> (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])
+pub fn Match::fuzzy_counts(Self) -> (Int32, Int32, Int32)
+pub fn Match::group(Self, group? : GroupKey, default? : String?) -> String? raise @parse.Refused
 pub fn Match::groupdict(Self, default? : String?) -> Map[String, String]
 pub fn Match::groups(Self, default? : String?) -> Array[String?]
 pub fn Match::lastgroup(Self) -> String?
 pub fn Match::lastindex(Self) -> Int32?
 pub fn Match::pattern(Self) -> Pattern
+pub fn Match::pos(Self) -> Int32
+pub fn Match::re(Self) -> Pattern
+pub fn Match::slices(Self, group? : GroupKey) -> Array[String] raise @parse.Refused
 pub fn Match::span(Self, group? : GroupKey) -> (Int32, Int32) raise @parse.Refused
 pub fn Match::start(Self, group? : GroupKey) -> Int32 raise @parse.Refused
 pub fn Match::string(Self) -> String
@@ -77,6 +156,7 @@ pub fn Pattern::groups(Self) -> Int32
 pub fn Pattern::match_at(Self, String, pos? : Int32, limit? : Int32) -> Match? raise @parse.Refused
 pub fn Pattern::partial(Self) -> Bool
 pub fn Pattern::pattern(Self) -> String
+pub fn Pattern::scanner(Self, String) -> Scanner
 pub fn Pattern::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> Match? raise @parse.Refused
 pub fn Pattern::split(Self, String, maxsplit? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> Array[String?] raise @parse.Refused
 pub fn Pattern::sub(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> String raise @parse.Refused
@@ -84,12 +164,28 @@ pub fn Pattern::sub_by(Self, String, (Match) -> String raise @parse.Refused, cou
 pub fn Pattern::subn(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> (String, Int32) raise @parse.Refused
 pub fn Pattern::subn_by(Self, String, (Match) -> String raise @parse.Refused, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> (String, Int32) raise @parse.Refused
 
+pub struct Scanner {
+  // private fields
+}
+pub fn Scanner::findall(Self, group? : GroupKey, overlapped? : Bool) -> Array[String?] raise @parse.Refused
+pub fn Scanner::finditer(Self, overlapped? : Bool) -> Array[Match] raise @parse.Refused
+pub fn Scanner::fullmatch(Self) -> Match? raise @parse.Refused
+pub fn Scanner::match_at(Self) -> Match? raise @parse.Refused
+pub fn Scanner::search(Self) -> Match? raise @parse.Refused
+pub fn Scanner::split(Self, maxsplit? : Int32) -> Array[String?] raise @parse.Refused
+pub fn Scanner::sub(Self, String, count? : Int32) -> String raise @parse.Refused
+pub fn Scanner::subn(Self, String, count? : Int32) -> (String, Int32) raise @parse.Refused
+
 // Type aliases
 pub using @parse {type Dialect}
 
 pub using @parse {type Flags}
 
 pub using @parse {type Refused}
+
+pub using @parse {type Refused as RegexError}
+
+pub using @parse {type Flags as RegexFlag}
 
 pub using @parse {type Version}
 
