@@ -3,7 +3,7 @@
 
 ///|
 /// Which way a lookaround looks, and whether it wants to find something.
-pub(all) enum Look {
+pub enum Look {
   /// `(?=…)` / `(?!…)`
   Ahead(positive~ : Bool)
   /// `(?<=…)` / `(?<!…)`
@@ -23,7 +23,7 @@ pub extend Look with Debug::{to_repr}
 /// `^` under `m` is a different node from `^` without it, and Python's `$`
 /// (which also matches before a trailing newline) from ECMA-262's (which does
 /// not) — so the executor reads one meaning per node.
-pub(all) enum Anchor {
+pub enum Anchor {
   /// `^`: start of line when `multiline`, of the text otherwise.
   StartLine(multiline~ : Bool)
   /// `$`: end of line when `multiline`, of the text otherwise.
@@ -51,7 +51,7 @@ pub extend Anchor with Debug::{to_repr}
 
 ///|
 /// What a conditional tests.
-pub(all) enum Cond {
+pub enum Cond {
   /// `(?(1)yes|no)`: whether a group took part in the match.
   ByGroup(slot~ : Int32)
   /// `(?(?=…)yes|no)`: whether a lookaround holds here.
@@ -72,7 +72,7 @@ pub extend Cond with Debug::{to_repr}
 /// weighed. The representation is settled here before any of it executes, so
 /// the executor grows one interpreter for fuzzy nodes rather than a fuzzy
 /// branch in every path.
-pub(all) struct FuzzySpec {
+pub struct FuzzySpec {
   /// `i<=n`: how many insertions.
   insertions : Int32?
   /// `d<=n`: how many deletions.
@@ -93,7 +93,7 @@ pub extend FuzzySpec with Debug::{to_repr}
 
 ///|
 /// What a recursion calls back into.
-pub(all) enum Recurse {
+pub enum Recurse {
   /// `(?R)`: the whole pattern.
   Whole
   /// `(?1)`: a capture group by number.
@@ -114,7 +114,7 @@ pub extend Recurse with Debug::{to_repr}
 /// The tree is resolved: flags have been folded into the nodes that care
 /// (`(?s:.)` is an `Any` that eats newlines, `(?i)k` is a class holding both
 /// cases), so the executor never asks which grammar a node came from.
-pub(all) enum Node {
+pub enum Node {
   /// Matches the empty string.
   Empty
   /// One literal code point.

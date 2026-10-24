@@ -1,0 +1,57 @@
+name: GitHub Pages
+
+# Build the homepage and the API docs and publish them to GitHub Pages on every
+# push to master. The homepage lives in `docs/`; the API docs are generated from
+# the source with `moon doc` and served alongside it under `api/`.
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: install moonbit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: build API docs
+        run: |
+          moon update
+          moon doc
+          mkdir -p _site/api
+          cp -r _build/doc/moonbitstack/moonregex/* _site/api/
+
+      - name: assemble site
+        run: |
+          cp docs/index.html _site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

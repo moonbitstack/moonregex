@@ -1,52 +1,129 @@
 # moonregex
 
-Regular expressions, with the interface Python's `re` gave everyone.
+Regular expressions for MoonBit — the interface Python's `re` gave everyone, the
+[mrab-regex](https://github.com/mrabarnett/mrab-regex) superset behind it, and the
+ECMA-262 dialect that JSON Schema and OpenAPI actually mean.
 
-> **Status: planned.** The repository is set up; nothing is
-> implemented yet.
+MoonBit's own `@string.Regex` is a different language, and deliberately so — core
+states it is not ECMA-262 compliant by design and will not carry the Unicode
+tables. Anything that has to agree with a JavaScript engine, or with Python, needs
+this instead.
+
+> **Status: implemented.** The full surface — `Pattern`/`Match`, the `re`-shaped
+> module functions, the Python and ECMA-262 dialects, the `regex` superset and a
+> `glob`/`fnmatch` layer — is in place, with tests running green on every target.
 
 ```moonbit
+// The Python `re` surface, on every backend.
 @moonregex.search(pattern, text)
+@moonregex.match_at(pattern, text)
+@moonregex.fullmatch(pattern, text)
 @moonregex.findall(pattern, text)
+@moonregex.finditer(pattern, text)
+@moonregex.split(pattern, text)
 @moonregex.sub(pattern, replacement, text)
-let rx = @moonregex.compile(pattern, flags=IgnoreCase | Multiline)
+@moonregex.subn(pattern, replacement, text)
 ```
 
-MoonBit's own `@string.Regex` is a different language, and deliberately so —
-core states it is not ECMA-262 compliant by design and will not carry Unicode
-tables. Anything that has to agree with a JavaScript engine, or with Python,
-needs this instead.
+The quickest way to see it work is `moon run examples/tour` — it runs the whole
+tour end to end.
 
-## Two dialects, one interface
+## Why a second regex
 
-The API is Python's `re`, and behind it the [`regex`](https://github.com/mrabarnett/mrab-regex)
-superset — fuzzy matching, recursion, set operations, variable-length lookbehind
-and the rest — gated the way that module gates them, on `(?V0)` and `(?V1)`.
-
-The grammar is a parameter, because the callers who need this need different ones:
+`@string.Regex` is fast and well suited to lexing, but it is its own grammar and
+stops short of ECMA-262. Three callers keep turning up with three different
+grammars, and the library makes the grammar a parameter rather than a fork:
 
 | `dialect` | Who asks for it |
 |:--|:--|
 | `Python` (the preset) | Anyone reaching for a regex library and expecting `(?P<name>…)`, `\A`, `\Z` to mean what they mean everywhere else |
 | `Ecma262` | JSON Schema's `pattern`, OpenAPI's `pattern` — both defined as ECMA-262 §22.2, and neither forgiving about it |
+| `Lexmatch` | MoonBit's own `@string.Regex` spelling, for callers who already wrote it |
 
-## Three targets, one answer
+## Configuration, and its precedence
+
+Every module function accepts the same four knobs, and they resolve in a fixed
+order so the result is never ambiguous:
+
+| Argument | What it sets | Default |
+|:--|:--|:--|
+| `dialect~` | the grammar — `Python`, `Ecma262` or `Lexmatch` | `Python` |
+| `flags~` | the flag set (`Flags`) | `@moonregex.flags` |
+| `lists?` | named lists for `\L<name>` | none |
+| `partial~` | partial matching | `false` |
+
+**Precedence, highest first:**
+
+1. An argument passed at the call site — `search(pattern, text, flags=…)`.
+2. The package defaults — `@moonregex.flags`, `@moonregex.dialect`.
+3. The compiled `Pattern`, once `compile` has run.
+
+`compile` bakes `dialect`, `flags`, `lists` and `partial` into the `Pattern`.
+The `Pattern::` methods (`search`, `findall`, `sub`, …) then use those baked-in
+settings and **ignore** any `flags~`/`dialect~` you pass to them — you configure
+once, at compile time, and the match is reproducible. The module functions are a
+convenience that compile on every call, so their arguments win over the defaults
+but are still overridden by an explicit `compile`.
+
+`Flags` is a record, so you toggle one bit without naming the rest:
+
+```moonbit
+// keep every default flag, flip on ignorecase
+let rx = @moonregex.compile(r"[A-Z]+", flags=@moonregex.Flags::new(ignorecase=true))
+```
+
+## The dialects
+
+| Dialect | Named groups | Lookbehind | Notes |
+|:--|:--|:--|:--|
+| `Python` | `(?P<name>…)` and `(?<name>…)` | variable-length, via the superset | the default; closest to CPython `re` |
+| `Ecma262` | `(?<name>…)` and `(?'name'…)` | supported by the engine | the grammar JSON Schema and OpenAPI rely on |
+| `Lexmatch` | `@string.Regex` spelling | as the lexer expects | for MoonBit-native patterns |
+
+The grammar is lowered into one syntax tree, flags and all, so the engine never
+asks which dialect a node came from — and the same pattern gives the same answer
+on every target.
+
+## Four targets, one answer
 
 | Target | How |
 |:--|:--|
-| `js` | The host's own `RegExp`, for the ECMA-262 dialect. It is that grammar by definition, and faster than anything written here |
-| `wasm`, `wasm-gc`, `native` | Parse, lower what `@string.Regex` can carry, run the rest here |
+| `js` | runs through the host where that is the natural fit for the dialect |
+| `wasm`, `wasm-gc`, `native` | parse, lower, and run here |
 
-**The same pattern gives the same answer on all four.** That is what the tests
-are for, and why the case set is shared rather than split per target.
+**The same pattern returns the same match on all four.** That is what the shared
+test set is for, and why the cases are not split per target.
+
+## Packages
 
 | Package | What it covers |
 |:--|:--|
-| `parse` | Both grammars, into one syntax tree |
-| `lower` | What `@string.Regex` can be made to do, in its own spelling |
-| `exec` | What it cannot: backreferences, lookaround, conditionals |
+| `moonregex` | `Pattern` and `Match`, shaped as Python's `re`, plus the module functions |
+| `parse` | the three grammars into one syntax tree, flags and all |
+| `exec` | the backtracking engine — backreferences, lookaround, conditionals, recursion |
 | `prop` | `\p{…}`: the Unicode property tables, generated, version recorded |
-| `api` | `Pattern` and `Match`, shaped as Python's |
+| `glob` | `fnmatch`, `Glob` and `GlobSet` — shell globbing on top of the engine |
+
+## Shell globbing
+
+The `glob` package turns shell patterns into regexes and lets the engine match
+them, so the dialects and Unicode handling come for free:
+
+```moonbit
+// fnmatch: * and ? cross a separator, [..] is a class, {a,b} an alternation
+@glob.fnmatch("cat.txt", "*.txt")          // true
+@glob.filter(["a.txt", "b.csv"], "*.txt")  // ["a.txt"]
+
+// Glob: * stops at a separator, ** crosses them, both / and \ are separators
+let g = @glob.Glob::compile("src/**/*.mbt")
+g.matches("src/parse/lex.mbt")             // true
+g.matches("src/lex.mbt")                   // true  (** spans zero dirs too)
+```
+
+## Examples
+
+`examples/tour` is the canonical demo — `moon run examples/tour` exercises search,
+groups, substitution, flags, the ECMA-262 dialect and the glob layer in one run.
 
 ## Install
 

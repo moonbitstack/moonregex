@@ -1,0 +1,13 @@
+// glob: shell-style globbing and fnmatch, built on moonregex.
+//
+// Two layers sit on the regex engine:
+//   * `fnmatch` — the classic shell pattern: `*` and `?`, character classes and
+//     brace alternation, matched against a single name.
+//   * `Glob` / `GlobSet` — path-aware globbing where `*` stops at a separator,
+//     `**` crosses them, and the whole path is anchored.
+//
+// The package turns a pattern into a regex and lets `@moonregex` do the matching,
+// so the dialects, flags and Unicode handling come for free.
+import {
+  "moonbitstack/moonregex",
+}

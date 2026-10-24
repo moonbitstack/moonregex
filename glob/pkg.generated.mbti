@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonregex/glob"
+
+import {
+  "moonbitstack/moonregex/parse",
+}
+
+// Values
+pub fn filter(Array[String], StringView, ignorecase? : Bool) -> Array[String] raise @parse.Refused
+
+pub fn filter_paths(Array[String], StringView, ignorecase? : Bool) -> Array[String] raise @parse.Refused
+
+pub fn fnmatch(String, StringView, ignorecase? : Bool) -> Bool raise @parse.Refused
+
+pub fn fnmatchcase(String, StringView) -> Bool raise @parse.Refused
+
+pub fn match_path(String, StringView, ignorecase? : Bool) -> Bool raise @parse.Refused
+
+pub fn translate(StringView) -> String
+
+// Errors
+
+// Types and methods
+pub struct Glob {
+  // private fields
+}
+pub fn Glob::compile(StringView, ignorecase? : Bool) -> Self raise @parse.Refused
+pub fn Glob::matches(Self, String) -> Bool raise @parse.Refused
+pub fn Glob::pattern(Self) -> String
+
+pub struct GlobSet {
+  // private fields
+}
+pub fn GlobSet::compile(Array[String], ignorecase? : Bool) -> Self raise @parse.Refused
+pub fn GlobSet::matches(Self, String) -> Array[Int32] raise @parse.Refused
+pub fn GlobSet::matches_any(Self, String) -> Bool raise @parse.Refused
+pub fn GlobSet::patterns(Self) -> Array[String]
+
+// Type aliases
+
+// Traits

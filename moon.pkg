@@ -1,0 +1,11 @@
+// moonregex: regular expressions for MoonBit — Python's re interface, the
+// mrab-regex superset behind it, and the ECMA-262 dialect that JSON Schema and
+// OpenAPI mean.
+//
+// The whole surface is here: `Pattern` and `Match`, and the module functions
+// that build and drive them. The other packages — `parse`, `exec`, `prop` — are
+// the ones this one drives, and callers rarely meet them directly.
+import {
+  "moonbitstack/moonregex/parse",
+  "moonbitstack/moonregex/exec",
+}

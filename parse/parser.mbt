@@ -705,11 +705,20 @@ fn Parser::group(
     }
     return self.scoped_flags(after)
   }
-  if self.dialect is Python && ext == '<' {
-    // `(?<name>…)`: the regex superset's spelling of a named group. Python's
-    // own `re` refuses it, which is why it is read here and not there.
+  if (self.dialect is Python || self.dialect is Ecma262) && ext == '<' {
+    // `(?<name>…)`: ECMA-262's spelling of a named group and the regex
+    // superset's; Python's own `re` refuses it, so it is read here rather than
+    // under `?P`.
     let (view, body) = self.named(after.view(start_offset=2))
     return (view, body)
+  }
+  if ext == '\'' {
+    // ECMA-262's `(?'name'…)`: the single-quoted spelling of a named group.
+    if self.dialect is Ecma262 {
+      let (view, body) = self.named_sq(after.view(start_offset=2))
+      return (view, body)
+    }
+    raise self.refuse(rest, "unknown extension ?'")
   }
   raise self.refuse(rest, "unknown extension ?\{ext.unsafe_to_char()}")
 }
@@ -783,6 +792,24 @@ fn Parser::named(
 ) -> (StringView, Node) raise Refused {
   let (rest, name) = self.name(rest)
   self.capture(rest, Some(name))
+}
+
+///|
+/// ECMA-262's `(?'name'…)`: read `'name'` and open a capture group under it.
+fn Parser::named_sq(
+  self : Parser,
+  rest : StringView,
+) -> (StringView, Node) raise Refused {
+  let mut i = 0
+  while i < rest.length() && is_name_char(rest.at(i).to_int()) {
+    i += 1
+  }
+  if i == 0 || i >= rest.length() || rest.at(i).to_int() != '\'' {
+    raise self.refuse(rest, "missing ', unterminated name")
+  }
+  let name = rest.view(end_offset=i).to_owned()
+  let rest2 = rest.view(start_offset=i + 1)
+  self.capture(rest2, Some(name))
 }
 
 ///|

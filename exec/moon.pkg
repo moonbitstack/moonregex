@@ -1,0 +1,7 @@
+// exec: the tree compiled to a flat program and walked by a backtracking
+// virtual machine — captures, anchors, backreferences, lookarounds, atomic
+// groups, conditionals and recursion, all under a step ceiling.
+import {
+  "moonbitstack/moonregex/parse",
+  "moonbitstack/moonregex/prop",
+}

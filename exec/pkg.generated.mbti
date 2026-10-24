@@ -1,0 +1,69 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonregex/exec"
+
+import {
+  "moonbitstack/moonregex/parse",
+  "moonbitstack/moonregex/prop",
+}
+
+// Values
+pub fn compile(@parse.Ast) -> Program
+
+// Errors
+
+// Types and methods
+pub(all) enum AnchorKind {
+  TextStart
+  TextEnd
+  LineStart
+  LineEnd
+  SoftEnd
+  WordBoundary(negate~ : Bool)
+  WordStart
+  WordEnd
+  SearchStart
+}
+
+pub(all) enum Inst {
+  Char(code~ : Int32)
+  Any(except_newline~ : Bool)
+  Class(set~ : @prop.CharSet)
+  Anchor(kind~ : AnchorKind)
+  Split(x~ : Int32, y~ : Int32)
+  SplitLazy(x~ : Int32, y~ : Int32)
+  Jmp(x~ : Int32)
+  Save(slot~ : Int32)
+  Match
+  Backref(slot~ : Int32, icase~ : Bool)
+  Keep
+  Grapheme
+  Atomic(id~ : Int32)
+  Lookahead(id~ : Int32, positive~ : Bool)
+  Lookbehind(id~ : Int32, positive~ : Bool)
+  CondGroup(slot~ : Int32, yes_id~ : Int32, no_id~ : Int32)
+  CondLook(id~ : Int32, yes_id~ : Int32, no_id~ : Int32)
+  Star(body_id~ : Int32, greedy~ : Bool)
+  RecurseGroup(slot~ : Int32)
+  RecurseWhole
+}
+
+pub struct MatchResult {
+  start : Int32
+  end : Int32
+  spans : Array[(Int32, Int32)]
+  fuzzy : (Int32, Int32, Int32)?
+}
+
+pub struct Program {
+  code : Array[Inst]
+  ngroups : Int32
+  group_codes : Map[Int32, Array[Inst]]
+  extra : Map[Int32, Array[Inst]]
+}
+pub fn Program::fullmatch(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+pub fn Program::match_at(Self, String, pos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+pub fn Program::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+
+// Type aliases
+
+// Traits

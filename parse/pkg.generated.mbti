@@ -9,7 +9,15 @@ import {
 // Values
 pub let dialect : Dialect
 
+pub fn ecma_parse(StringView) -> Ast raise Refused
+
+pub fn ecma_parse_with(StringView, Flags) -> Ast raise Refused
+
 pub let flags : Flags
+
+pub fn lexmatch_parse(StringView) -> Ast raise Refused
+
+pub fn lexmatch_parse_with(StringView, Flags) -> Ast raise Refused
 
 pub fn parse(StringView, flags? : Flags, dialect? : Dialect, lists? : Map[String, Array[String]]) -> Ast raise Refused
 
@@ -27,7 +35,7 @@ pub fn Refused::to_string(Self) -> String
 pub impl Show for Refused
 
 // Types and methods
-pub(all) enum Anchor {
+pub enum Anchor {
   StartLine(multiline~ : Bool)
   EndLine(multiline~ : Bool, before_final_newline~ : Bool)
   TextStart
@@ -55,7 +63,7 @@ pub fn Ast::groups(Self) -> Int32
 pub fn Ast::named_lists(Self) -> Map[String, Array[String]]
 pub fn Ast::root(Self) -> Node
 
-pub(all) enum Cond {
+pub enum Cond {
   ByGroup(slot~ : Int32)
   ByLook(node~ : Node, look~ : Look)
 } derive(Eq, @debug.Debug)
@@ -96,7 +104,7 @@ pub fn Flags::new(ignorecase? : Bool, multiline? : Bool, dotall? : Bool, verbose
 pub fn Flags::not_equal(Self, Self) -> Bool
 pub fn Flags::to_repr(Self) -> @debug.Repr
 
-pub(all) struct FuzzySpec {
+pub struct FuzzySpec {
   insertions : Int32?
   deletions : Int32?
   substitutions : Int32?
@@ -107,7 +115,7 @@ pub fn FuzzySpec::equal(Self, Self) -> Bool
 pub fn FuzzySpec::not_equal(Self, Self) -> Bool
 pub fn FuzzySpec::to_repr(Self) -> @debug.Repr
 
-pub(all) enum Look {
+pub enum Look {
   Ahead(positive~ : Bool)
   Behind(positive~ : Bool)
 } derive(Eq, @debug.Debug)
@@ -115,7 +123,7 @@ pub fn Look::equal(Self, Self) -> Bool
 pub fn Look::not_equal(Self, Self) -> Bool
 pub fn Look::to_repr(Self) -> @debug.Repr
 
-pub(all) enum Node {
+pub enum Node {
   Empty
   Char(code~ : Int32)
   Any(dotall~ : Bool)
@@ -138,7 +146,7 @@ pub fn Node::equal(Self, Self) -> Bool
 pub fn Node::not_equal(Self, Self) -> Bool
 pub fn Node::to_repr(Self) -> @debug.Repr
 
-pub(all) enum Recurse {
+pub enum Recurse {
   Whole
   Group(slot~ : Int32)
   Named(name~ : String)

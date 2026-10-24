@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>moonregex — regular expressions for MoonBit</title>
+<meta name="description" content="Regular expressions for MoonBit: Python's re interface, the mrab-regex superset, and the ECMA-262 dialect JSON Schema and OpenAPI mean." />
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --ink: #e6edf3;
+    --muted: #9aa7b4;
+    --line: #2a3340;
+    --accent: #6ea8fe;
+    --accent-2: #b692f6;
+    --code-bg: #0b0f14;
+    --radius: 14px;
+    --maxw: 960px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 70% -10%, #1a2230 0%, var(--bg) 55%);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+  header.hero {
+    padding: 84px 0 56px;
+    border-bottom: 1px solid var(--line);
+  }
+  .badge {
+    display: inline-block; font-size: 13px; letter-spacing: .04em;
+    color: var(--accent-2); border: 1px solid var(--line);
+    background: var(--panel); padding: 4px 12px; border-radius: 999px; margin-bottom: 22px;
+  }
+  h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.08; margin: 0 0 14px; letter-spacing: -.02em; }
+  h1 .grad { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 19px; color: var(--muted); max-width: 720px; margin: 0 0 26px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px;
+    border-radius: 10px; font-weight: 600; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink);
+  }
+  .btn.primary { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #0b0f14; border: none; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px; overflow-x: auto; margin: 0; font-size: 14.5px; line-height: 1.55;
+  }
+  code, pre { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; }
+  p code, li code { background: var(--panel-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: 13.5px; }
+  section { padding: 54px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 28px; margin: 0 0 10px; letter-spacing: -.01em; }
+  .section-sub { color: var(--muted); margin: 0 0 26px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .card h3 { margin: 0 0 8px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+  th { color: var(--muted); font-weight: 600; background: var(--panel-2); }
+  tr:last-child td { border-bottom: none; }
+  .pill { font-size: 12.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--accent); background: var(--panel-2); }
+  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; }
+  .split { display: grid; gap: 26px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .split { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .note { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <span class="badge">moonbitstack · Apache-2.0 · 4 targets</span>
+      <h1>Regular expressions for MoonBit, <span class="grad">the way Python drew them.</span></h1>
+      <p class="lede">
+        Python's <code>re</code> interface, the mrab-regex superset behind it, and the
+        ECMA-262 dialect that JSON Schema and OpenAPI actually mean — one engine, the same
+        answer on native, wasm, wasm-gc and js.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/moonbitstack/moonregex">View on GitHub</a>
+        <a class="btn" href="https://github.com/moonbitstack/moonregex/tree/master/examples/tour">Run the tour</a>
+        <a class="btn" href="./api/module.mbt.html">API reference</a>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <h2>Why a second regex</h2>
+      <p class="section-sub">
+        MoonBit's own <code>@string.Regex</code> is fast and good at lexing, but it is its own
+        grammar and stops short of ECMA-262. moonregex makes the grammar a parameter instead of a fork.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>Python, by default</h3>
+          <p><code>(?P&lt;name&gt;…)</code>, <code>\A</code>, <code>\Z</code> — the interface everyone already knows.</p>
+        </div>
+        <div class="card">
+          <h3>ECMA-262, for real</h3>
+          <p>The grammar JSON Schema and OpenAPI define, where <code>pattern</code> means §22.2 and tolerates nothing else.</p>
+        </div>
+        <div class="card">
+          <h3>The regex superset</h3>
+          <p>Fuzzy matching, recursion, set operations, variable-length lookbehind — gated the way mrab-regex gates them.</p>
+        </div>
+        <div class="card">
+          <h3>Shell globbing</h3>
+          <p><code>fnmatch</code>, <code>Glob</code> and <code>GlobSet</code> sit on the same engine, so Unicode handling is free.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Quick start</h2>
+      <p class="section-sub">Add the module, then use the <code>re</code>-shaped surface on every backend.</p>
+      <div class="split">
+        <div>
+          <pre><code># install
+moon add moonbitstack/moonregex
+
+# run the demo
+moon run examples/tour</code></pre>
+        </div>
+        <div>
+          <pre><code>// the leftmost match, Python-style
+match @moonregex.search(r"(\w+) (\w+)", "hello world") {
+  Some(m) =&gt; println(m.group().unwrap())  // "hello world"
+  None =&gt; println("no match")
+}
+
+// compile once, configure once
+let rx = @moonregex.compile(
+  r"[A-Z]+",
+  flags=@moonregex.Flags::new(ignorecase=true),
+)</code></pre>
+        </div>
+      </div>
+      <p class="note">The API reference on this site is generated from the source — see the <a href="./api/module.mbt.html">module index</a>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Configuration, and its precedence</h2>
+      <p class="section-sub">
+        Every module function takes the same four knobs; they resolve in a fixed order so the result is never ambiguous.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Argument</th><th>Sets</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>dialect~</code></td><td>the grammar</td><td><span class="pill">Python</span></td></tr>
+          <tr><td><code>flags~</code></td><td>the flag set</td><td><code>@moonregex.flags</code></td></tr>
+          <tr><td><code>lists?</code></td><td>named lists for <code>\L&lt;name&gt;</code></td><td>none</td></tr>
+          <tr><td><code>partial~</code></td><td>partial matching</td><td><code>false</code></td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:20px">
+        <strong>Precedence, highest first:</strong> an argument at the call site → the package defaults →
+        the compiled <code>Pattern</code>. <code>compile</code> bakes the settings in; the <code>Pattern::</code>
+        methods then ignore any flags you pass and reuse what was compiled. Configure once, match reproducibly.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Packages</h2>
+      <p class="section-sub">One tree, one engine, three grammars — each concern in its own package.</p>
+      <table>
+        <thead>
+          <tr><th>Package</th><th>Covers</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>moonregex</code></td><td><code>Pattern</code> and <code>Match</code>, shaped as Python's <code>re</code>, plus the module functions.</td></tr>
+          <tr><td><code>parse</code></td><td>The three grammars into one syntax tree, flags and all.</td></tr>
+          <tr><td><code>exec</code></td><td>The backtracking engine — backreferences, lookaround, conditionals, recursion.</td></tr>
+          <tr><td><code>prop</code></td><td><code>\p{…}</code>: the Unicode property tables, generated, version recorded.</td></tr>
+          <tr><td><code>glob</code></td><td><code>fnmatch</code>, <code>Glob</code> and <code>GlobSet</code> — shell globbing on top.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Four targets, one answer</h2>
+      <p class="section-sub">The same pattern returns the same match on every backend — that is what the shared test set is for.</p>
+      <div class="grid">
+        <div class="card"><h3>native</h3><p>Parse, lower and run here.</p></div>
+        <div class="card"><h3>wasm</h3><p>Parse, lower and run here.</p></div>
+        <div class="card"><h3>wasm-gc</h3><p>Parse, lower and run here.</p></div>
+        <div class="card"><h3>js</h3><p>Runs through the host where that is the natural fit for the dialect.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      moonregex · Apache-2.0 · <a href="https://github.com/moonbitstack/moonregex">moonbitstack/moonregex</a>
+    </div>
+  </footer>
+</body>
+</html>
