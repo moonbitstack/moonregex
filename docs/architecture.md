@@ -89,14 +89,21 @@ stateful object behind them.
 | `subn(pat, repl, s, …)`         | `subn(pat, repl, s, …)`            | returns `(String, Int32)` |
 | `sub(pat, f, s)` (callable)     | `sub_by(pat, f, s, …)`             | `f : Match -> String` |
 | `subn(pat, f, s)` (callable)    | `subn_by(pat, f, s, …)`            | |
+| `subf(pat, tmpl, s, …)`         | `subf(pat, tmpl, s, …)`            | `str.format`-shaped template, `{}`/`{0}`/`{name}`/`{0[0]}` |
+| `subfn(pat, tmpl, s, …)`        | `subfn(pat, tmpl, s, …)`           | returns `(String, Int32)` |
 | `escape(s, special_only, literal_spaces)` | `escape(s, special_only~, literal_spaces~)` | |
 | `purge()`                       | `purge()`                           | clears the compile cache |
-| `error`                         | `error` (= `Refused`)               | the exception type |
+| `error`                         | `RegexError` (= `Refused`)          | the exception type (upper-case in MoonBit) |
 | `RegexFlag` / `re.RegexFlag`    | `RegexFlag` (= `Flags`)             | the flags type |
-| `DEFAULT_VERSION`               | `DEFAULT_VERSION`                   | `V1` |
+| `DEFAULT_VERSION`               | `default_version`                   | `V0` |
+| `__version__`                   | `version`                           | `"0.1.0"` |
+| `__version_info__`              | `version_info`                      | `(0, 1, 0)` |
 
 `findall` with a callable replacement does not exist in `re`; moonregex
-exposes `sub_by`/`subn_by` instead of overloading `sub`'s type.
+exposes `sub_by`/`subn_by` instead of overloading `sub`'s type. The named
+flags (`I`/`IGNORECASE`, `M`, `S`, …) are lower-case `let` bindings — `i`,
+`ignorecase`, `m`, `multiline`, … — because MoonBit requires upper-case
+constants to be primitive.
 
 ### 2.2 `Pattern`
 
@@ -112,7 +119,7 @@ partial matching.
 | `p.groupindex`             | `p.groupindex()`               |
 | `p.scanner(s)`             | `p.scanner(s)` → `Scanner`     |
 | `p.match / fullmatch / search / findall / finditer / split / sub / subn` | same, with `pos~/endpos~/limit~` |
-| `p.subf(s, tmpl)` / `p.subfn` | *documented gap* — needs a `str.format` engine; see §4 |
+| `p.subf(s, tmpl)` / `p.subfn` | `p.subf(s, tmpl)` / `p.subfn(s, tmpl)` | format substitution (§4) |
 
 ### 2.3 `Match`
 
@@ -134,6 +141,7 @@ partial matching.
 | `m.lastindex` / `m.lastgroup` | `m.lastindex()` / `m.lastgroup()` |
 | `m.string`               | `m.string()`                      |
 | `m.re`                   | `m.re()` (= `m.pattern()`)        |
+| `m.partial`              | `m.partial()`                      |
 | `m.fuzzy_counts`         | `m.fuzzy_counts()` → `(sub,ins,del)` |
 | `m.fuzzy_changes`        | `m.fuzzy_changes()` → `(subs,ins,dels)` |
 
@@ -243,7 +251,7 @@ Key invariants that keep the layers honest:
 | Fuzzy `{e}`/`{i}`/`{d}`/`{s}` + counts/changes | ✅ counts · ✅ changes | exec |
 | Set algebra `--` `&&` `~~` (V1)        | ✅ | parse |
 | `(*LIMIT:n)`, `(*FENCE)`, `(*VERSION)` | ⬜ documented gap | — |
-| `subf`/`subfn` format substitution     | ⬜ documented gap (needs `str.format`) | — |
+| `subf`/`subfn` format substitution     | ✅ (`{}` `{0}` `{name}` `{0[0]}` + `:spec` align/width/precision; types `s d x X o b`) | subf.mbt |
 | `(*MARK:name)` capture / `mark()`      | ⬜ documented gap | — |
 
 Gaps are *named* and *bounded*, not silent: the parser refuses unknown

@@ -256,6 +256,58 @@ pub fn subn(
 }
 
 ///|
+/// Replace matches with `repl`, as `regex.subf` — `repl` is a format template
+/// whose fields name groups (`{}`, `{0}`, `{name}`, `{0[0]}`).
+pub fn subf(
+  pattern : StringView,
+  repl : String,
+  text : String,
+  flags~ : @parse.Flags = @parse.flags,
+  dialect~ : @parse.Dialect = @parse.Python,
+  count~ : Int32 = 0,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  limit~ : Int32 = 10000000,
+  lists? : Map[String, Array[String]],
+  partial~ : Bool = false,
+) -> String raise @parse.Refused {
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subf(
+    text,
+    repl,
+    count~,
+    pos~,
+    endpos~,
+    limit~,
+  )
+}
+
+///|
+/// Replace matches with `repl`, returning the new text and the count, as
+/// `regex.subfn`.
+pub fn subfn(
+  pattern : StringView,
+  repl : String,
+  text : String,
+  flags~ : @parse.Flags = @parse.flags,
+  dialect~ : @parse.Dialect = @parse.Python,
+  count~ : Int32 = 0,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  limit~ : Int32 = 10000000,
+  lists? : Map[String, Array[String]],
+  partial~ : Bool = false,
+) -> (String, Int32) raise @parse.Refused {
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subfn(
+    text,
+    repl,
+    count~,
+    pos~,
+    endpos~,
+    limit~,
+  )
+}
+
+///|
 /// Replace matches with the result of `f(match)`, as Python's `re.sub` with a
 /// callable replacement.
 pub fn sub_by(
@@ -503,6 +555,15 @@ pub let version1_value : @parse.Version = @parse.V1
 ///|
 /// The version the engine reads a Python pattern under when none is asked for.
 pub let default_version : @parse.Version = @parse.V0
+
+///|
+/// The library version, as `regex.__version__` reports it.
+pub let version : String = "0.1.0"
+
+///|
+/// The library version split into `(major, minor, patch)`, as
+/// `regex.__version_info__` reports it.
+pub let version_info : (Int32, Int32, Int32) = (0, 1, 0)
 
 ///|
 /// Clear the compiled-pattern cache. `moonregex` compiles on demand and keeps

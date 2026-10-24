@@ -156,3 +156,55 @@ test "RegexError and RegexFlag aliases are the underlying types" {
   let _flag : @moonregex.RegexFlag = @moonregex.i
   assert_true(true)
 }
+
+///|
+test "version constants mirror regex.__version__" {
+  assert_eq(@moonregex.version, "0.1.0")
+  assert_eq(@moonregex.version_info, (0, 1, 0))
+}
+
+///|
+test "Match partial reflects the compile-time partial flag" {
+  let m = @moonregex.search("a", "a").unwrap()
+  assert_false(m.partial())
+  let p = @moonregex.compile("a", partial=true)
+  let m2 = p.search("a").unwrap()
+  assert_true(m2.partial())
+}
+
+///|
+test "subf formats the whole match and groups" {
+  // {} is the whole match; substitution is in-place, keeping the rest.
+  assert_eq(@moonregex.subf("\\d+", "({})", "order 42"), "order (42)")
+  // {name} names a group; {n} reorders the captured parts.
+  let pat = @moonregex.compile("(?P<w>\\w+)=(?P<n>\\d+)")
+  assert_eq(pat.subf("a=1 b=22", "{n}:{w}"), "1:a 22:b")
+}
+
+///|
+test "subf applies alignment, width and precision" {
+  // Right-align in a field of 5.
+  assert_eq(@moonregex.subf("\\d+", "[{0:>5}]", "7"), "[    7]")
+  // Left-align with a fill character.
+  assert_eq(@moonregex.subf("\\d+", "[{0:*<5}]", "7"), "[7****]")
+  // Precision truncates a string.
+  assert_eq(@moonregex.subf("\\w+", "{0:.2}", "abcdef"), "ab")
+}
+
+///|
+test "subf formats integer groups in other bases" {
+  assert_eq(@moonregex.subf("\\d+", "{0:x}", "255"), "ff")
+  assert_eq(@moonregex.subf("\\d+", "{0:X}", "255"), "FF")
+  assert_eq(@moonregex.subf("\\d+", "{0:o}", "8"), "10")
+  assert_eq(@moonregex.subf("\\d+", "{0:b}", "5"), "101")
+}
+
+///|
+test "subfn returns the replacement count" {
+  let (s, n) = @moonregex.subfn("\\d", "#", "1a2b3")
+  assert_eq(s, "#a#b#")
+  assert_eq(n, 3)
+  let (s2, n2) = @moonregex.subfn("\\d", "#", "1a2b3", count=2)
+  assert_eq(s2, "#a#b3")
+  assert_eq(n2, 2)
+}

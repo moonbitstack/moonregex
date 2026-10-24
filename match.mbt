@@ -122,6 +122,13 @@ pub fn Match::re(self : Match) -> Pattern {
 }
 
 ///|
+/// Whether this match is a partial match — `regex.Match.partial`. True when the
+/// pattern was compiled with `partial=true`.
+pub fn Match::partial(self : Match) -> Bool {
+  self.pattern.partial()
+}
+
+///|
 /// Expand the Python replacement language in `template` against this match —
 /// Python's `Match.expand`.
 pub fn Match::expand(

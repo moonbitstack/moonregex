@@ -325,3 +325,57 @@ pub fn Pattern::sub_by(
 ) -> String raise @parse.Refused {
   self.subn_by(text, f, count~, pos~, endpos~, limit~).0
 }
+
+///|
+/// Replace matches with `repl`, as `regex.subf` — `repl` is a format template
+/// whose fields name groups (`{}`, `{0}`, `{name}`, `{0[0]}`), with an optional
+/// `:spec`.
+pub fn Pattern::subf(
+  self : Pattern,
+  text : String,
+  repl : String,
+  count~ : Int32 = 0,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  limit~ : Int32 = 10000000,
+) -> String raise @parse.Refused {
+  self.subfn(text, repl, count~, pos~, endpos~, limit~).0
+}
+
+///|
+/// Replace matches with `repl`, returning the new text and the count, as
+/// `regex.subfn`.
+pub fn Pattern::subfn(
+  self : Pattern,
+  text : String,
+  repl : String,
+  count~ : Int32 = 0,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  limit~ : Int32 = 10000000,
+) -> (String, Int32) raise @parse.Refused {
+  let end = if endpos < 0 { cp_length(text) } else { endpos }
+  let buf = StringBuilder::StringBuilder()
+  let mut p = pos
+  let mut last = pos
+  let mut n = 0
+  while p <= end {
+    if count != 0 && n >= count {
+      break
+    }
+    match self.search(text, pos=p, endpos=end, limit~) {
+      None => break
+      Some(m) => {
+        let s = m.start()
+        let e = m.end()
+        buf.write_string(slice_cp(text, last, s))
+        buf.write_string(expandf(repl, m))
+        last = e
+        n += 1
+        p = if e > s { e } else { s + 1 }
+      }
+    }
+  }
+  buf.write_string(slice_cp(text, last, end))
+  (buf.to_string(), n)
+}

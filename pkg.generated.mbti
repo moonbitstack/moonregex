@@ -76,6 +76,10 @@ pub fn sub(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.
 
 pub fn sub_by(StringView, (Match) -> String raise @parse.Refused, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> String raise @parse.Refused
 
+pub fn subf(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> String raise @parse.Refused
+
+pub fn subfn(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> (String, Int32) raise @parse.Refused
+
 pub fn subn(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> (String, Int32) raise @parse.Refused
 
 pub fn subn_by(StringView, (Match) -> String raise @parse.Refused, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> (String, Int32) raise @parse.Refused
@@ -96,6 +100,8 @@ pub let v1 : @parse.Flags
 
 pub let verbose : @parse.Flags
 
+pub let version : String
+
 pub let version0 : @parse.Flags
 
 pub let version0_value : @parse.Version
@@ -103,6 +109,8 @@ pub let version0_value : @parse.Version
 pub let version1 : @parse.Flags
 
 pub let version1_value : @parse.Version
+
+pub let version_info : (Int32, Int32, Int32)
 
 pub let w : @parse.Flags
 
@@ -134,6 +142,7 @@ pub fn Match::groupdict(Self, default? : String?) -> Map[String, String]
 pub fn Match::groups(Self, default? : String?) -> Array[String?]
 pub fn Match::lastgroup(Self) -> String?
 pub fn Match::lastindex(Self) -> Int32?
+pub fn Match::partial(Self) -> Bool
 pub fn Match::pattern(Self) -> Pattern
 pub fn Match::pos(Self) -> Int32
 pub fn Match::re(Self) -> Pattern
@@ -161,6 +170,8 @@ pub fn Pattern::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int
 pub fn Pattern::split(Self, String, maxsplit? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> Array[String?] raise @parse.Refused
 pub fn Pattern::sub(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> String raise @parse.Refused
 pub fn Pattern::sub_by(Self, String, (Match) -> String raise @parse.Refused, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> String raise @parse.Refused
+pub fn Pattern::subf(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> String raise @parse.Refused
+pub fn Pattern::subfn(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> (String, Int32) raise @parse.Refused
 pub fn Pattern::subn(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> (String, Int32) raise @parse.Refused
 pub fn Pattern::subn_by(Self, String, (Match) -> String raise @parse.Refused, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -> (String, Int32) raise @parse.Refused
 

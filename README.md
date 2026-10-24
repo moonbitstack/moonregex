@@ -176,9 +176,18 @@ m.expand(r"\g<w>") // "go"
 m.captures()       // [(0, 5)]
 ```
 
+Format substitution (`regex.subf` / `subfn`) is here too — the replacement is
+a `str.format`-shaped template whose fields name groups:
+
+```moonbit
+@moonregex.subf(r"\d+", "({})", "order 42")       // "order (42)"
+@moonregex.compile(r"(?P<w>\w+)=(?P<n>\d+)").subf(
+  "a=1 b=22", "{n}:{w}")                          // "1:a 22:b"
+```
+
 Type aliases `RegexFlag` and `RegexError` mirror `regex.RegexFlag` and
-`regex.error`; `template` and `purge` are kept for compatibility. See
-`docs/architecture.md` for the full interface contract.
+`regex.error`; `template`, `purge`, `version` and `version_info` are kept for
+compatibility. See `docs/architecture.md` for the full interface contract.
 
 ## Examples
 
