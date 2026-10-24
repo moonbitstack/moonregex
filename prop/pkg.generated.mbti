@@ -1,0 +1,61 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonregex/prop"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub let ascii_digit : CharSet
+
+pub let ascii_space : CharSet
+
+pub let ascii_word : CharSet
+
+pub fn binary(StringView) -> CharSet?
+
+pub fn block(StringView) -> CharSet?
+
+pub fn category(StringView) -> CharSet?
+
+pub let digit : CharSet
+
+pub fn fold(Char) -> Char
+
+pub fn property(StringView) -> CharSet?
+
+pub fn script(StringView) -> CharSet?
+
+pub let space : CharSet
+
+pub fn version() -> String
+
+pub let word : CharSet
+
+// Errors
+
+// Types and methods
+pub struct CharSet {
+  ranges : Array[(Int32, Int32)]
+} derive(Eq)
+pub fn CharSet::any() -> Self
+pub fn CharSet::complement(Self) -> Self
+pub fn CharSet::contains(Self, Int32) -> Bool
+pub fn CharSet::difference(Self, Self) -> Self
+pub fn CharSet::empty() -> Self
+pub fn CharSet::equal(Self, Self) -> Bool
+pub fn CharSet::fold(Self) -> Self
+pub fn CharSet::intersection(Self, Self) -> Self
+pub fn CharSet::is_empty(Self) -> Bool
+pub fn CharSet::not_equal(Self, Self) -> Bool
+pub fn CharSet::of(Array[(Int32, Int32)]) -> Self
+pub fn CharSet::ranges(Self) -> Array[(Int32, Int32)]
+pub fn CharSet::single(Int32) -> Self
+pub fn CharSet::symmetric_difference(Self, Self) -> Self
+pub fn CharSet::to_repr(Self) -> @debug.Repr
+pub fn CharSet::union(Self, Self) -> Self
+pub impl @debug.Debug for CharSet
+
+// Type aliases
+
+// Traits
