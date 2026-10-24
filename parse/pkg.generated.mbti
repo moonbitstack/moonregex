@@ -26,6 +26,7 @@ pub(all) suberror Refused {
   Pattern(msg~ : String, at~ : Int32, line~ : Int32, column~ : Int32)
   Exceeded(limit~ : Int32, got~ : Int32)
   Ambiguous(groups~ : Int32)
+  Accept(start~ : Int32, end~ : Int32)
 } derive(Eq, @debug.Debug)
 pub fn Refused::equal(Self, Self) -> Bool
 pub fn Refused::not_equal(Self, Self) -> Bool
@@ -141,6 +142,7 @@ pub enum Node {
   Grapheme
   Fuzzy(spec~ : FuzzySpec, node~ : Node)
   Recurse(target~ : Recurse)
+  Verb(kind~ : VerbKind)
 } derive(Eq, @debug.Debug)
 pub fn Node::equal(Self, Self) -> Bool
 pub fn Node::not_equal(Self, Self) -> Bool
@@ -154,6 +156,17 @@ pub enum Recurse {
 pub fn Recurse::equal(Self, Self) -> Bool
 pub fn Recurse::not_equal(Self, Self) -> Bool
 pub fn Recurse::to_repr(Self) -> @debug.Repr
+
+pub enum VerbKind {
+  Accept
+  Fail
+  Mark(name~ : String)
+  Prune
+  Skip
+} derive(Eq, @debug.Debug)
+pub fn VerbKind::equal(Self, Self) -> Bool
+pub fn VerbKind::not_equal(Self, Self) -> Bool
+pub fn VerbKind::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Version {
   V0

@@ -184,6 +184,9 @@ pub(all) suberror Refused {
   /// A call needed one group out of a pattern that has several, and none was
   /// named — `findall` with two groups or more, for instance.
   Ambiguous(groups~ : Int32)
+  /// `(*ACCEPT)`: the pattern asked for the match to end here, successfully.
+  /// Carries the match's start and end so the caller can build it.
+  Accept(start~ : Int32, end~ : Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -204,6 +207,7 @@ pub impl Show for Refused with fn output(self, logger) {
       Exceeded(limit~, got~) => "match exceeded \{limit} steps (got \{got})"
       Ambiguous(groups~) =>
         "pattern has \{groups} groups; pass group= to say which one to take"
+      Accept(start~, end~) => "match accepted at \{start}..\{end}"
     },
   )
 }

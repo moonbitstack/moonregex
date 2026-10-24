@@ -70,6 +70,12 @@ pub(all) enum Inst {
     sub~ : Int32,
     err~ : Int32
   )
+  /// `(*ACCEPT)`: end the whole match here, successfully. The engine raises an
+  /// `Accept` refusal that the top-level search/match/fullmatch catch and turn
+  /// into the winning match.
+  Accept
+  /// `(*FAIL)` / `(*F)`: make this match attempt fail at this position.
+  Fail
 }
 
 ///|
@@ -148,13 +154,14 @@ fn Compile::emit(
     @parse.Group(slot~, node~) => {
       let key = slot
       if !self.group_codes.contains(key) {
-        let body : Array[Inst] = []
-        self.emit(node, body)
-        let wrapped : Array[Inst] = [
-          Save(slot=2 * key),
-          ..body,
-          Save(slot=2 * key + 1),
-        ]
+        // Emit the body into a program that already carries its leading
+        // `Save`, so the `Split`/`Jmp` offsets the body computes are correct
+        // relative to where the sub-program actually starts. Prepending the
+        // `Save` afterwards would shift every offset by one and turn an
+        // alternation into an infinite loop.
+        let wrapped : Array[Inst] = [Save(slot=2 * key)]
+        self.emit(node, wrapped)
+        wrapped.push(Save(slot=2 * key + 1))
         self.group_codes.set(key, wrapped)
       }
       // Inline: capture here, run the body, capture the end.
@@ -223,6 +230,14 @@ fn Compile::emit(
           }
           code.push(RecurseGroup(slot~))
         }
+      }
+    @parse.Verb(kind~) =>
+      match kind {
+        // `(*ACCEPT)` and `(*FAIL)` lower to dedicated instructions; the rest
+        // carry no observable effect on a plain match, so they are dropped.
+        @parse.Accept => code.push(Accept)
+        @parse.Fail => code.push(Fail)
+        _ => ()
       }
   }
 }
@@ -701,7 +716,7 @@ fn Matcher::run(
       // Reaching the end of a code array accepts: the main program always ends
       // in an explicit `Match`, but every sub-program (a group body, a look-
       // around, a condition branch, a star body) is a fragment that succeeds
-      // once its last instruction has run.
+      // once its last instruction has been run.
       return (true, sp, saves)
     }
     match code[pc] {
@@ -939,6 +954,8 @@ fn Matcher::run(
           return (false, sp, saves)
         }
       }
+      Accept => raise @parse.Accept(start=saves[0], end=sp)
+      Fail => return (false, sp, saves)
     }
   } nobreak {
     (false, 0, saves)
@@ -959,6 +976,15 @@ fn make_match(saves : Array[Int32], ngroups : Int32) -> MatchResult {
 }
 
 ///|
+/// Build the match `(*ACCEPT)` asked for: group 0 spans `start..end`, and no
+/// other group is set, because the verb cut the pattern short before they ran.
+fn accept_match(start : Int32, end : Int32, ngroups : Int32) -> MatchResult {
+  let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
+  spans[0] = (start, end)
+  MatchResult::{ start, end, spans, fuzzy: None, }
+}
+
+///|
 /// Search left to right from `pos` to `endpos`, returning the leftmost match.
 pub fn Program::search(
   self : Program,
@@ -972,15 +998,20 @@ pub fn Program::search(
   let end = if endpos < 0 { len } else { endpos }
   let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
   let mut p = pos
-  while p <= end {
-    let init = Array::make(2 * (self.ngroups + 1), -1)
-    let (ok, _esp, saves) = mat.run(self.code, 0, p, init)
-    if ok {
-      return Some(make_match(saves, self.ngroups))
+  try {
+    while p <= end {
+      let init = Array::make(2 * (self.ngroups + 1), -1)
+      let (ok, _esp, saves) = mat.run(self.code, 0, p, init)
+      if ok {
+        return Some(make_match(saves, self.ngroups))
+      }
+      p = p + 1
     }
-    p = p + 1
+    None
+  } catch {
+    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
+    e => raise e
   }
-  None
 }
 
 ///|
@@ -1001,11 +1032,16 @@ pub fn Program::match_at(
     steps: [0],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
-  let (ok, _esp, saves) = mat.run(self.code, 0, pos, init)
-  if ok {
-    Some(make_match(saves, self.ngroups))
-  } else {
-    None
+  try {
+    let (ok, _esp, saves) = mat.run(self.code, 0, pos, init)
+    if ok {
+      Some(make_match(saves, self.ngroups))
+    } else {
+      None
+    }
+  } catch {
+    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
+    e => raise e
   }
 }
 
@@ -1023,10 +1059,15 @@ pub fn Program::fullmatch(
   let end = if endpos < 0 { len } else { endpos }
   let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
   let init = Array::make(2 * (self.ngroups + 1), -1)
-  let (ok, esp, saves) = mat.run(self.code, 0, pos, init)
-  if ok && esp == end {
-    Some(make_match(saves, self.ngroups))
-  } else {
-    None
+  try {
+    let (ok, esp, saves) = mat.run(self.code, 0, pos, init)
+    if ok && esp == end {
+      Some(make_match(saves, self.ngroups))
+    } else {
+      None
+    }
+  } catch {
+    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
+    e => raise e
   }
 }

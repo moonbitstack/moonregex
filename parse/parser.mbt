@@ -226,12 +226,13 @@ fn Parser::quantify(
     Some(q) => {
       // `?` after a quantifier is the lazy marker, `+` the possessive one;
       // either way a quantifier may not follow it.
-      let (rest, reluctant) = if rest.length() > 0 && rest.at(0).to_int() == '?' {
-        (rest.view(start_offset=1), true)
+      let (rest, reluctant, possessive_mod) = if rest.length() > 0 &&
+        rest.at(0).to_int() == '?' {
+        (rest.view(start_offset=1), true, false)
       } else if rest.length() > 0 && rest.at(0).to_int() == '+' {
-        (rest.view(start_offset=1), false)
+        (rest.view(start_offset=1), false, true)
       } else {
-        (rest, false)
+        (rest, false, false)
       }
       let (_, again) = self.quantifier(rest)
       if again is Some(_) {
@@ -241,14 +242,16 @@ fn Parser::quantify(
         Some(spec) => Fuzzy(spec~, node=atom)
         None => {
           // A possessive quantifier is an atomic repeat: no backtracking into
-          // the repetitions once they are taken.
+          // the repetitions once they are taken. The possessive marker may be
+          // the `+` just past the quantifier, or the `+` after a counted one.
+          let possessive = q.possessive || possessive_mod
           let repeated = Repeat(
             node=atom,
             min=q.min,
             max=q.max,
             greedy=!reluctant,
           )
-          if q.possessive {
+          if possessive {
             Atomic(node=repeated)
           } else {
             repeated
@@ -617,6 +620,36 @@ fn next_char(rest : StringView) -> (Char, StringView) {
 }
 
 ///|
+/// Read a `\Q…\E` quoted run into a sequence of literal nodes.
+///
+/// `rest` points just past the `\Q`. Everything is taken literally until a `\E`
+/// closes it; if no `\E` appears, the rest of the pattern is quoted. Each code
+/// point is folded under `ignorecase` the way a plain literal would be.
+fn Parser::quote(self : Parser, rest : StringView) -> (StringView, Array[Node]) {
+  let items : Array[Node] = []
+  let mut view = rest
+  while view.length() > 0 {
+    if view.at(0).to_int() == '\\' &&
+      view.length() > 1 &&
+      view.at(1).to_int() == 'E'.to_int() {
+      view = view.view(start_offset=2)
+      break
+    }
+    let (ch, next) = next_char(view)
+    let code = ch.to_int()
+    items.push(
+      if self.flags.ignorecase {
+        Class(set=@prop.CharSet::single(code).fold())
+      } else {
+        Char(code~)
+      },
+    )
+    view = next
+  }
+  (view, items)
+}
+
+///|
 /// A group: `(…)`, with everything the `?` after the parenthesis can mean.
 fn Parser::group(
   self : Parser,
@@ -629,6 +662,11 @@ fn Parser::group(
   }
   if after.length() == 0 {
     raise self.refuse(rest, "missing ), unterminated group")
+  }
+  if after.at(0).to_int() == '*' {
+    // A control verb `(*ACCEPT)`, `(*FAIL)`, `(*MARK:name)`, … — no question
+    // mark, so it is caught before the `(?` extension branch below.
+    return self.verb(after)
   }
   if after.at(0).to_int() != '?' {
     // A plain capture group.
@@ -835,6 +873,16 @@ fn Parser::python_group(
     }
     return (rest, Backref(slot~, icase=self.flags.ignorecase))
   }
+  if c == '>' {
+    // `(?P>name)`: the `regex` superset's spelling of a named-group recursion.
+    // The name is closed by `)`, not `>`, so a `)`-delimited reader is used.
+    let (view, name) = self.name_close(rest.view(start_offset=3))
+    match self.groupindex.get(name) {
+      None => raise self.refuse(rest, "unknown group name '\{name}'")
+      Some(_) => ()
+    }
+    return (view, Recurse(target=Named(name~)))
+  }
   raise self.refuse(rest, "unknown extension ?P\{c.unsafe_to_char()}")
 }
 
@@ -850,6 +898,23 @@ fn Parser::name(
   }
   if i == 0 || i >= rest.length() || rest.at(i).to_int() != '>' {
     raise self.refuse(rest, "missing >, unterminated name")
+  }
+  (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
+}
+
+///|
+/// Like `name`, but the name is closed by `)` — used by `(?P>name)` and
+/// `(?&name)`, where the group parenthesis, not a `>`, follows the name.
+fn Parser::name_close(
+  self : Parser,
+  rest : StringView,
+) -> (StringView, String) raise Refused {
+  let mut i = 0
+  while i < rest.length() && is_name_char(rest.at(i).to_int()) {
+    i += 1
+  }
+  if i == 0 || i >= rest.length() || rest.at(i).to_int() != ')' {
+    raise self.refuse(rest, "missing ), unterminated name")
   }
   (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
 }
@@ -950,26 +1015,25 @@ fn Parser::recursion(
   self : Parser,
   rest : StringView,
 ) -> (StringView, Node) raise Refused {
-  // rest points at `(?R`, `(?1` or `(?&`.
-  if rest.length() < 3 {
+  // rest points at `?R`, `?1` or `?&` — the `(` was consumed by the caller.
+  if rest.length() < 2 {
     raise self.refuse(rest, "unknown extension ?")
   }
-  let c = rest.at(2).to_int()
+  let c = rest.at(1).to_int()
   if c == 'R' {
-    let view = self.close(rest.view(start_offset=3))
+    let view = self.close(rest.view(start_offset=2))
     return (view, Recurse(target=Whole))
   }
   if c == '&' {
-    let (rest, name) = self.name(rest.view(start_offset=3))
+    let (view, name) = self.name_close(rest.view(start_offset=2))
     match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(_) => ()
     }
-    let view = self.close(rest)
     return (view, Recurse(target=Named(name~)))
   }
   // A number: `(?1)` … `(?99)`.
-  let (slot, after) = match self.digits(rest, 2) {
+  let (slot, after) = match self.digits(rest, 1) {
     None => raise self.refuse(rest, "invalid group reference")
     Some(pair) => pair
   }
@@ -978,6 +1042,59 @@ fn Parser::recursion(
   }
   let view = self.close(rest.view(start_offset=after))
   (view, Recurse(target=Group(slot~)))
+}
+
+///|
+/// `(*VERB)`, `(*VERB:arg)`: a control verb from the `regex` superset.
+///
+/// `rest` points at `(?*…`, so `at(2)` is the first letter of the verb. The
+/// whole `(…)` is read to its close, the verb name and optional argument split
+/// at `:`, and the name mapped to a `VerbKind`. Unknown verbs are refused so a
+/// pattern counting on behaviour we do not carry is flagged rather than silent.
+fn Parser::verb(
+  self : Parser,
+  rest : StringView,
+) -> (StringView, Node) raise Refused {
+  // rest points at `*VERB)…` (the `(` was consumed by the caller's atom).
+  // Read to the closing parenthesis of the group.
+  match self.read_until_close(rest.view(start_offset=1), ')') {
+    None => raise self.refuse(rest, "unterminated verb")
+    Some((inner, view)) => {
+      // Split the verb at its first `:`, into the name and an optional argument.
+      let mut colon = -1
+      let mut k = 0
+      while k < inner.length() {
+        if inner.at(k).to_int() == ':' {
+          colon = k
+          break
+        }
+        k = k + 1
+      }
+      let (name, arg) = if colon < 0 {
+        (inner, None)
+      } else {
+        (inner.view(end_offset=colon), Some(inner.view(start_offset=colon + 1)))
+      }
+      let kind = match name.to_owned() {
+        "ACCEPT" => VerbKind::Accept
+        "FAIL" | "F" => VerbKind::Fail
+        "PRUNE" => VerbKind::Prune
+        "SKIP" => VerbKind::Skip
+        "MARK" =>
+          match arg {
+            None => raise self.refuse(rest, "(*MARK) needs a name")
+            Some(a) => VerbKind::Mark(name=a.to_owned())
+          }
+        ":" =>
+          match arg {
+            None => raise self.refuse(rest, "(*:MARK) needs a name")
+            Some(a) => VerbKind::Mark(name=a.to_owned())
+          }
+        other => raise self.refuse(rest, "unknown verb (*\{other})")
+      }
+      (view, Verb(kind~))
+    }
+  }
 }
 
 ///|
@@ -1213,6 +1330,12 @@ fn Parser::escape(
         raise self.refuse(
           rest, "named characters (\\N{...}) are not in the tables yet",
         )
+      'Q' => {
+        // `\Q…\E`: quote everything literally until the `\E`. The superset's
+        // way to paste a string of metacharacters without escaping each one.
+        let (view, items) = self.quote(after)
+        return (view, Seq(items~), false)
+      }
       _ => ()
     }
   }

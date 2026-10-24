@@ -103,6 +103,30 @@ pub enum Recurse {
 } derive(Eq, Debug)
 
 ///|
+/// A control verb from the `regex` superset: `(*ACCEPT)`, `(*FAIL)`, and the
+/// rest. `Accept` ends the whole match at the current position; `Fail` forces
+/// the current match attempt to fail; `Mark` records a name; `Prune` and `Skip`
+/// carry the position past a failure so the scan does not retry it.
+pub enum VerbKind {
+  /// `(*ACCEPT)`: end the match successfully here.
+  Accept
+  /// `(*FAIL)` / `(*F)`: make this match attempt fail.
+  Fail
+  /// `(*MARK:name)` / `(*:name)`: record a name on the match.
+  Mark(name~ : String)
+  /// `(*PRUNE)`: fail and do not backtrack before this point.
+  Prune
+  /// `(*SKIP)`: fail and resume the scan after the mark.
+  Skip
+} derive(Eq, Debug)
+
+///|
+pub extend VerbKind with Eq::{equal, not_equal}
+
+///|
+pub extend VerbKind with Debug::{to_repr}
+
+///|
 pub extend Recurse with Eq::{equal, not_equal}
 
 ///|
@@ -151,6 +175,9 @@ pub enum Node {
   Fuzzy(spec~ : FuzzySpec, node~ : Node)
   /// A recursive call back into the pattern.
   Recurse(target~ : Recurse)
+  /// A control verb: `(*ACCEPT)`, `(*FAIL)`, `(*MARK:name)`, `(*PRUNE)`,
+  /// `(*SKIP)`.
+  Verb(kind~ : VerbKind)
 } derive(Eq, Debug)
 
 ///|
@@ -356,6 +383,16 @@ fn dump_node(node : Node, buf : StringBuilder) -> Unit {
           buf.write_string(")")
         }
       }
+    Verb(kind~) =>
+      buf.write_string(
+        match kind {
+          Accept => "(*ACCEPT)"
+          Fail => "(*FAIL)"
+          Mark(name~) => "(*MARK:" + name + ")"
+          Prune => "(*PRUNE)"
+          Skip => "(*SKIP)"
+        },
+      )
   }
 }
 
