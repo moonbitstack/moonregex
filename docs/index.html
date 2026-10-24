@@ -3,214 +3,639 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>moonregex — regular expressions for MoonBit</title>
-<meta name="description" content="Regular expressions for MoonBit: Python's re interface, the mrab-regex superset, and the ECMA-262 dialect JSON Schema and OpenAPI mean." />
+<title>moonregex — a regular-expression engine for MoonBit</title>
+<meta name="description" content="moonregex is a regular-expression engine for MoonBit: three dialects, backreferences, lookaround, conditionals, recursion, fuzzy matching, and shell globs — on native, wasm, wasm-gc and js." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #0e1117;
-    --panel: #161b22;
-    --panel-2: #1c2330;
-    --ink: #e6edf3;
-    --muted: #9aa7b4;
-    --line: #2a3340;
-    --accent: #6ea8fe;
-    --accent-2: #b692f6;
-    --code-bg: #0b0f14;
-    --radius: 14px;
-    --maxw: 960px;
+    --bg: #0a0b14;
+    --bg-2: #0e1020;
+    --surface: #12142a;
+    --surface-2: #161a36;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #eceaf6;
+    --muted: #9a98b5;
+    --faint: #6b698a;
+    --accent: #8ea2ff;
+    --accent-2: #5be0c6;
+    --mark: #ffc857;
+    --mark-soft: rgba(255, 200, 87, 0.16);
+    --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
+
   * { box-sizing: border-box; }
+
   html { scroll-behavior: smooth; }
+
   body {
     margin: 0;
-    background: radial-gradient(1200px 600px at 70% -10%, #1a2230 0%, var(--bg) 55%);
-    color: var(--ink);
-    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.65;
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
-  header.hero {
-    padding: 84px 0 56px;
-    border-bottom: 1px solid var(--line);
+
+  /* Atmospheric night-sky backdrop */
+  .sky {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(1200px 700px at 78% -8%, rgba(142, 162, 255, 0.16), transparent 60%),
+      radial-gradient(900px 600px at 10% 8%, rgba(91, 224, 198, 0.07), transparent 55%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
   }
-  .badge {
-    display: inline-block; font-size: 13px; letter-spacing: .04em;
-    color: var(--accent-2); border: 1px solid var(--line);
-    background: var(--panel); padding: 4px 12px; border-radius: 999px; margin-bottom: 22px;
+  .stars {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 65% 18%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 82% 62%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 40% 72%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 12% 84%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 92% 38%, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1px 1px at 55% 92%, rgba(255,255,255,0.4), transparent);
+    opacity: 0.7;
+    animation: twinkle 6s ease-in-out infinite alternate;
   }
-  h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.08; margin: 0 0 14px; letter-spacing: -.02em; }
-  h1 .grad { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .lede { font-size: 19px; color: var(--muted); max-width: 720px; margin: 0 0 26px; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  @keyframes twinkle { from { opacity: 0.45; } to { opacity: 0.85; } }
+
+  /* The moon, top-right */
+  .moon {
+    position: fixed;
+    top: -90px;
+    right: -90px;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    z-index: -1;
+    background: radial-gradient(circle at 38% 38%, #f3f1ff 0%, #c9cdf2 45%, #8b8fc4 100%);
+    box-shadow: 0 0 120px 30px rgba(142, 162, 255, 0.25), inset -30px -22px 60px rgba(10,11,20,0.55);
+    opacity: 0.9;
+  }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---------- top bar ---------- */
+  header.nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    backdrop-filter: blur(10px);
+    background: rgba(10, 11, 20, 0.62);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 66px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .brand .dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #f3f1ff, #8b8fc4);
+    box-shadow: 0 0 18px rgba(142,162,255,0.6);
+  }
+  .brand span.acc { color: var(--accent); }
+  .nav-links { display: flex; gap: 26px; align-items: center; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 15px;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a.cta {
+    color: var(--bg); background: var(--accent);
+    padding: 8px 16px; border-radius: 8px; font-weight: 600;
+  }
+  .nav-links a.cta:hover { background: #aab9ff; }
+  @media (max-width: 720px) { .nav-links a.txt { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 86px 0 64px; }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+  @media (max-width: 920px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 44px; }
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--mono); font-size: 13px; color: var(--accent-2);
+    border: 1px solid var(--border-strong); border-radius: 999px;
+    padding: 6px 14px; margin-bottom: 26px; letter-spacing: 0.04em;
+  }
+  .eyebrow .pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2);
+    box-shadow: 0 0 10px var(--accent-2); animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  h1.title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(46px, 7vw, 84px);
+    line-height: 0.98;
+    letter-spacing: -0.035em;
+    margin: 0 0 22px;
+  }
+  h1.title .reg {
+    color: var(--accent);
+    position: relative;
+  }
+  h1.title .reg::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0.08em; height: 0.13em;
+    background: var(--mark); opacity: 0.55; border-radius: 4px;
+    transform: rotate(-1.2deg);
+  }
+  .lede {
+    font-size: 19px; color: var(--muted); max-width: 34ch; margin: 0 0 32px;
+  }
+  .lede b { color: var(--text); font-weight: 600; }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
   .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px;
-    border-radius: 10px; font-weight: 600; border: 1px solid var(--line);
-    background: var(--panel); color: var(--ink);
+    font-family: var(--body); font-weight: 600; font-size: 15px;
+    padding: 13px 22px; border-radius: 10px; text-decoration: none;
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+    border: 1px solid transparent;
   }
-  .btn.primary { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #0b0f14; border: none; }
-  pre {
-    background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 18px 20px; overflow-x: auto; margin: 0; font-size: 14.5px; line-height: 1.55;
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { background: #aab9ff; transform: translateY(-2px); box-shadow: 0 12px 30px rgba(142,162,255,0.3); }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+
+  /* ---------- live matcher demo ---------- */
+  .demo {
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+    position: relative;
   }
-  code, pre { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; }
-  p code, li code { background: var(--panel-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: 13.5px; }
-  section { padding: 54px 0; border-bottom: 1px solid var(--line); }
-  h2 { font-size: 28px; margin: 0 0 10px; letter-spacing: -.01em; }
-  .section-sub { color: var(--muted); margin: 0 0 26px; }
-  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
-  .card h3 { margin: 0 0 8px; font-size: 17px; }
-  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
-  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
-  th { color: var(--muted); font-weight: 600; background: var(--panel-2); }
-  tr:last-child td { border-bottom: none; }
-  .pill { font-size: 12.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--accent); background: var(--panel-2); }
-  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; }
-  .split { display: grid; gap: 26px; grid-template-columns: 1fr; }
-  @media (min-width: 760px) { .split { grid-template-columns: 1fr 1fr; align-items: start; } }
-  .note { color: var(--muted); font-size: 13px; }
+  .demo-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .phase { display: flex; gap: 5px; margin-right: auto; }
+  .phase i {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 1px solid var(--border-strong); display: inline-block;
+  }
+  .phase i.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .demo-bar .lbl { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .demo-body { padding: 18px 18px 20px; }
+  .demo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .demo-row label { font-family: var(--mono); font-size: 12px; color: var(--faint); width: 56px; }
+  .demo-row .pat {
+    flex: 1; font-family: var(--mono); font-size: 15px;
+    background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+    color: var(--accent-2); border-radius: 8px; padding: 9px 12px;
+  }
+  .demo-row .pat:focus { outline: none; border-color: var(--accent); }
+  .flags { display: flex; gap: 6px; }
+  .flags button {
+    font-family: var(--mono); font-size: 12px; width: 28px; height: 28px;
+    border-radius: 7px; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: 0.15s;
+  }
+  .flags button.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700; }
+  .demo-text {
+    font-family: var(--mono); font-size: 15px; line-height: 1.9;
+    color: var(--text); word-break: break-word; min-height: 84px;
+    background: rgba(0,0,0,0.22); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; position: relative;
+  }
+  .demo-text mark {
+    background: var(--mark-soft); color: var(--mark);
+    border-radius: 4px; padding: 1px 2px; font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(255,200,87,0.35);
+  }
+  .demo-text .caret {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
+    box-shadow: 0 0 12px var(--accent); opacity: 0.0; animation: scan 3.4s linear infinite;
+  }
+  @keyframes scan {
+    0% { left: 0; opacity: 0; } 6% { opacity: 0.9; } 94% { opacity: 0.9; } 100% { left: 100%; opacity: 0; }
+  }
+  .demo-stat { margin-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .demo-stat b { color: var(--mark); }
+
+  /* ---------- noise band ---------- */
+  .noise {
+    margin: 70px 0; padding: 30px 0; border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden; white-space: nowrap; position: relative;
+  }
+  .noise .track {
+    display: inline-block; font-family: var(--mono); font-size: 15px;
+    color: var(--faint); letter-spacing: 0.04em;
+    animation: slide 38s linear infinite;
+  }
+  .noise .track mark { background: none; color: var(--mark); font-weight: 700; padding: 0; }
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ---------- sections ---------- */
+  .section { padding: 56px 0; }
+  .sec-head { margin-bottom: 38px; }
+  .sec-kicker {
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .sec-title {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em;
+    margin: 10px 0 0;
+  }
+  .sec-sub { color: var(--muted); max-width: 60ch; margin: 12px 0 0; }
+
+  /* ---------- feature list (editorial, numbered) ---------- */
+  .features {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px;
+  }
+  @media (max-width: 760px) { .features { grid-template-columns: 1fr; } }
+  .feat {
+    display: grid; grid-template-columns: 64px 1fr; gap: 18px;
+    padding: 26px 0; border-top: 1px solid var(--border);
+  }
+  .feat .num {
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    color: var(--accent); opacity: 0.8;
+  }
+  .feat h3 { margin: 0 0 6px; font-family: var(--display); font-size: 19px; font-weight: 600; }
+  .feat p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  .feat .tag {
+    display: inline-block; margin-top: 10px; font-family: var(--mono);
+    font-size: 12px; color: var(--accent-2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+  }
+
+  /* ---------- code terminal ---------- */
+  .term {
+    background: linear-gradient(180deg, #0c0e1c, #0a0b16);
+    border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02);
+  }
+  .term-bar .dots { display: flex; gap: 6px; }
+  .term-bar .dots i { width: 11px; height: 11px; border-radius: 50%; background: #2a2e4d; }
+  .term-bar .tabs { display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; }
+  .term-bar .tabs button {
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    background: transparent; border: 1px solid transparent; border-radius: 7px;
+    padding: 5px 11px; cursor: pointer; transition: 0.15s;
+  }
+  .term-bar .tabs button:hover { color: var(--text); }
+  .term-bar .tabs button.active { color: var(--bg); background: var(--accent); font-weight: 600; }
+  .term pre {
+    margin: 0; padding: 22px; overflow-x: auto;
+    font-family: var(--mono); font-size: 14px; line-height: 1.75; color: #d7d9f0;
+  }
+  .term .c-com { color: #5d6088; font-style: italic; }
+  .term .c-kw { color: #8ea2ff; }
+  .term .c-fn { color: #5be0c6; }
+  .term .c-str { color: #ffc857; }
+  .term .c-num { color: #ff9fb0; }
+
+  /* ---------- install strip ---------- */
+  .install {
+    margin: 18px 0 0; display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px; flex-wrap: wrap;
+  }
+  .install code { font-family: var(--mono); font-size: 14.5px; color: var(--accent-2); }
+  .install .hint { color: var(--muted); font-size: 14px; }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--border); margin-top: 40px;
+    padding: 40px 0 56px; color: var(--muted); font-size: 14px;
+  }
+  .foot-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+  footer .copy { color: var(--faint); }
 </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="wrap">
-      <span class="badge">moonbitstack · Apache-2.0 · 4 targets</span>
-      <h1>Regular expressions for MoonBit, <span class="grad">the way Python drew them.</span></h1>
-      <p class="lede">
-        Python's <code>re</code> interface, the mrab-regex superset behind it, and the
-        ECMA-262 dialect that JSON Schema and OpenAPI actually mean — one engine, the same
-        answer on native, wasm, wasm-gc and js.
-      </p>
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/moonbitstack/moonregex">View on GitHub</a>
-        <a class="btn" href="https://github.com/moonbitstack/moonregex/tree/master/examples/tour">Run the tour</a>
-        <a class="btn" href="./api/module.mbt.html">API reference</a>
-      </div>
+  <div class="sky"></div>
+  <div class="stars"></div>
+  <div class="moon"></div>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top"><span class="dot"></span>moon<span class="acc">regex</span></a>
+      <nav class="nav-links">
+        <a class="txt" href="#features">Features</a>
+        <a class="txt" href="#code">Examples</a>
+        <a class="txt" href="./api/module.mbt.html">API</a>
+        <a class="cta" href="https://github.com/moonbitstack/moonregex">GitHub</a>
+      </nav>
     </div>
   </header>
 
-  <section>
-    <div class="wrap">
-      <h2>Why a second regex</h2>
-      <p class="section-sub">
-        MoonBit's own <code>@string.Regex</code> is fast and good at lexing, but it is its own
-        grammar and stops short of ECMA-262. moonregex makes the grammar a parameter instead of a fork.
-      </p>
-      <div class="grid">
-        <div class="card">
-          <h3>Python, by default</h3>
-          <p><code>(?P&lt;name&gt;…)</code>, <code>\A</code>, <code>\Z</code> — the interface everyone already knows.</p>
+  <a id="top"></a>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow"><span class="pulse"></span>regular expressions for MoonBit</span>
+        <h1 class="title">Find the<br /><span class="reg">signal</span> in the noise.</h1>
+        <p class="lede">
+          <b>moonregex</b> is a complete regular-expression engine written in
+          MoonBit — three dialects, backreferences, lookaround, conditionals,
+          recursion, fuzzy matching and shell globs, on every target.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#code">See it work</a>
+          <a class="btn btn-ghost" href="./api/module.mbt.html">Read the API</a>
         </div>
-        <div class="card">
-          <h3>ECMA-262, for real</h3>
-          <p>The grammar JSON Schema and OpenAPI define, where <code>pattern</code> means §22.2 and tolerates nothing else.</p>
+      </div>
+
+      <div class="demo" aria-label="live regex matcher demo">
+        <div class="demo-bar">
+          <span class="phase"><i class="on"></i><i></i><i></i><i class="on"></i><i></i></span>
+          <span class="lbl">moonregex · live matcher</span>
         </div>
-        <div class="card">
-          <h3>The regex superset</h3>
-          <p>Fuzzy matching, recursion, set operations, variable-length lookbehind — gated the way mrab-regex gates them.</p>
-        </div>
-        <div class="card">
-          <h3>Shell globbing</h3>
-          <p><code>fnmatch</code>, <code>Glob</code> and <code>GlobSet</code> sit on the same engine, so Unicode handling is free.</p>
+        <div class="demo-body">
+          <div class="demo-row">
+            <label for="pat">pattern</label>
+            <input id="pat" class="pat" value="(m\w+)" spellcheck="false" />
+            <span class="flags">
+              <button id="fi" title="ignore case">i</button>
+              <button id="fg" class="active" title="global">g</button>
+            </span>
+          </div>
+          <div id="text" class="demo-text"><span class="caret"></span></div>
+          <div class="demo-stat" id="stat"></div>
         </div>
       </div>
     </div>
   </section>
 
-  <section>
+  <div class="noise" aria-hidden="true">
+    <div class="track" id="noisetrack"></div>
+  </div>
+
+  <section class="section" id="features">
     <div class="wrap">
-      <h2>Quick start</h2>
-      <p class="section-sub">Add the module, then use the <code>re</code>-shaped surface on every backend.</p>
-      <div class="split">
-        <div>
-          <pre><code># install
-moon add moonbitstack/moonregex
+      <div class="sec-head">
+        <div class="sec-kicker">what it does</div>
+        <h2 class="sec-title">One engine, many dialects.</h2>
+        <p class="sec-sub">
+          A single parse tree lowers into three grammars and one backtracking
+          virtual machine. Reach for what the job needs — and switch without
+          rewriting your patterns.
+        </p>
+      </div>
 
-# run the demo
-moon run examples/tour</code></pre>
+      <div class="features">
+        <div class="feat">
+          <div class="num">01</div>
+          <div>
+            <h3>Three dialects</h3>
+            <p>Python <code>re</code>, ECMA-262 and Lexmatch share one tree. Named groups read as <code>(?P&lt;n&gt;)</code>, <code>(?&lt;n&gt;)</code> and <code>(?'n')</code>.</p>
+            <span class="tag">python · ecma262 · lexmatch</span>
+          </div>
         </div>
-        <div>
-          <pre><code>// the leftmost match, Python-style
-match @moonregex.search(r"(\w+) (\w+)", "hello world") {
-  Some(m) =&gt; println(m.group().unwrap())  // "hello world"
-  None =&gt; println("no match")
-}
-
-// compile once, configure once
-let rx = @moonregex.compile(
-  r"[A-Z]+",
-  flags=@moonregex.Flags::new(ignorecase=true),
-)</code></pre>
+        <div class="feat">
+          <div class="num">02</div>
+          <div>
+            <h3>Deep syntax</h3>
+            <p>Backreferences, look-ahead and look-behind, conditionals, atomic groups, recursion and possessive quantifiers — the hard parts, handled.</p>
+            <span class="tag">(?(1)x|y) · (?&gt;…) · (?R)</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="num">03</div>
+          <div>
+            <h3>Fuzzy matching</h3>
+            <p>A bounded Levenshtein budget over literal runs: <code>{e&lt;=1}</code>, <code>{i&lt;=1}</code>, <code>{d&lt;=1}</code>, <code>{s&lt;=1}</code> — insertions, deletions and substitutions.</p>
+            <span class="tag">approximate search</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="num">04</div>
+          <div>
+            <h3>Shell globs</h3>
+            <p>The <code>glob</code> package translates <code>*</code>, <code>**</code>, <code>?</code>, <code>[…]</code> and <code>{a,b}</code> into patterns, with path-aware matching.</p>
+            <span class="tag">fnmatch · Glob · GlobSet</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="num">05</div>
+          <div>
+            <h3>Unicode, properly</h3>
+            <p>Codepoint classes, <code>\p{…}</code> properties, case- and line-aware flags, and correct counting of characters, not bytes.</p>
+            <span class="tag">\p{Script=Han}</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="num">06</div>
+          <div>
+            <h3>Four targets</h3>
+            <p>One source, four backends: native, wasm, wasm-gc and js. The same test suite runs green on all of them.</p>
+            <span class="tag">native · wasm · wasm-gc · js</span>
+          </div>
         </div>
       </div>
-      <p class="note">The API reference on this site is generated from the source — see the <a href="./api/module.mbt.html">module index</a>.</p>
     </div>
   </section>
 
-  <section>
+  <section class="section" id="code">
     <div class="wrap">
-      <h2>Configuration, and its precedence</h2>
-      <p class="section-sub">
-        Every module function takes the same four knobs; they resolve in a fixed order so the result is never ambiguous.
-      </p>
-      <table>
-        <thead>
-          <tr><th>Argument</th><th>Sets</th><th>Default</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>dialect~</code></td><td>the grammar</td><td><span class="pill">Python</span></td></tr>
-          <tr><td><code>flags~</code></td><td>the flag set</td><td><code>@moonregex.flags</code></td></tr>
-          <tr><td><code>lists?</code></td><td>named lists for <code>\L&lt;name&gt;</code></td><td>none</td></tr>
-          <tr><td><code>partial~</code></td><td>partial matching</td><td><code>false</code></td></tr>
-        </tbody>
-      </table>
-      <p style="margin-top:20px">
-        <strong>Precedence, highest first:</strong> an argument at the call site → the package defaults →
-        the compiled <code>Pattern</code>. <code>compile</code> bakes the settings in; the <code>Pattern::</code>
-        methods then ignore any flags you pass and reuse what was compiled. Configure once, match reproducibly.
-      </p>
-    </div>
-  </section>
+      <div class="sec-head">
+        <div class="sec-kicker">in practice</div>
+        <h2 class="sec-title">A small, honest surface.</h2>
+        <p class="sec-sub">
+          Module-level functions mirror Python's <code>re</code>; a compiled
+          <code>Pattern</code> and a <code>Match</code> carry the rest. The
+          example below is real MoonBit, not pseudocode.
+        </p>
+      </div>
 
-  <section>
-    <div class="wrap">
-      <h2>Packages</h2>
-      <p class="section-sub">One tree, one engine, three grammars — each concern in its own package.</p>
-      <table>
-        <thead>
-          <tr><th>Package</th><th>Covers</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>moonregex</code></td><td><code>Pattern</code> and <code>Match</code>, shaped as Python's <code>re</code>, plus the module functions.</td></tr>
-          <tr><td><code>parse</code></td><td>The three grammars into one syntax tree, flags and all.</td></tr>
-          <tr><td><code>exec</code></td><td>The backtracking engine — backreferences, lookaround, conditionals, recursion.</td></tr>
-          <tr><td><code>prop</code></td><td><code>\p{…}</code>: the Unicode property tables, generated, version recorded.</td></tr>
-          <tr><td><code>glob</code></td><td><code>fnmatch</code>, <code>Glob</code> and <code>GlobSet</code> — shell globbing on top.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+      <div class="term">
+        <div class="term-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="tabs" id="tabs">
+            <button class="active" data-k="search">search</button>
+            <button data-k="groups">groups</button>
+            <button data-k="sub">sub_by</button>
+            <button data-k="glob">glob</button>
+            <button data-k="fuzzy">fuzzy</button>
+          </span>
+        </div>
+        <pre id="codeblock"></pre>
+      </div>
 
-  <section>
-    <div class="wrap">
-      <h2>Four targets, one answer</h2>
-      <p class="section-sub">The same pattern returns the same match on every backend — that is what the shared test set is for.</p>
-      <div class="grid">
-        <div class="card"><h3>native</h3><p>Parse, lower and run here.</p></div>
-        <div class="card"><h3>wasm</h3><p>Parse, lower and run here.</p></div>
-        <div class="card"><h3>wasm-gc</h3><p>Parse, lower and run here.</p></div>
-        <div class="card"><h3>js</h3><p>Runs through the host where that is the natural fit for the dialect.</p></div>
+      <div class="install">
+        <code>moon add moonbitstack/moonregex</code>
+        <span class="hint">— and build with <code>moon build --target all</code>.</span>
       </div>
     </div>
   </section>
 
   <footer>
-    <div class="wrap">
-      moonregex · Apache-2.0 · <a href="https://github.com/moonbitstack/moonregex">moonbitstack/moonregex</a>
+    <div class="wrap foot-grid">
+      <div>
+        <a class="brand" href="#top"><span class="dot"></span>moon<span class="acc">regex</span></a>
+        <div class="copy" style="margin-top:10px">© 2026 Leo Cheng · Apache-2.0</div>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap">
+        <a href="./api/module.mbt.html">API docs</a>
+        <a href="https://github.com/moonbitstack/moonregex">GitHub</a>
+        <a href="https://github.com/moonbitstack/moonregex/blob/master/README.md">README</a>
+        <a href="https://github.com/moonbitstack/moonregex/blob/master/examples/tour/main.mbt">Tour</a>
+      </div>
     </div>
   </footer>
+
+<script>
+  // ---- live matcher ----
+  var SAMPLE = "the moonregex matcher scans moonbit and moonlight for every moon-shaped word in the text";
+  var patEl = document.getElementById("pat");
+  var textEl = document.getElementById("text");
+  var statEl = document.getElementById("stat");
+  var fi = document.getElementById("fi");
+  var fg = document.getElementById("fg");
+  var flags = { i: false, g: true };
+
+  function render() {
+    var raw = patEl.value;
+    var fl = (flags.i ? "i" : "") + (flags.g ? "g" : "");
+    var re;
+    try { re = new RegExp(raw, fl); }
+    catch (e) { textEl.innerHTML = escapeHtml(SAMPLE); statEl.innerHTML = "invalid pattern"; return; }
+    if (!re.global) {
+      var m = re.exec(SAMPLE);
+      if (!m) { textEl.innerHTML = escapeHtml(SAMPLE); statEl.innerHTML = "0 matches"; return; }
+      textEl.innerHTML = highlight(SAMPLE, [ [m.index, m[0].length] ]);
+      statEl.innerHTML = "1 match";
+      return;
+    }
+    var out = [], last = 0, mm, spans = [];
+    while ((mm = re.exec(SAMPLE)) !== null) {
+      spans.push([mm.index, mm[0].length]);
+      if (mm.index === re.lastIndex) re.lastIndex++;
+    }
+    textEl.innerHTML = highlight(SAMPLE, spans);
+    statEl.innerHTML = "<b>" + spans.length + "</b> match" + (spans.length === 1 ? "" : "es");
+  }
+
+  function highlight(s, spans) {
+    if (!spans.length) return escapeHtml(s);
+    spans.sort(function(a,b){ return a[0]-b[0]; });
+    var html = "", cur = 0;
+    for (var i = 0; i < spans.length; i++) {
+      var start = spans[i][0], end = spans[i][0] + spans[i][1];
+      if (start < cur) continue;
+      html += escapeHtml(s.slice(cur, start));
+      html += "<mark>" + escapeHtml(s.slice(start, end)) + "</mark>";
+      cur = end;
+    }
+    html += escapeHtml(s.slice(cur));
+    return html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  patEl.addEventListener("input", render);
+  fi.addEventListener("click", function(){ flags.i = !flags.i; fi.classList.toggle("active"); render(); });
+  fg.addEventListener("click", function(){ flags.g = !flags.g; fg.classList.toggle("active"); render(); });
+  render();
+
+  // ---- noise band ----
+  var noiseText = "xzq moonbit wkrp moonregex qlv moonlight m9 moon-shaped zxp moon qwe moonbeam moonwalk".repeat(3);
+  noiseText = noiseText.replace(/m\w+/g, function(m){ return "<mark>" + m + "</mark>"; });
+  document.getElementById("noisetrack").innerHTML = noiseText + "&nbsp;&nbsp;&nbsp;&nbsp;" + noiseText;
+
+  // ---- code tabs ----
+  var CODE = {
+    search:
+'<span class="c-com">// search anywhere, or force a start-anchored match</span>\n' +
+'<span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>).unwrap()\n' +
+'m.group().unwrap()                 <span class="c-com">// "42"</span>\n' +
+'@moonregex.match_at(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>)  <span class="c-com">// None</span>\n' +
+'\n' +
+'<span class="c-com">// collect one capture per match</span>\n' +
+'@moonregex.findall(<span class="c-str">"(\\w+)=(\\d+)"</span>, <span class="c-str">"a=1 b=2"</span>)  <span class="c-com">// ["a","1","b","2"]</span>',
+
+    groups:
+'<span class="c-com">// named groups, three spellings, one tree</span>\n' +
+'<span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"(?P&lt;word&gt;\\w+)"</span>, <span class="c-str">"see spot"</span>).unwrap()\n' +
+'m.group(group=@moonregex.Name(n=<span class="c-str">"word"</span>)).unwrap()  <span class="c-com">// "see"</span>\n' +
+'\n' +
+'<span class="c-com">// split keeps the captured separators</span>\n' +
+'@moonregex.split(<span class="c-str">"(\\s+)"</span>, <span class="c-str">"a  b\\tc"</span>)  <span class="c-com">// ["a","  ","b","\\t","c"]</span>',
+
+    sub:
+'<span class="c-com">// substitute with a callable replacement</span>\n' +
+'<span class="c-kw">let</span> upper = @moonregex.sub_by(\n' +
+'  <span class="c-str">"(\\w+)"</span>,\n' +
+'  <span class="c-kw">fn</span>(m) -&gt; String raise @moonregex.Refused {\n' +
+'    <span class="c-kw">match</span> m.group() { Some(s) =&gt; s.to_upper() None =&gt; <span class="c-str">""</span> }\n' +
+'  },\n' +
+'  <span class="c-str">"hello world"</span>,\n' +
+')\n' +
+'<span class="c-com">// "HELLO WORLD"</span>',
+
+    glob:
+'<span class="c-com">// shell globs on top of the engine</span>\n' +
+'<span class="c-kw">let</span> ok = @glob.fnmatch(<span class="c-str">"src/exec/exec.mbt"</span>, <span class="c-str">"src/**/*.mbt"</span>)\n' +
+'<span class="c-com">// true — ** spans directories</span>\n' +
+'\n' +
+'<span class="c-kw">let</span> g = @glob.Glob::compile(<span class="c-str">"build/{debug,release}/*.wasm"</span>)\n' +
+'g.matches(<span class="c-str">"build/release/app.wasm"</span>)  <span class="c-com">// true</span>',
+
+    fuzzy:
+'<span class="c-com">// fuzzy: a bounded edit budget over a literal run</span>\n' +
+'<span class="c-kw">let</span> m = @moonregex.fullmatch(<span class="c-str">"(?:hello){e&lt;=1}"</span>, <span class="c-str">"hellp"</span>)\n' +
+'<span class="c-com">// Some(_) — one substitution, p -&gt; o</span>\n' +
+'\n' +
+'<span class="c-com">// scoped budgets: insertions, deletions, substitutions</span>\n' +
+'@moonregex.search(<span class="c-str">"(?:abc){i&lt;=1}"</span>, <span class="c-str">"xabcd"</span>)  <span class="c-com">// matches "abcd"</span>'
+  };
+
+  var codeEl = document.getElementById("codeblock");
+  var tabs = document.getElementById("tabs");
+  function setCode(k) { codeEl.innerHTML = CODE[k]; }
+  Array.prototype.forEach.call(tabs.children, function(btn){
+    btn.addEventListener("click", function(){
+      Array.prototype.forEach.call(tabs.children, function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      setCode(btn.getAttribute("data-k"));
+    });
+  });
+  setCode("search");
+</script>
 </body>
 </html>

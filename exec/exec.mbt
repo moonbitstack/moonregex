@@ -58,6 +58,18 @@ pub(all) enum Inst {
   RecurseGroup(slot~ : Int32)
   /// Recurse into the whole pattern.
   RecurseWhole
+  /// A fuzzy match over a literal/character-class sequence: the target is
+  /// matched against the text with a bounded Levenshtein budget of insertions,
+  /// deletions and substitutions. The general case (a fuzzy quantifier over an
+  /// arbitrary sub-expression) still matches the inner node exactly; this
+  /// covers the common, well-defined case of a fuzzy literal or class run.
+  FuzzyLit(
+    target~ : Array[@prop.CharSet],
+    ins~ : Int32,
+    del~ : Int32,
+    sub~ : Int32,
+    err~ : Int32
+  )
 }
 
 ///|
@@ -190,12 +202,16 @@ fn Compile::emit(
     @parse.Anchor(anchor~) => code.push(Anchor(kind=anchor_to_kind(anchor)))
     @parse.Keep => code.push(Keep)
     @parse.Grapheme => code.push(Grapheme)
-    @parse.Fuzzy(spec~, node~) => {
-      // Fuzzy is matched exactly for now: the inner node, without edits. The
-      // budget is recorded so a later, fuller implementation can spend it.
-      let _ = spec
-      self.emit(node, code)
-    }
+    @parse.Fuzzy(spec~, node~) =>
+      // When the inner node is a literal or character-class run, lower it to a
+      // `FuzzyLit` that the matcher solves with a bounded edit-distance search.
+      // Otherwise the budget is ignored and the inner node is matched exactly,
+      // as before — the syntax is still accepted.
+      match (flatten_literal(node), fuzzy_caps(spec)) {
+        (Some(target), Some((ins, del, sub, err))) =>
+          code.push(FuzzyLit(target~, ins~, del~, sub~, err~))
+        _ => self.emit(node, code)
+      }
     @parse.Recurse(target~) =>
       match target {
         @parse.Whole => code.push(RecurseWhole)
@@ -323,6 +339,224 @@ fn anchor_to_kind(anchor : @parse.Anchor) -> AnchorKind {
     @parse.WordStart => WordStart
     @parse.WordEnd => WordEnd
     @parse.SearchAnchor => SearchStart
+  }
+}
+
+///|
+/// Flatten a node into a sequence of character sets when it is nothing but
+/// literals and character classes (possibly grouped). Anything else — an
+/// alternation, a quantifier, an anchor, a backreference — returns `None`, and
+/// the fuzzy quantifier falls back to matching the node exactly.
+fn flatten_literal(node : @parse.Node) -> Array[@prop.CharSet]? {
+  match node {
+    @parse.Char(code=c) => Some([@prop.CharSet::single(c)])
+    @parse.Class(set~) => Some([set])
+    @parse.Group(node=inner, ..) => flatten_literal(inner)
+    @parse.Seq(items~) => {
+      let out : Array[@prop.CharSet] = []
+      for it in items {
+        match flatten_literal(it) {
+          Some(set) =>
+            for s in set {
+              out.push(s)
+            }
+          None => return None
+        }
+      }
+      Some(out)
+    }
+    _ => None
+  }
+}
+
+///|
+/// Turn a parsed budget into `(insertions, deletions, substitutions, errors)`
+/// caps, or `None` when there is no budget to spend (or a weighted budget,
+/// which the literal matcher does not approximate).
+fn fuzzy_caps(spec : @parse.FuzzySpec) -> (Int32, Int32, Int32, Int32)? {
+  if spec.cost is Some(_) {
+    // A weighted budget (`2i+1d+1s<=3`): not approximated here, so the inner
+    // node is matched exactly.
+    return None
+  }
+  if spec.errors is None &&
+    spec.insertions is None &&
+    spec.deletions is None &&
+    spec.substitutions is None {
+    return None
+  }
+  match spec.errors {
+    Some(e) => {
+      // A total error budget also caps each operation at the same total, with
+      // the combined spend bounded by `err`.
+      let ins = spec.insertions.unwrap_or(e)
+      let del = spec.deletions.unwrap_or(e)
+      let sub = spec.substitutions.unwrap_or(e)
+      Some((ins, del, sub, e))
+    }
+    None => {
+      // Individual budgets only: an unmentioned operation is not permitted.
+      let ins = spec.insertions.unwrap_or(0)
+      let del = spec.deletions.unwrap_or(0)
+      let sub = spec.substitutions.unwrap_or(0)
+      Some((ins, del, sub, -1))
+    }
+  }
+}
+
+///|
+/// Add `v` to `arr` unless it is already present.
+fn push_state(arr : Array[Int32], v : Int32) -> Array[Int32] {
+  for x in arr {
+    if x == v {
+      return arr
+    }
+  }
+  arr.push(v)
+  arr
+}
+
+///|
+/// Solve a fuzzy match of `target` against the text starting at `sp`, allowing
+/// at most `ins` insertions, `del` deletions and `sub` substitutions, and at
+/// most `err` errors of any kind (`err < 0` means no total cap). Returns the
+/// code-point offset just past the shortest successful match, or `-1`.
+///
+/// The search is a bounded Levenshtein alignment: a state is `(ti, pi, ins,
+/// del, sub)` and we ask whether `pi == target.length()` is reachable. It is
+/// bounded by `target` length and the budgets, so it stays safe and quick for
+/// the short literals fuzzy matching is meant for.
+fn fuzzy_lit_end(
+  chars : Array[Int32],
+  sp : Int32,
+  len : Int32,
+  target : Array[@prop.CharSet],
+  ins_cap : Int32,
+  del_cap : Int32,
+  sub_cap : Int32,
+  err_cap : Int32,
+) -> Int32 {
+  let m = target.length()
+  if m == 0 {
+    return sp
+  }
+  // Guard against pathological budgets: beyond these, match the literal exactly.
+  if m > 64 || ins_cap > 32 || del_cap > 32 || sub_cap > 32 {
+    return -1
+  }
+  let avail = len - sp
+  if avail < 0 {
+    return -1
+  }
+  let max_ti = if avail < m + ins_cap { avail } else { m + ins_cap }
+  let dl1 = del_cap + 1
+  let sl1 = sub_cap + 1
+  let pack = fn(ins : Int32, del : Int32, sub : Int32) -> Int32 {
+    (ins * dl1 + del) * sl1 + sub
+  }
+  // dp[ti][pi] holds the set of reachable `(ins, del, sub)` states.
+  let dp : Array[Array[Array[Int32]]] = []
+  let mut ti = 0
+  while ti <= max_ti {
+    let row : Array[Array[Int32]] = []
+    let mut pi = 0
+    while pi <= m {
+      row.push([])
+      pi = pi + 1
+    }
+    dp.push(row)
+    ti = ti + 1
+  }
+  dp[0][0] = [pack(0, 0, 0)]
+  ti = 0
+  while ti <= max_ti {
+    let mut pi = 0
+    while pi <= m {
+      let states = dp[ti][pi]
+      if states.length() == 0 {
+        pi = pi + 1
+        continue
+      }
+      for st in states {
+        let sub0 = st % sl1
+        let rem = st / sl1
+        let del0 = rem % dl1
+        let ins0 = rem / dl1
+        if pi < m {
+          // Match or substitute one text character.
+          if ti < max_ti {
+            let hit = target[pi].contains(chars[sp + ti])
+            if hit {
+              dp[ti + 1][pi + 1] = push_state(
+                dp[ti + 1][pi + 1],
+                pack(ins0, del0, sub0),
+              )
+            } else if sub0 < sub_cap {
+              dp[ti + 1][pi + 1] = push_state(
+                dp[ti + 1][pi + 1],
+                pack(ins0, del0, sub0 + 1),
+              )
+            }
+          }
+          // Insert a text character (pattern stays put).
+          if ti < max_ti && ins0 < ins_cap {
+            dp[ti + 1][pi] = push_state(
+              dp[ti + 1][pi],
+              pack(ins0 + 1, del0, sub0),
+            )
+          }
+          // Delete a pattern character (text stays put).
+          if del0 < del_cap {
+            dp[ti][pi + 1] = push_state(
+              dp[ti][pi + 1],
+              pack(ins0, del0 + 1, sub0),
+            )
+          }
+          // The whole pattern is consumed: only insertions may still absorb
+          // trailing text characters.
+        } else if ti < max_ti && ins0 < ins_cap {
+          dp[ti + 1][pi] = push_state(
+            dp[ti + 1][pi],
+            pack(ins0 + 1, del0, sub0),
+          )
+        }
+      }
+      pi = pi + 1
+    }
+    ti = ti + 1
+  }
+  // Greedy fuzzy: consume as much text as possible while the pattern fits
+  // within the budget. The longest end that finishes the pattern (and respects
+  // any total error cap) wins; an exact, shorter match is only taken when no
+  // longer alignment fits.
+  let mut best = -1
+  let mut t = max_ti
+  while t >= 0 {
+    if dp[t][m].length() > 0 {
+      if err_cap < 0 {
+        best = t
+        break
+      }
+      for st in dp[t][m] {
+        let sub0 = st % sl1
+        let rem = st / sl1
+        let del0 = rem % dl1
+        let ins0 = rem / dl1
+        if ins0 + del0 + sub0 <= err_cap {
+          best = t
+          break
+        }
+      }
+      if best >= 0 {
+        break
+      }
+    }
+    t = t - 1
+  }
+  if best < 0 {
+    -1
+  } else {
+    sp + best
   }
 }
 
@@ -682,6 +916,24 @@ fn Matcher::run(
         if ok {
           sp = esp
           saves = ns
+          pc = pc + 1
+        } else {
+          return (false, sp, saves)
+        }
+      }
+      FuzzyLit(target~, ins~, del~, sub~, err~) => {
+        let end = fuzzy_lit_end(
+          self.chars,
+          sp,
+          self.len,
+          target,
+          ins,
+          del,
+          sub,
+          err,
+        )
+        if end >= 0 {
+          sp = end
           pc = pc + 1
         } else {
           return (false, sp, saves)

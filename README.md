@@ -13,6 +13,9 @@ this instead.
 > module functions, the Python and ECMA-262 dialects, the `regex` superset and a
 > `glob`/`fnmatch` layer — is in place, with tests running green on every target.
 
+> **Homepage:** <https://moonbitstack.github.io/moonregex/> — generated API docs live
+> under `/api`.
+
 ```moonbit
 // The Python `re` surface, on every backend.
 @moonregex.search(pattern, text)
@@ -100,7 +103,7 @@ test set is for, and why the cases are not split per target.
 |:--|:--|
 | `moonregex` | `Pattern` and `Match`, shaped as Python's `re`, plus the module functions |
 | `parse` | the three grammars into one syntax tree, flags and all |
-| `exec` | the backtracking engine — backreferences, lookaround, conditionals, recursion |
+| `exec` | the backtracking engine — backreferences, lookaround, conditionals, recursion, fuzzy matching |
 | `prop` | `\p{…}`: the Unicode property tables, generated, version recorded |
 | `glob` | `fnmatch`, `Glob` and `GlobSet` — shell globbing on top of the engine |
 
@@ -119,6 +122,26 @@ let g = @glob.Glob::compile("src/**/*.mbt")
 g.matches("src/parse/lex.mbt")             // true
 g.matches("src/lex.mbt")                   // true  (** spans zero dirs too)
 ```
+
+## Fuzzy matching
+
+For a run of literals or character classes, `moonregex` performs approximate
+matching with a bounded edit distance, spelled the way mrab-regex spells it:
+
+```moonbit
+// a total error budget of one (insertion, deletion or substitution)
+@moonregex.fullmatch("(?:hello){e<=1}", "hellp")  // Some(_) — p -> o
+
+// budgets can be scoped to one operation
+@moonregex.fullmatch("(?:abc){i<=1}", "abcd")    // Some(_) — one insertion
+@moonregex.fullmatch("(?:abc){d<=1}", "ab")      // Some(_) — one deletion
+@moonregex.fullmatch("(?:abc){s<=1}", "abd")     // Some(_) — one substitution
+```
+
+The matcher consumes as much text as the budget allows, so an exact prefix still
+wins when no edit is needed. A weighted budget (`2i+1d+1s<=3`) and fuzzy groups
+whose inner node is not a literal or class run are matched exactly for now, and
+the syntax is still accepted.
 
 ## Examples
 

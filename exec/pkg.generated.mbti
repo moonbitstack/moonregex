@@ -45,6 +45,7 @@ pub(all) enum Inst {
   Star(body_id~ : Int32, greedy~ : Bool)
   RecurseGroup(slot~ : Int32)
   RecurseWhole
+  FuzzyLit(target~ : Array[@prop.CharSet], ins~ : Int32, del~ : Int32, sub~ : Int32, err~ : Int32)
 }
 
 pub struct MatchResult {
