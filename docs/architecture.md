@@ -245,19 +245,24 @@ Key invariants that keep the layers honest:
 | `VERBOSE` `x`, `DOTALL` `s`, `MULTILINE` `m`, `ASCII` `a`, `IGNORECASE` `i` | ✅ | flags |
 | `FULLCASE` `f`, `WORD` `w` (`\m \M`)   | ✅ | flags + parse |
 | `POSIX` `p`, `REVERSE` `r`, `BESTMATCH` `b`, `ENHANCEMATCH` `e` | ✅ | flags + exec |
-| Control verbs `(*ACCEPT)` `(*FAIL)` `(*MARK)` `(*PRUNE)` `(*SKIP)` | ✅(`ACCEPT`/`FAIL`) · `MARK`/`PRUNE`/`SKIP` partial | parse + exec |
+| Control verbs `(*ACCEPT)` `(*FAIL)` `(*COMMIT)` `(*MARK)` `(*PRUNE)` `(*SKIP)` `(*THEN)` `(*LIMIT_MATCH)` `(*LIMIT_RECURSION)` `(*VERSION)` `(*FENCE)` | ✅ | parse + exec |
 | Recursion `(?R)`, `(?1)`, `(?P>name)`, `(?&name)` | ✅ | parse + exec |
+| Recursion conditions `(?(R))`, `(?(R1))`, `(?(R&name))` | ✅ | parse + exec |
+| `(?\|…)` branch reset, `(?(DEFINE)…)`    | ✅ | parse + exec |
 | `\Q…\E` literal quoting                | ✅ | parse |
+| `\R` `\h` `\H` `\v` `\V` `\N` `\e`     | ✅ | parse + exec |
+| Backreferences `\g{name}` `\g{n}`      | ✅ | parse + exec |
 | Fuzzy `{e}`/`{i}`/`{d}`/`{s}` + counts/changes | ✅ counts · ✅ changes | exec |
 | Set algebra `--` `&&` `~~` (V1)        | ✅ | parse |
-| `(*LIMIT:n)`, `(*FENCE)`, `(*VERSION)` | ⬜ documented gap | — |
 | `subf`/`subfn` format substitution     | ✅ (`{}` `{0}` `{name}` `{0[0]}` + `:spec` align/width/precision; types `s d x X o b`) | subf.mbt |
-| `(*MARK:name)` capture / `mark()`      | ⬜ documented gap | — |
+| `Match.marks()` — `(*MARK:name)` names | ✅ | match.mbt |
 
-Gaps are *named* and *bounded*, not silent: the parser refuses unknown
-control verbs rather than ignoring them, and the module does not pretend to
-implement `subf` until a `str.format` engine exists. This is the discipline
-the architecture enforces — no half-features shipped under a friendly name.
+The only deliberate, bounded deferral is `\N{name}` (a named Unicode
+character): it needs a UCD name table (~150 000 entries) generated from the
+name field of `UnicodeData.txt`, which is a follow-up to `scripts/gen_unicode.py`
+rather than a half-sized table shipped now. Plain `\N` (not-newline) works.
+Everything else is implemented; unknown control verbs are refused with a
+position rather than ignored.
 
 ---
 

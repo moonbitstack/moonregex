@@ -56,6 +56,8 @@ pub enum Cond {
   ByGroup(slot~ : Int32)
   /// `(?(?=…)yes|no)`: whether a lookaround holds here.
   ByLook(node~ : Node, look~ : Look)
+  /// `(?(R)…)`, `(?(R1)…)`, `(?(R&name)…)`: whether we are inside a recursion.
+  ByRecurse(target~ : RecurseCond)
 } derive(Eq, Debug)
 
 ///|
@@ -112,12 +114,24 @@ pub enum VerbKind {
   Accept
   /// `(*FAIL)` / `(*F)`: make this match attempt fail.
   Fail
+  /// `(*COMMIT)`: fail the entire match, no further search.
+  Commit
   /// `(*MARK:name)` / `(*:name)`: record a name on the match.
   Mark(name~ : String)
-  /// `(*PRUNE)`: fail and do not backtrack before this point.
-  Prune
-  /// `(*SKIP)`: fail and resume the scan after the mark.
-  Skip
+  /// `(*PRUNE)` / `(*PRUNE:name)`: fail and do not backtrack before this point.
+  Prune(name~ : String?)
+  /// `(*SKIP)` / `(*SKIP:name)`: fail and resume the scan after the mark.
+  Skip(name~ : String?)
+  /// `(*THEN)` / `(*THEN:name)`: fail and jump to the next alternative.
+  Then(name~ : String?)
+  /// `(*LIMIT_MATCH:n)`: set the match step ceiling.
+  LimitMatch(n~ : Int32)
+  /// `(*LIMIT_RECURSION:n)`: set the recursion depth ceiling.
+  LimitRecursion(n~ : Int32)
+  /// `(*VERSION)`: accept the current engine version (a no-op).
+  Version
+  /// `(*FENCE)`: prevent any backtracking past this point.
+  Fence
 } derive(Eq, Debug)
 
 ///|
@@ -131,6 +145,23 @@ pub extend Recurse with Eq::{equal, not_equal}
 
 ///|
 pub extend Recurse with Debug::{to_repr}
+
+///|
+/// The target of a recursion condition `(?(R)…)`.
+pub enum RecurseCond {
+  /// `(?(R))`: inside any recursion.
+  AnyRecursion
+  /// `(?(R1))`: inside a recursion of group `slot`.
+  GroupRecursion(slot~ : Int32)
+  /// `(?(R&name))`: inside a recursion of named group `name`.
+  NamedRecursion(name~ : String)
+} derive(Eq, Debug)
+
+///|
+pub extend RecurseCond with Eq::{equal, not_equal}
+
+///|
+pub extend RecurseCond with Debug::{to_repr}
 
 ///|
 /// One node of the syntax tree every dialect is lowered into.
@@ -173,6 +204,9 @@ pub enum Node {
   Grapheme
   /// The enclosed node, matched with a budget of edits.
   Fuzzy(spec~ : FuzzySpec, node~ : Node)
+  /// `(?(DEFINE)…)`: declare subroutines, match empty. The body's groups are
+  /// registered (and compiled into sub-programs) but never matched inline.
+  Define(node~ : Node)
   /// A recursive call back into the pattern.
   Recurse(target~ : Recurse)
   /// A control verb: `(*ACCEPT)`, `(*FAIL)`, `(*MARK:name)`, `(*PRUNE)`,
@@ -335,6 +369,14 @@ fn dump_node(node : Node, buf : StringBuilder) -> Unit {
       match probe {
         ByGroup(slot~) => buf.write_string("\{slot}")
         ByLook(..) => buf.write_string("?")
+        ByRecurse(target~) =>
+          buf.write_string(
+            match target {
+              AnyRecursion => "R"
+              GroupRecursion(slot~) => "R\{slot}"
+              NamedRecursion(name~) => "R&" + name
+            },
+          )
       }
       dump_node(yes, buf)
       match no {
@@ -369,6 +411,11 @@ fn dump_node(node : Node, buf : StringBuilder) -> Unit {
       dump_node(node, buf)
       buf.write_string(dump_fuzzy(spec))
     }
+    Define(node~) => {
+      buf.write_string("(?(DEFINE)")
+      dump_node(node, buf)
+      buf.write_string(")")
+    }
     Recurse(target~) =>
       match target {
         Whole => buf.write_string("(?R)")
@@ -388,11 +435,25 @@ fn dump_node(node : Node, buf : StringBuilder) -> Unit {
         match kind {
           Accept => "(*ACCEPT)"
           Fail => "(*FAIL)"
+          Commit => "(*COMMIT)"
           Mark(name~) => "(*MARK:" + name + ")"
-          Prune => "(*PRUNE)"
-          Skip => "(*SKIP)"
+          Prune(name~) => verb_arg("(*PRUNE", name)
+          Skip(name~) => verb_arg("(*SKIP", name)
+          Then(name~) => verb_arg("(*THEN", name)
+          LimitMatch(n~) => "(*LIMIT_MATCH:\{n})"
+          LimitRecursion(n~) => "(*LIMIT_RECURSION:\{n})"
+          Version => "(*VERSION)"
+          Fence => "(*FENCE)"
         },
       )
+  }
+}
+
+///|
+fn verb_arg(verb : String, name : String?) -> String {
+  match name {
+    None => verb + ")"
+    Some(n) => verb + ":" + n + ")"
   }
 }
 

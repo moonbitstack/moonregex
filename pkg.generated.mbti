@@ -142,6 +142,7 @@ pub fn Match::groupdict(Self, default? : String?) -> Map[String, String]
 pub fn Match::groups(Self, default? : String?) -> Array[String?]
 pub fn Match::lastgroup(Self) -> String?
 pub fn Match::lastindex(Self) -> Int32?
+pub fn Match::marks(Self) -> Array[String]
 pub fn Match::partial(Self) -> Bool
 pub fn Match::pattern(Self) -> Pattern
 pub fn Match::pos(Self) -> Int32

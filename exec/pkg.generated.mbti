@@ -48,6 +48,20 @@ pub(all) enum Inst {
   FuzzyLit(target~ : Array[@prop.CharSet], ins~ : Int32, del~ : Int32, sub~ : Int32, err~ : Int32)
   Accept
   Fail
+  Commit
+  Prune
+  Skip(name~ : String?)
+  Then
+  Mark(name~ : String)
+  Limit(kind~ : LimitKind, n~ : Int32)
+  Version
+  Fence
+  CondRecurse(cond~ : RecurseCondKind, yes_id~ : Int32, no_id~ : Int32)
+}
+
+pub(all) enum LimitKind {
+  Match
+  Recursion
 }
 
 pub struct MatchResult {
@@ -56,6 +70,7 @@ pub struct MatchResult {
   spans : Array[(Int32, Int32)]
   fuzzy : (Int32, Int32, Int32)?
   fuzzy_changes : (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])?
+  marks : Array[String]
 }
 
 pub struct Program {
@@ -63,10 +78,17 @@ pub struct Program {
   ngroups : Int32
   group_codes : Map[Int32, Array[Inst]]
   extra : Map[Int32, Array[Inst]]
+  groupindex : Map[String, Array[Int32]]
 }
 pub fn Program::fullmatch(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
 pub fn Program::match_at(Self, String, pos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
 pub fn Program::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+
+pub(all) enum RecurseCondKind {
+  AnyRecursion
+  GroupRecursion(slot~ : Int32)
+  NamedRecursion(name~ : String)
+}
 
 // Type aliases
 

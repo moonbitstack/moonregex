@@ -27,6 +27,8 @@ pub(all) suberror Refused {
   Exceeded(limit~ : Int32, got~ : Int32)
   Ambiguous(groups~ : Int32)
   Accept(start~ : Int32, end~ : Int32)
+  Commit
+  Skip(target~ : Int32)
 } derive(Eq, @debug.Debug)
 pub fn Refused::equal(Self, Self) -> Bool
 pub fn Refused::not_equal(Self, Self) -> Bool
@@ -67,6 +69,7 @@ pub fn Ast::root(Self) -> Node
 pub enum Cond {
   ByGroup(slot~ : Int32)
   ByLook(node~ : Node, look~ : Look)
+  ByRecurse(target~ : RecurseCond)
 } derive(Eq, @debug.Debug)
 pub fn Cond::equal(Self, Self) -> Bool
 pub fn Cond::not_equal(Self, Self) -> Bool
@@ -141,6 +144,7 @@ pub enum Node {
   Keep
   Grapheme
   Fuzzy(spec~ : FuzzySpec, node~ : Node)
+  Define(node~ : Node)
   Recurse(target~ : Recurse)
   Verb(kind~ : VerbKind)
 } derive(Eq, @debug.Debug)
@@ -157,12 +161,27 @@ pub fn Recurse::equal(Self, Self) -> Bool
 pub fn Recurse::not_equal(Self, Self) -> Bool
 pub fn Recurse::to_repr(Self) -> @debug.Repr
 
+pub enum RecurseCond {
+  AnyRecursion
+  GroupRecursion(slot~ : Int32)
+  NamedRecursion(name~ : String)
+} derive(Eq, @debug.Debug)
+pub fn RecurseCond::equal(Self, Self) -> Bool
+pub fn RecurseCond::not_equal(Self, Self) -> Bool
+pub fn RecurseCond::to_repr(Self) -> @debug.Repr
+
 pub enum VerbKind {
   Accept
   Fail
+  Commit
   Mark(name~ : String)
-  Prune
-  Skip
+  Prune(name~ : String?)
+  Skip(name~ : String?)
+  Then(name~ : String?)
+  LimitMatch(n~ : Int32)
+  LimitRecursion(n~ : Int32)
+  Version
+  Fence
 } derive(Eq, @debug.Debug)
 pub fn VerbKind::equal(Self, Self) -> Bool
 pub fn VerbKind::not_equal(Self, Self) -> Bool

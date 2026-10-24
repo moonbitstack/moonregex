@@ -189,6 +189,20 @@ Type aliases `RegexFlag` and `RegexError` mirror `regex.RegexFlag` and
 `regex.error`; `template`, `purge`, `version` and `version_info` are kept for
 compatibility. See `docs/architecture.md` for the full interface contract.
 
+The control verbs are complete too — `(*ACCEPT)`, `(*FAIL)`, `(*COMMIT)`,
+`(*PRUNE)`, `(*SKIP)`, `(*THEN)`, `(*MARK:name)` (read back with
+`Match.marks()`), `(*LIMIT_MATCH:n)`, `(*LIMIT_RECURSION:n)`, `(*VERSION)` and
+`(*FENCE)` — alongside the PCRE/Perl escapes `\R` (line break), `\h`/`\H`
+(horizontal whitespace), `\v`/`\V` (vertical whitespace), `\N` (not newline),
+`\e`, braced backreferences `\g{name}`/`\g{n}`, branch reset `(?|…)`,
+`(?(DEFINE)…)` and recursion conditions `(?(R)…)`.
+
+```moonbit
+@moonregex.fullmatch("a(*COMMIT)b", "ab")        // None — the commit aborts
+@moonregex.fullmatch("\\R", "\u{2028}")          // Some(_) — a line separator
+@moonregex.fullmatch("(?|(a)|(b))", "b")         // Some(_) — branch reset
+```
+
 ## Examples
 
 `examples/tour` is the canonical demo — `moon run examples/tour` exercises search,

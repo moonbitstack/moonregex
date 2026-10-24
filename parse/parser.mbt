@@ -677,6 +677,11 @@ fn Parser::group(
     raise self.refuse(rest, "unexpected end of pattern")
   }
   let ext = after.at(1).to_int()
+  if ext == '|' {
+    // `(?|…)`: a branch-reset group, so each alternative renumbers its groups
+    // from the same slot.
+    return self.branch_reset(after)
+  }
   if ext == ':' {
     let (view, body) = self.scoped(after.view(start_offset=2))
     return (view, body)
@@ -759,6 +764,39 @@ fn Parser::group(
     raise self.refuse(rest, "unknown extension ?'")
   }
   raise self.refuse(rest, "unknown extension ?\{ext.unsafe_to_char()}")
+}
+
+///|
+/// `(?|…)`: a branch-reset group. Each alternative renumbers its capture
+/// groups from the same starting slot, so `(?|(a)|(b))` captures to group 1
+/// whichever branch is taken. After the group, the counter resumes at the
+/// highest slot any branch reached.
+fn Parser::branch_reset(
+  self : Parser,
+  rest : StringView,
+) -> (StringView, Node) raise Refused {
+  // rest points at `?|…`.
+  let base = self.groups
+  let branches : Array[Node] = []
+  self.depth += 1
+  self.groups = base
+  let (next, first) = self.sequence(rest.view(start_offset=2))
+  let mut view = next
+  branches.push(first)
+  let mut max_slot = self.groups
+  while view.length() > 0 && view.at(0).to_int() == '|' {
+    self.groups = base
+    let (nxt, branch) = self.sequence(view.view(start_offset=1))
+    branches.push(branch)
+    if self.groups > max_slot {
+      max_slot = self.groups
+    }
+    view = nxt
+  }
+  self.groups = max_slot
+  self.depth -= 1
+  let view = self.close(view)
+  (view, if branches.length() == 1 { branches[0] } else { Alt(items=branches) })
 }
 
 ///|
@@ -920,6 +958,22 @@ fn Parser::name_close(
 }
 
 ///|
+/// Like `name`, but the name is closed by `}` — used by Perl's `\g{name}`.
+fn Parser::name_braced(
+  self : Parser,
+  rest : StringView,
+) -> (StringView, String) raise Refused {
+  let mut i = 0
+  while i < rest.length() && is_name_char(rest.at(i).to_int()) {
+    i += 1
+  }
+  if i == 0 || i >= rest.length() || rest.at(i).to_int() != '}' {
+    raise self.refuse(rest, "missing }, unterminated name")
+  }
+  (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
+}
+
+///|
 fn is_name_char(c : Int32) -> Bool {
   (c >= 'a' && c <= 'z') ||
   (c >= 'A' && c <= 'Z') ||
@@ -939,6 +993,18 @@ fn Parser::conditional(
   let (cond, view) = if head.length() > 0 && head.at(0).to_int() == '?' {
     let ((body, look), view) = self.look_cond(head)
     (Cond::ByLook(node=body, look~), view)
+  } else if head.length() > 0 && head.at(0).to_int() == 'R' {
+    // `(?(R)…)`, `(?(R1)…)`, `(?(R&name)…)`: a recursion condition.
+    self.recurse_cond(rest, head)
+  } else if head.length() > 6 && head.view(end_offset=6).to_owned() == "DEFINE" {
+    // `(?(DEFINE)…)`: declare subroutines, match empty. The inner groups are
+    // registered, but the group itself produces nothing.
+    let view = self.close(head.view(start_offset=6))
+    self.depth += 1
+    let (view, body) = self.alternation(view)
+    self.depth -= 1
+    let view = self.close(view)
+    return (view, Define(node=body))
   } else {
     let mut i = 0
     while i < head.length() && is_name_char(head.at(i).to_int()) {
@@ -979,6 +1045,42 @@ fn Parser::conditional(
   }
   let view = self.close(view)
   (view, Cond(probe=cond, yes~, no~))
+}
+
+///|
+/// `(?(R)…)`, `(?(R1)…)`, `(?(R&name)…)`: read a recursion condition.
+fn Parser::recurse_cond(
+  self : Parser,
+  rest : StringView,
+  head : StringView,
+) -> (Cond, StringView) raise Refused {
+  // head points at `R…`.
+  let after = head.view(start_offset=1)
+  if after.length() == 0 {
+    raise self.refuse(rest, "bad condition (?(R)")
+  }
+  let c = after.at(0).to_int()
+  if c == ')' {
+    return (Cond::ByRecurse(target=AnyRecursion), after.view(start_offset=1))
+  }
+  if c == '&' {
+    let (view, name) = self.name_close(after.view(start_offset=1))
+    match self.groupindex.get(name) {
+      None => raise self.refuse(rest, "unknown group name '\{name}'")
+      Some(_) => ()
+    }
+    return (Cond::ByRecurse(target=NamedRecursion(name~)), view)
+  }
+  // `(?(R1))` … `(?(R99))`.
+  let (slot, after2) = match self.digits(after, 0) {
+    None => raise self.refuse(rest, "bad condition (?(R")
+    Some(pair) => pair
+  }
+  if slot > self.groups {
+    raise self.refuse(rest, "invalid group reference \{slot}")
+  }
+  let view = self.close(after.view(start_offset=after2))
+  (Cond::ByRecurse(target=GroupRecursion(slot~)), view)
 }
 
 ///|
@@ -1078,8 +1180,10 @@ fn Parser::verb(
       let kind = match name.to_owned() {
         "ACCEPT" => VerbKind::Accept
         "FAIL" | "F" => VerbKind::Fail
-        "PRUNE" => VerbKind::Prune
-        "SKIP" => VerbKind::Skip
+        "COMMIT" => VerbKind::Commit
+        "PRUNE" => VerbKind::Prune(name=arg.map(to_str))
+        "SKIP" => VerbKind::Skip(name=arg.map(to_str))
+        "THEN" => VerbKind::Then(name=arg.map(to_str))
         "MARK" =>
           match arg {
             None => raise self.refuse(rest, "(*MARK) needs a name")
@@ -1090,10 +1194,50 @@ fn Parser::verb(
             None => raise self.refuse(rest, "(*:MARK) needs a name")
             Some(a) => VerbKind::Mark(name=a.to_owned())
           }
+        "LIMIT_MATCH" =>
+          match arg {
+            None => raise self.refuse(rest, "(*LIMIT_MATCH) needs a number")
+            Some(a) => VerbKind::LimitMatch(n=self.verb_number(rest, a))
+          }
+        "LIMIT_RECURSION" =>
+          match arg {
+            None => raise self.refuse(rest, "(*LIMIT_RECURSION) needs a number")
+            Some(a) => VerbKind::LimitRecursion(n=self.verb_number(rest, a))
+          }
+        "VERSION" => VerbKind::Version
+        "FENCE" => VerbKind::Fence
         other => raise self.refuse(rest, "unknown verb (*\{other})")
       }
       (view, Verb(kind~))
     }
+  }
+}
+
+///|
+/// Turn a verb's `:name` argument into a `String`.
+fn to_str(view : StringView) -> String {
+  view.to_owned()
+}
+
+///|
+/// Read a non-negative number out of a verb argument, refusing otherwise.
+fn Parser::verb_number(
+  self : Parser,
+  rest : StringView,
+  arg : StringView,
+) -> Int32 raise Refused {
+  if arg.length() == 0 {
+    raise self.refuse(rest, "verb needs a number")
+  }
+  match parse_int(arg) {
+    None =>
+      raise self.refuse(rest, "verb needs a number, got '\{arg.to_owned()}'")
+    Some(n) =>
+      if n < 0 {
+        raise self.refuse(rest, "verb number must not be negative")
+      } else {
+        n
+      }
   }
 }
 
@@ -1293,6 +1437,22 @@ fn Parser::escape(
       'K' => return (after, Keep, true)
       'm' => return (after, Anchor(anchor=WordStart), true)
       'M' => return (after, Anchor(anchor=WordEnd), true)
+      'h' =>
+        return (after, Class(set=horizontal_space(self.flags.ascii)), false)
+      'H' =>
+        return (
+          after,
+          Class(set=horizontal_space(self.flags.ascii).complement()),
+          false,
+        )
+      'v' => return (after, Class(set=vertical_space(self.flags.ascii)), false)
+      'V' =>
+        return (
+          after,
+          Class(set=vertical_space(self.flags.ascii).complement()),
+          false,
+        )
+      'R' => return (after, Class(set=vertical_space(self.flags.ascii)), false)
       'X' => return (after, Grapheme, false)
       'p' | 'P' => {
         let (after, set) = self.property(after, c == 'P')
@@ -1304,11 +1464,18 @@ fn Parser::escape(
         return (after, node, false)
       }
       'g' => {
-        // `\g<name>` / `\g<1>`: the superset's backreference spelling.
-        if after.length() == 0 || after.at(0).to_int() != '<' {
-          raise self.refuse(rest, "missing < in \\g")
+        // `\g<name>` / `\g<1>` and the Perl `\g{name}` / `\g{n}`.
+        if after.length() == 0 {
+          raise self.refuse(rest, "missing delimiter in \\g")
         }
-        let (after, name) = self.name(after.view(start_offset=1))
+        let open = after.at(0).to_int()
+        let (after, name) = if open == '<' {
+          self.name(after.view(start_offset=1))
+        } else if open == '{' {
+          self.name_braced(after.view(start_offset=1))
+        } else {
+          raise self.refuse(rest, "missing < or { in \\g")
+        }
         let slot = match parse_int(name[:]) {
           Some(n) =>
             if n > self.groups {
@@ -1325,11 +1492,16 @@ fn Parser::escape(
         return (after, Backref(slot~, icase=self.flags.ignorecase), false)
       }
       'N' =>
-        // Named characters need a name table the property package does not
-        // carry yet; refusing is better than guessing.
-        raise self.refuse(
-          rest, "named characters (\\N{...}) are not in the tables yet",
-        )
+        if after.length() > 0 && after.at(0).to_int() == '{' {
+          // Named characters need a name table the property package does not
+          // carry yet; refusing is better than guessing.
+          raise self.refuse(
+            rest, "named characters (\\N{...}) are not in the tables yet",
+          )
+        } else {
+          // `\N`: any character except a newline — the superset's spelling.
+          return (after, Class(set=not_newline()), false)
+        }
       'Q' => {
         // `\Q…\E`: quote everything literally until the `\E`. The superset's
         // way to paste a string of metacharacters without escaping each one.
@@ -1405,6 +1577,50 @@ fn Parser::shorthand(self : Parser, c : Int32) -> @prop.CharSet {
     'W' => (if ascii { @prop.ascii_word } else { @prop.word }).complement()
     _ => @prop.CharSet::empty()
   }
+}
+
+///|
+/// `\h` / `\H`: horizontal whitespace — tab, space, and the Unicode spaces.
+fn horizontal_space(ascii : Bool) -> @prop.CharSet {
+  if ascii {
+    @prop.CharSet::of([(0x09, 0x09), (0x20, 0x20)])
+  } else {
+    @prop.CharSet::of([
+      (0x09, 0x09),
+      (0x20, 0x20),
+      (0xA0, 0xA0),
+      (0x1680, 0x1680),
+      (0x180E, 0x180E),
+      (0x2000, 0x200A),
+      (0x202F, 0x202F),
+      (0x205F, 0x205F),
+      (0x3000, 0x3000),
+    ])
+  }
+}
+
+///|
+/// `\v` / `\V` / `\R`: the line separators — LF, VT, FF, CR, NEL, LS, PS.
+fn vertical_space(ascii : Bool) -> @prop.CharSet {
+  if ascii {
+    @prop.CharSet::of([(0x0A, 0x0A), (0x0B, 0x0B), (0x0C, 0x0C), (0x0D, 0x0D)])
+  } else {
+    @prop.CharSet::of([
+      (0x0A, 0x0A),
+      (0x0B, 0x0B),
+      (0x0C, 0x0C),
+      (0x0D, 0x0D),
+      (0x85, 0x85),
+      (0x2028, 0x2028),
+      (0x2029, 0x2029),
+    ])
+  }
+}
+
+///|
+/// `\N`: any character except a newline (`\n`).
+fn not_newline() -> @prop.CharSet {
+  @prop.CharSet::single('\n'.to_int()).complement()
 }
 
 ///|
@@ -1500,6 +1716,12 @@ fn Parser::char_escape(
         (after, 0x07)
       } else {
         (after, 'a'.to_int())
+      }
+    'e' =>
+      if self.dialect is Python {
+        (after, 0x1B)
+      } else {
+        (after, 'e'.to_int())
       }
     'x' =>
       match self.hex(after, 2) {

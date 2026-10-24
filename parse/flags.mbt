@@ -187,6 +187,11 @@ pub(all) suberror Refused {
   /// `(*ACCEPT)`: the pattern asked for the match to end here, successfully.
   /// Carries the match's start and end so the caller can build it.
   Accept(start~ : Int32, end~ : Int32)
+  /// `(*COMMIT)` / `(*FENCE)`: the whole match fails, no further search.
+  Commit
+  /// `(*SKIP)`: fail and resume the search at `target` (the last mark, or the
+  /// search start when no mark was set).
+  Skip(target~ : Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -208,6 +213,8 @@ pub impl Show for Refused with fn output(self, logger) {
       Ambiguous(groups~) =>
         "pattern has \{groups} groups; pass group= to say which one to take"
       Accept(start~, end~) => "match accepted at \{start}..\{end}"
+      Commit => "match committed: no match is possible"
+      Skip(target~) => "match skipped to \{target}"
     },
   )
 }

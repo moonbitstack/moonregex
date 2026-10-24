@@ -19,6 +19,24 @@ pub(all) enum AnchorKind {
 }
 
 ///|
+/// The target of a `(*LIMIT_MATCH:n)` / `(*LIMIT_RECURSION:n)` verb.
+pub(all) enum LimitKind {
+  Match
+  Recursion
+}
+
+///|
+/// What a recursion condition `(?(R)…)` tests.
+pub(all) enum RecurseCondKind {
+  /// `(?(R))`: inside any recursion.
+  AnyRecursion
+  /// `(?(R1))`: inside a recursion of group `slot`.
+  GroupRecursion(slot~ : Int32)
+  /// `(?(R&name))`: inside a recursion of named group `name`.
+  NamedRecursion(name~ : String)
+}
+
+///|
 /// One instruction of the flat program the tree is lowered into.
 ///
 /// Every jump and slot is an `Int`, the native index type of `Array`; only the
@@ -76,6 +94,24 @@ pub(all) enum Inst {
   Accept
   /// `(*FAIL)` / `(*F)`: make this match attempt fail at this position.
   Fail
+  /// `(*COMMIT)`: fail the entire match — the engine raises `Commit`.
+  Commit
+  /// `(*PRUNE)`: fail the current branch.
+  Prune
+  /// `(*SKIP)` / `(*SKIP:name)`: fail and resume the search at the mark.
+  Skip(name~ : String?)
+  /// `(*THEN)` / `(*THEN:name)`: fail and jump to the next alternative.
+  Then
+  /// `(*MARK:name)`: record a mark at the current position.
+  Mark(name~ : String)
+  /// `(*LIMIT_MATCH:n)` / `(*LIMIT_RECURSION:n)`: set a ceiling.
+  Limit(kind~ : LimitKind, n~ : Int32)
+  /// `(*VERSION)`: accept the current engine version — a no-op.
+  Version
+  /// `(*FENCE)`: prevent any backtracking past this point.
+  Fence
+  /// `(?(R)…)`: a conditional on whether we are inside a recursion.
+  CondRecurse(cond~ : RecurseCondKind, yes_id~ : Int32, no_id~ : Int32)
 }
 
 ///|
@@ -86,6 +122,7 @@ pub struct Program {
   ngroups : Int32
   group_codes : Map[Int32, Array[Inst]]
   extra : Map[Int32, Array[Inst]]
+  groupindex : Map[String, Array[Int32]]
 }
 
 ///|
@@ -109,6 +146,8 @@ pub struct MatchResult {
     Array[(Int32, Int32)],
     Array[(Int32, Int32)],
   )?
+  /// The marks `(*MARK:name)` set during the match, in the order they were set.
+  marks : Array[String]
 }
 
 ///|
@@ -228,6 +267,10 @@ fn Compile::emit(
           self.extra.set(look_id, look_sub)
           code.push(CondLook(id=look_id, yes_id~, no_id~))
         }
+        @parse.ByRecurse(target~) =>
+          code.push(
+            CondRecurse(cond=recurse_cond_kind(target), yes_id~, no_id~),
+          )
       }
     }
     @parse.Anchor(anchor~) => code.push(Anchor(kind=anchor_to_kind(anchor)))
@@ -243,6 +286,13 @@ fn Compile::emit(
           code.push(FuzzyLit(target~, ins~, del~, sub~, err~))
         _ => self.emit(node, code)
       }
+    @parse.Define(node~) => {
+      // Emit the body into a throwaway array so its groups land in
+      // `group_codes` (reachable by recursion), but do not emit inline: a
+      // DEFINE group matches empty.
+      let scratch : Array[Inst] = []
+      self.emit(node, scratch)
+    }
     @parse.Recurse(target~) =>
       match target {
         @parse.Whole => code.push(RecurseWhole)
@@ -257,12 +307,34 @@ fn Compile::emit(
       }
     @parse.Verb(kind~) =>
       match kind {
-        // `(*ACCEPT)` and `(*FAIL)` lower to dedicated instructions; the rest
-        // carry no observable effect on a plain match, so they are dropped.
         @parse.Accept => code.push(Accept)
         @parse.Fail => code.push(Fail)
-        _ => ()
+        @parse.Commit => code.push(Commit)
+        @parse.Prune(name~) => {
+          ignore(name)
+          code.push(Prune)
+        }
+        @parse.Skip(name~) => code.push(Skip(name~))
+        @parse.Then(name~) => {
+          ignore(name)
+          code.push(Then)
+        }
+        @parse.Mark(name~) => code.push(Mark(name~))
+        @parse.LimitMatch(n~) => code.push(Limit(kind=Match, n~))
+        @parse.LimitRecursion(n~) => code.push(Limit(kind=Recursion, n~))
+        @parse.Version => code.push(Version)
+        @parse.Fence => code.push(Fence)
       }
+  }
+}
+
+///|
+/// Lower a recursion condition's parse node into its instruction kind.
+fn recurse_cond_kind(target : @parse.RecurseCond) -> RecurseCondKind {
+  match target {
+    @parse.AnyRecursion => AnyRecursion
+    @parse.GroupRecursion(slot~) => GroupRecursion(slot~)
+    @parse.NamedRecursion(name~) => NamedRecursion(name~)
   }
 }
 
@@ -674,6 +746,7 @@ pub fn compile(ast : @parse.Ast) -> Program {
     ngroups: ast.groups(),
     group_codes: state.group_codes,
     extra: state.extra,
+    groupindex: ast.groupindex(),
   }
 }
 
@@ -692,8 +765,17 @@ priv struct Matcher {
   chars : Array[Int32]
   len : Int32
   pos : Int32
-  limit : Int32
+  /// The match step ceiling, mutable so `(*LIMIT_MATCH:n)` can lower it.
+  limit : Array[Int32]
+  /// The recursion depth ceiling, mutable so `(*LIMIT_RECURSION:n)` can set it.
+  recurse_limit : Array[Int32]
   steps : Array[Int32]
+  /// The stack of capture-group slots currently being recursed (empty when not
+  /// inside a recursion); a whole-pattern recursion pushes `-1`. Read by
+  /// `(?(R)…)`.
+  recurse : Array[Int32]
+  /// The marks `(*MARK:name)` set, as `(name, position)`, in order.
+  marks : Array[(String, Int32)]
 }
 
 ///|
@@ -792,8 +874,8 @@ fn Matcher::run(
   let program = self.program
   while true {
     self.steps[0] = self.steps[0] + 1
-    if self.steps[0] > self.limit {
-      raise @parse.Exceeded(limit=self.limit, got=self.steps[0])
+    if self.steps[0] > self.limit[0] {
+      raise @parse.Exceeded(limit=self.limit[0], got=self.steps[0])
     }
     if pc < 0 {
       return (false, sp, saves)
@@ -1004,7 +1086,12 @@ fn Matcher::run(
           Some(s) => s
           None => [Match]
         }
+        if self.recurse.length() >= self.recurse_limit[0] {
+          return (false, sp, saves)
+        }
+        self.recurse.push(slot)
         let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
+        ignore(self.recurse.pop())
         if ok {
           sp = esp
           saves = ns
@@ -1014,6 +1101,10 @@ fn Matcher::run(
         }
       }
       RecurseWhole => {
+        if self.recurse.length() >= self.recurse_limit[0] {
+          return (false, sp, saves)
+        }
+        self.recurse.push(-1)
         let (ok, esp, ns) = self.run(
           program.code,
           0,
@@ -1021,6 +1112,7 @@ fn Matcher::run(
           clone_saves(saves),
           fz,
         )
+        ignore(self.recurse.pop())
         if ok {
           sp = esp
           saves = ns
@@ -1041,6 +1133,50 @@ fn Matcher::run(
         }
       Accept => raise @parse.Accept(start=saves[0], end=sp)
       Fail => return (false, sp, saves)
+      Commit => raise @parse.Commit
+      Fence => pc = pc + 1
+      Prune => return (false, sp, saves)
+      Then => return (false, sp, saves)
+      Skip(name~) => {
+        let target = match find_mark(self.marks, name) {
+          None => self.pos
+          Some(pos) => pos
+        }
+        raise @parse.Skip(target~)
+      }
+      Mark(name~) => {
+        self.marks.push((name, sp))
+        pc = pc + 1
+      }
+      Limit(kind~, n~) => {
+        match kind {
+          Match => self.limit[0] = n
+          Recursion => self.recurse_limit[0] = n
+        }
+        pc = pc + 1
+      }
+      Version => pc = pc + 1
+      CondRecurse(cond~, yes_id~, no_id~) => {
+        let inside = match cond {
+          AnyRecursion => self.recurse.length() > 0
+          GroupRecursion(slot~) => self.recurse.contains(slot)
+          NamedRecursion(name~) =>
+            match self.program.groupindex.get(name) {
+              None => false
+              Some(slots) => self.recurse.contains(slots[0])
+            }
+        }
+        let bid = if inside { yes_id } else { no_id }
+        let sub = self.program.extra.get(bid).unwrap()
+        let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
+        if ok {
+          sp = esp
+          saves = ns
+          pc = pc + 1
+        } else {
+          return (false, sp, saves)
+        }
+      }
     }
   } nobreak {
     (false, 0, saves)
@@ -1048,10 +1184,27 @@ fn Matcher::run(
 }
 
 ///|
+/// The position of the most recent mark with `name`, or the most recent mark
+/// when `name` is `None`; `None` when no mark has been set.
+fn find_mark(marks : Array[(String, Int32)], name : String?) -> Int32? {
+  let mut i = marks.length() - 1
+  while i >= 0 {
+    let (mn, pos) = marks[i]
+    match name {
+      None => return Some(pos)
+      Some(n) => if mn == n { return Some(pos) }
+    }
+    i = i - 1
+  }
+  None
+}
+
+///|
 fn make_match(
   saves : Array[Int32],
   ngroups : Int32,
   fz : FuzzyOutcome?,
+  marks : Array[(String, Int32)],
 ) -> MatchResult {
   let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
   for g in 0..<(ngroups + 1) {
@@ -1065,16 +1218,45 @@ fn make_match(
     None => (None, None)
     Some(o) => (Some((o.sub, o.ins, o.del)), Some((o.subs, o.ins_ch, o.del_ch)))
   }
-  MatchResult::{ start: saves[0], end: saves[1], spans, fuzzy, fuzzy_changes, }
+  MatchResult::{
+    start: saves[0],
+    end: saves[1],
+    spans,
+    fuzzy,
+    fuzzy_changes,
+    marks: mark_names(marks),
+  }
 }
 
 ///|
 /// Build the match `(*ACCEPT)` asked for: group 0 spans `start..end`, and no
 /// other group is set, because the verb cut the pattern short before they ran.
-fn accept_match(start : Int32, end : Int32, ngroups : Int32) -> MatchResult {
+fn accept_match(
+  start : Int32,
+  end : Int32,
+  ngroups : Int32,
+  marks : Array[(String, Int32)],
+) -> MatchResult {
   let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
   spans[0] = (start, end)
-  MatchResult::{ start, end, spans, fuzzy: None, fuzzy_changes: None, }
+  MatchResult::{
+    start,
+    end,
+    spans,
+    fuzzy: None,
+    fuzzy_changes: None,
+    marks: mark_names(marks),
+  }
+}
+
+///|
+/// The names of the marks, dropping the positions they recorded.
+fn mark_names(marks : Array[(String, Int32)]) -> Array[String] {
+  let out : Array[String] = []
+  for (name, _pos) in marks {
+    out.push(name)
+  }
+  out
 }
 
 ///|
@@ -1090,21 +1272,74 @@ pub fn Program::search(
   let len = chars.length()
   let end = if endpos < 0 { len } else { endpos }
   let fz : Array[FuzzyOutcome?] = [None]
-  let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
+  let mat = Matcher::{
+    program: self,
+    chars,
+    len,
+    pos,
+    limit: [limit],
+    recurse_limit: [10000],
+    steps: [0],
+    recurse: [],
+    marks: [],
+  }
   let mut p = pos
-  try {
-    while p <= end {
-      let init = Array::make(2 * (self.ngroups + 1), -1)
+  while p <= end {
+    let init = Array::make(2 * (self.ngroups + 1), -1)
+    clear_ints(mat.recurse)
+    clear_marks(mat.marks)
+    fz[0] = None
+    let mut stop = false
+    let mut skip_to = -1
+    let result = try {
       let (ok, _esp, saves) = mat.run(self.code, 0, p, init, fz)
       if ok {
-        return Some(make_match(saves, self.ngroups, fz[0]))
+        Some(make_match(saves, self.ngroups, fz[0], mat.marks))
+      } else {
+        None
       }
+    } catch {
+      @parse.Accept(start~, end~) =>
+        Some(accept_match(start, end, self.ngroups, mat.marks))
+      @parse.Commit => {
+        stop = true
+        None
+      }
+      @parse.Skip(target~) => {
+        skip_to = target
+        None
+      }
+      e => raise e
+    }
+    match result {
+      Some(m) => return Some(m)
+      None => ()
+    }
+    if stop {
+      return None
+    }
+    if skip_to >= 0 {
+      p = skip_to + 1
+    } else {
       p = p + 1
     }
-    None
-  } catch {
-    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
-    e => raise e
+  }
+  None
+}
+
+///|
+/// Empty a slot stack in place (arrays are reference-mutable; the field is not).
+fn clear_ints(a : Array[Int32]) -> Unit {
+  while a.length() > 0 {
+    ignore(a.pop())
+  }
+}
+
+///|
+/// Empty a mark stack in place.
+fn clear_marks(a : Array[(String, Int32)]) -> Unit {
+  while a.length() > 0 {
+    ignore(a.pop())
   }
 }
 
@@ -1123,19 +1358,25 @@ pub fn Program::match_at(
     chars,
     len: chars.length(),
     pos,
-    limit,
+    limit: [limit],
+    recurse_limit: [10000],
     steps: [0],
+    recurse: [],
+    marks: [],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
     let (ok, _esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok {
-      Some(make_match(saves, self.ngroups, fz[0]))
+      Some(make_match(saves, self.ngroups, fz[0], mat.marks))
     } else {
       None
     }
   } catch {
-    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
+    @parse.Accept(start~, end~) =>
+      Some(accept_match(start, end, self.ngroups, mat.marks))
+    @parse.Commit => None
+    @parse.Skip(..) => None
     e => raise e
   }
 }
@@ -1153,17 +1394,30 @@ pub fn Program::fullmatch(
   let len = chars.length()
   let end = if endpos < 0 { len } else { endpos }
   let fz : Array[FuzzyOutcome?] = [None]
-  let mat = Matcher::{ program: self, chars, len, pos, limit, steps: [0], }
+  let mat = Matcher::{
+    program: self,
+    chars,
+    len,
+    pos,
+    limit: [limit],
+    recurse_limit: [10000],
+    steps: [0],
+    recurse: [],
+    marks: [],
+  }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
     let (ok, esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok && esp == end {
-      Some(make_match(saves, self.ngroups, fz[0]))
+      Some(make_match(saves, self.ngroups, fz[0], mat.marks))
     } else {
       None
     }
   } catch {
-    @parse.Accept(start~, end~) => Some(accept_match(start, end, self.ngroups))
+    @parse.Accept(start~, end~) =>
+      Some(accept_match(start, end, self.ngroups, mat.marks))
+    @parse.Commit => None
+    @parse.Skip(..) => None
     e => raise e
   }
 }

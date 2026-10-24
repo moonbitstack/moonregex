@@ -212,6 +212,13 @@ pub fn Match::fuzzy_changes(
 }
 
 ///|
+/// The names of the marks `(*MARK:name)` set during the match, in the order
+/// they were set — an empty list when none were.
+pub fn Match::marks(self : Match) -> Array[String] {
+  self.result.marks
+}
+
+///|
 /// All capturing groups (1..n) as strings, `None` for those that did not take
 /// part — Python's `Match.groups`.
 pub fn Match::groups(self : Match, default~ : String? = None) -> Array[String?] {
