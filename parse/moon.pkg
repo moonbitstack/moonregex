@@ -1,0 +1,15 @@
+// parse: one syntax tree for three grammars — Python's `re`, ECMA-262's
+// RegExp, and the `lexmatch` literal MoonBit's own `@string.Regex` speaks.
+//
+// The tree is the contract between this package and `exec`: everything a
+// dialect can say is lowered into it here, flags and all, so the executor
+// never asks which grammar a node came from.
+//
+// References:
+//   Python `re`      https://docs.python.org/3/library/re.html
+//   mrab-regex       https://github.com/mrabarnett/mrab-regex
+//   ECMA-262 §22.2   https://tc39.es/ecma262/#sec-regexp-regular-expression-objects
+//   lexmatch         https://github.com/moonbitlang/lexmatch_spec
+import {
+  "moonbitstack/moonregex/prop",
+}
