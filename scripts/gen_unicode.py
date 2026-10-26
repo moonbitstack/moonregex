@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate prop/unicode_data.mbt — the Unicode property tables — from the
+"""Generate src/prop/unicode_data.mbt — the Unicode property tables — from the
 Unicode Character Database.
 
 The tables are data, not code: they are regenerated whenever Unicode ships a
@@ -25,7 +25,7 @@ import sys
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-OUT = ROOT / "prop" / "unicode_data.mbt"
+OUT = ROOT / "src" / "prop" / "unicode_data.mbt"
 CACHE = ROOT / "scripts" / ".ucd"
 BASE = "https://www.unicode.org/Public/{v}/ucd"
 

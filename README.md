@@ -28,7 +28,7 @@ this instead.
 @moonregex.subn(pattern, replacement, text)
 ```
 
-The quickest way to see it work is `moon run examples/tour` — it runs the whole
+The quickest way to see it work is `moon run src/examples/tour` — it runs the whole
 tour end to end.
 
 ## Why a second regex
@@ -206,7 +206,7 @@ branch reset `(?|…)`, `(?(DEFINE)…)` and recursion conditions `(?(R)…)`.
 
 ## Examples
 
-`examples/tour` is the canonical demo — `moon run examples/tour` exercises search,
+`src/examples/tour` is the canonical demo — `moon run src/examples/tour` exercises search,
 groups, substitution, flags, the ECMA-262 dialect and the glob layer in one run.
 
 ## Install
