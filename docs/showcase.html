@@ -169,10 +169,7 @@
   .pg-input.is-bad { border-color: var(--mark); }
   .pg-input.is-bad:focus { box-shadow: 0 0 0 3px var(--mark-soft); }
   .pg-input::placeholder, .pg-text::placeholder { color: var(--faint); }
-  .pg-text {
-    resize: vertical; min-height: 78px; line-height: 1.6;
-    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
-  }
+  .pg-text { resize: vertical; min-height: 78px; line-height: 1.6; }
 
   /* the error, and where it sits in the pattern */
   .pg-hint:empty { display: none; }
@@ -186,7 +183,6 @@
     margin: 0; padding: 0; border: 0; background: none; border-radius: 0;
     font-family: var(--mono); font-size: 13px; line-height: 1.45;
     color: var(--muted); white-space: pre; overflow-x: auto;
-    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent;
   }
   .pg-caret { color: var(--mark); font-weight: 700; }
   .pg-at { color: var(--muted); }
@@ -208,7 +204,6 @@
     border-radius: 10px; padding: 12px 14px;
     white-space: pre-wrap; word-break: break-word;
     max-height: 240px; overflow: auto;
-    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
   }
   .pg-hit.is-empty::before {
     content: "the text appears here, matches marked";
@@ -223,7 +218,6 @@
   .pg-results {
     display: grid; gap: 8px; margin-top: 12px;
     max-height: 320px; overflow: auto;
-    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
   }
   .pg-results:empty { display: none; }
   .pg-match {
@@ -253,6 +247,19 @@
     border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
   }
   .pg-empty code { color: var(--c-str); }
+
+  /* Firefox only: Chrome gets the same look from the shared `::-webkit-…`
+     rules, and setting both paths there paints two bars. */
+  @supports not selector(::-webkit-scrollbar) {
+    .pg-text, .pg-hit {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sb-thumb) var(--sb-track);
+    }
+    .pg-echo, .pg-results {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sb-thumb) transparent;
+    }
+  }
 
   @media (width <= 620px) {
     .pg { padding: 14px; }

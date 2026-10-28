@@ -29,9 +29,9 @@
   --c-com: #85839f;
   --c-num: #ffc857;
 
-  --sb-track: #0a0c17;
-  --sb-thumb: #24284a;
-  --sb-thumb-hover: #333a66;
+  --sb-track: #05070f;
+  --sb-thumb: #4b5490;
+  --sb-thumb-hover: #5f6ab0;
 
   /* A card's shadow is a token: on a dark page it has to be a wide, low
      black blur, on a light one a tight, faint blue one — the same rule would
@@ -80,9 +80,9 @@
   --shadow-raise: 0 14px 30px -22px rgba(21, 26, 62, 0.28);
   --shadow-nav: 0 8px 22px -18px rgba(21, 26, 62, 0.35);
 
-  --sb-track: #eceefa;
-  --sb-thumb: #c3c7de;
-  --sb-thumb-hover: #a8adcb;
+  --sb-track: #e2e5f4;
+  --sb-thumb: #8f97bd;
+  --sb-thumb-hover: #767fae;
 
   --glow-a: rgba(63, 81, 207, 0.12);
   --glow-b: rgba(10, 143, 122, 0.08);
@@ -93,20 +93,46 @@
 
 html {
   scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: var(--sb-thumb) var(--sb-track);
+  /* Reserve the strip whether or not the page scrolls: no layout shift when a
+     page grows (the playground's results, say), and the bar is there from the
+     first paint rather than appearing once something overflows. */
+  scrollbar-gutter: stable;
+}
+
+/* Firefox has no `::-webkit-scrollbar`, so it gets the two standard
+   properties. Chrome honours them *as well as* the pseudo-elements and ends up
+   painting a second, thinner bar inside the same gutter — two stubs at the top
+   and bottom of the page that make the scrollbar look broken at scroll 0. One
+   path or the other, never both. */
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-thumb) var(--sb-track);
+  }
+  pre, .term pre, .sig {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-thumb) transparent;
+  }
 }
 
 /* Our scrollbar, not the system's. Every scroller in the site gets it. */
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: var(--sb-track); }
 ::-webkit-scrollbar-thumb {
   background: var(--sb-thumb);
-  border-radius: 999px;
+  /* The border is the track's colour, so the thumb reads as a rounded bar set
+     into the channel. (A transparent border with `background-clip` looks
+     tidier in theory but Chrome paints two stubs at the ends of the bar and
+     leaves the thumb floating 13px below the top — which is exactly what makes
+     a scrollbar look missing at the top of a page.) */
   border: 2px solid var(--sb-track);
+  border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); }
 ::-webkit-scrollbar-corner { background: var(--sb-track); }
+/* No arrow buttons: Chrome draws them on Windows, and a 3px stub above the
+   thumb reads as a second, broken scrollbar. */
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 
 body {
   margin: 0;
@@ -117,7 +143,10 @@ body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   font-variant-ligatures: no-contextual;
+  /* `clip` does not make the body a scroll container the way `hidden` does
+     (the older value stays as the fallback). */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -504,7 +533,6 @@ h2.sec-title {
 }
 .tabs button.active { color: #0a0c18; background: var(--accent); }
 [data-theme="light"] .tabs button.active { color: #fff; }
-.term pre, pre, .sig { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent; }
 .term pre {
   margin: 0; padding: 20px 22px; overflow-x: auto;
   font-family: var(--mono); font-size: 13.6px; line-height: 1.75;
