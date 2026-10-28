@@ -1,121 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>moonregex — guide</title>
-<meta name="description" content="A progressive guide to moonregex: matching, groups, replacement, flags, the three dialects, Unicode properties, and the bridge to MoonBit's own regular-expression engine." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%230a0b14'/%3E%3C/svg%3E" />
+<meta name="description" content="A progressive guide to moonregex: matching, groups, replacement, flags, the three grammars, Unicode properties, and the bridge to MoonBit's own regular-expression engine." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%23080a13'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --bg: #0a0b14;
-    --bg-2: #0e1020;
-    --surface: #12142a;
-    --border: rgba(255, 255, 255, 0.08);
-    --text: #eceaf6;
-    --muted: #9a98b5;
-    --faint: #6b698a;
-    --accent: #8ea2ff;
-    --accent-2: #5be0c6;
-    --mark: #ffc857;
-    --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
-    --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
-    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html, body, button, input, textarea, select { font-variant-ligatures: no-contextual; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0; background:
-      radial-gradient(1000px 600px at 85% -10%, rgba(142, 162, 255, 0.14), transparent 60%),
-      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
-    background-attachment: fixed;
-    color: var(--text); font-family: var(--body); line-height: 1.7; font-size: 16.5px;
-  }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); background: rgba(10, 11, 20, 0.82); border-bottom: 1px solid var(--border); }
-  .wrap { width: min(1080px, calc(100% - 48px)); margin: 0 auto; }
-  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
-  .brand { font-family: var(--display); font-weight: 600; font-size: 19px; color: var(--text); letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
-  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-  .brand .acc { color: var(--accent); }
-  .nav-links { display: flex; align-items: center; gap: 4px; }
-  .nav-links a { color: var(--muted); font-size: 14.5px; padding: 7px 11px; border-radius: 8px; }
-  .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); text-decoration: none; }
-  .nav-links a.cta { color: var(--text); border: 1px solid var(--border); }
-
-  .layout { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 48px; padding: 44px 0 80px; }
-  .side { position: sticky; top: 86px; align-self: start; font-size: 14.5px; }
-  .side h4 { margin: 0 0 10px; font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
-  .side ol { list-style: none; margin: 0 0 22px; padding: 0; counter-reset: step; }
-  .side li { counter-increment: step; margin: 2px 0; }
-  .side li a { color: var(--muted); display: block; padding: 5px 10px 5px 30px; border-radius: 8px; position: relative; border-left: 2px solid transparent; }
-  .side li a::before { content: counter(step); position: absolute; left: 8px; color: var(--faint); font-family: var(--mono); font-size: 12px; }
-  .side li a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); text-decoration: none; }
-  .side li a.on { color: var(--text); background: rgba(142, 162, 255, 0.1); border-left-color: var(--accent); border-radius: 0 8px 8px 0; }
-
-  main { min-width: 0; }
-  h1 { font-family: var(--display); font-size: 40px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 12px; }
-  h1 .reg { color: var(--mark); }
-  h2 { font-family: var(--display); font-size: 25px; letter-spacing: -0.01em; margin: 54px 0 10px; scroll-margin-top: 86px; }
-  h2 .num { color: var(--faint); font-family: var(--mono); font-size: 15px; margin-right: 10px; }
-  h3 { font-family: var(--display); font-size: 18px; margin: 28px 0 6px; }
-  p { margin: 12px 0; color: #d6d4e6; }
-  .lede { font-size: 18.5px; color: var(--muted); }
-  ul, ol { color: #d6d4e6; padding-left: 22px; }
-  li { margin: 6px 0; }
-  code { font-family: var(--mono); font-size: 0.88em; background: rgba(142, 162, 255, 0.1); color: #cfd6ff; padding: 1.5px 5px; border-radius: 5px; }
-  pre {
-    background: #0c0e1c; border: 1px solid var(--border); border-radius: 12px;
-    padding: 16px 18px; overflow-x: auto; margin: 16px 0; font-size: 13.8px; line-height: 1.65;
-  }
-  pre code { background: none; padding: 0; color: #d9d8f0; white-space: pre; }
-  .c-kw { color: #8ea2ff; }
-  .c-str { color: #5be0c6; }
-  .c-com { color: #6b698a; }
-  .c-num { color: #ffc857; }
-  .out { border-left: 2px solid var(--accent-2); background: rgba(91, 224, 198, 0.06); padding: 2px 14px; border-radius: 0 8px 8px 0; margin: 10px 0 18px; color: var(--muted); font-size: 14.5px; }
-  .out code { background: none; color: var(--accent-2); }
-  .note { border-left: 2px solid var(--mark); background: rgba(255, 200, 87, 0.07); padding: 2px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; color: #e4dfc9; font-size: 14.8px; }
-  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.8px; }
-  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--faint); font-weight: 500; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; }
-  td code { font-size: 0.9em; }
-  footer { border-top: 1px solid var(--border); padding: 30px 0 60px; color: var(--faint); font-size: 14px; }
-  footer .foot-grid { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-
-  ::-webkit-scrollbar { width: 11px; height: 11px; }
-  ::-webkit-scrollbar-track { background: #0b0d18; }
-  ::-webkit-scrollbar-thumb { background: #262a45; border-radius: 6px; border: 2px solid #0b0d18; }
-  ::-webkit-scrollbar-thumb:hover { background: #343a5e; }
-  @supports not selector(::-webkit-scrollbar) {
-    html { scrollbar-color: #343a5e #0b0d18; scrollbar-width: thin; }
-  }
-  @media (width <= 860px) {
-    .layout { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 24px; }
-    .side { position: static; }
-    .side ol { display: flex; flex-wrap: wrap; gap: 4px; }
-    .side li a { padding: 5px 10px 5px 26px; }
-    h1 { font-size: 31px; }
-    .wrap { width: calc(100% - 32px); }
-  }
-</style>
+<link rel="stylesheet" href="./assets/site.css" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("moonregex-theme");
+      var light = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+      document.documentElement.setAttribute("data-theme", saved || (light ? "light" : "dark"));
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
+
+<div class="sky"></div>
+<div class="stars"></div>
+<div class="grid-lines"></div>
 
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="./index.html"><span class="dot"></span>moon<span class="acc">regex</span></a>
-    <nav class="nav-links">
-      <a href="./index.html">Home</a>
-      <a href="./guide.html">Guide</a>
+    <nav class="nav-links" aria-label="site">
+      <a class="hide-sm" href="./index.html">Home</a>
+      <a href="./showcase.html">Showcase</a>
       <a href="./api.html">API</a>
+      <button class="theme-toggle" type="button" aria-label="Switch theme">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>
+      </button>
       <a class="cta" href="https://github.com/moonbitstack/moonregex" aria-label="Repository on GitHub">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         GitHub
       </a>
     </nav>
@@ -125,7 +48,7 @@
 <div class="wrap layout">
   <aside class="side">
     <h4>Guide</h4>
-    <ol id="toc">
+    <ol>
       <li><a href="#first">First match</a></li>
       <li><a href="#anchors">Where a match may fall</a></li>
       <li><a href="#groups">Groups</a></li>
@@ -138,17 +61,17 @@
       <li><a href="#globs">Globs</a></li>
     </ol>
     <h4>Elsewhere</h4>
-    <ol style="counter-reset: none">
-      <li><a href="./api.html" style="padding-left:10px">API reference</a></li>
-      <li><a href="./index.html" style="padding-left:10px">Home</a></li>
-    </ol>
+    <ul>
+      <li><a href="./showcase.html">Showcase</a></li>
+      <li><a href="./api.html">API reference</a></li>
+    </ul>
   </aside>
 
-  <main>
-    <h1>Find what you meant,<br /><span class="reg">not what you typed.</span></h1>
-    <p class="lede">A regular-expression engine written in MoonBit: three grammars, one
-      syntax tree, one executor, the same answers on every backend. This guide goes
-      from the first match to the parts that surprise people.</p>
+<main>
+    <h1 class="docs-title">Find what you meant,<br /><span class="reg">not what you typed.</span></h1>
+    <p class="docs-lede">Three grammars, one syntax tree, one executor, the same
+      answers on every backend. This guide goes from the first match to the parts
+      that surprise people.</p>
 
     <h2 id="first"><span class="num">01</span>First match</h2>
     <pre><code>moon add moonbitstack/moonregex</code></pre>
@@ -347,27 +270,16 @@ g.matches(<span class="c-str">"src/lex.mbt"</span>)          <span class="c-com"
 <footer>
   <div class="wrap foot-grid">
     <div>moonregex — Apache-2.0.</div>
-    <div>
-      <a href="./index.html">Home</a> ·
-      <a href="./api.html">API</a> ·
-      <a href="https://github.com/moonbitstack/moonregex">GitHub</a> ·
-      <a href="https://mooncakes.io/docs/moonbitstack/moonregex">Mooncakes</a>
+    <div class="foot-links">
+      <a href="./index.html">Home</a>
+      <a href="./showcase.html">Showcase</a>
+      <a href="./api.html">API</a>
+      <a href="https://moonbitstack.mooncakes.io/docs/moonbitstack/moonregex">Mooncakes</a>
+      <a href="https://github.com/moonbitstack/moonregex">GitHub</a>
     </div>
   </div>
 </footer>
 
-<script>
-  var links = [].slice.call(document.querySelectorAll('#toc a'));
-  var heads = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
-  function mark() {
-    var at = 0;
-    for (var i = 0; i < heads.length; i++) {
-      if (heads[i] && heads[i].getBoundingClientRect().top < 140) at = i;
-    }
-    links.forEach(function (a, i) { a.classList.toggle('on', i === at); });
-  }
-  document.addEventListener('scroll', mark, { passive: true });
-  mark();
-</script>
+<script src="./assets/site.js"></script>
 </body>
 </html>

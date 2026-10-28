@@ -7,6 +7,7 @@ behind it, and the ECMA-262 grammar that JSON Schema and OpenAPI mean.
 
 [Homepage](https://moonbitstack.github.io/moonregex/) ·
 [Guide](https://moonbitstack.github.io/moonregex/guide.html) ·
+[Showcase](https://moonbitstack.github.io/moonregex/showcase.html) ·
 [API](https://moonbitstack.github.io/moonregex/api.html) ·
 [Mooncakes](https://mooncakes.io/docs/moonbitstack/moonregex)
 

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>moonregex — showcase</title>
+<meta name="description" content="Four demos with the output the library actually gave: a match walkthrough, one pattern in three spellings, escape in three grammars, and grapheme clusters." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%23080a13'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./assets/site.css" />
+<style>
+  /* page-local: the four demos */
+  .demo-block {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--surface); padding: 20px; margin: 18px 0 34px;
+  }
+  .demo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .demo-head h3 { margin: 0; font-size: 17px; }
+  .demo-head .badge {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px;
+  }
+  .demo-note { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+
+  /* walk */
+  .walk-text {
+    font-family: var(--mono); font-size: 17px; letter-spacing: 0.02em;
+    padding: 18px 16px; border-radius: 10px; background: var(--code-bg);
+    border: 1px solid var(--line); color: #d9d8f0; white-space: pre;
+    overflow-x: auto;
+  }
+  .walk-text span { border-radius: 4px; padding: 2px 0; transition: background .25s, color .25s; }
+  .walk-text .hit-w { background: rgba(91,224,198,.22); color: #5be0c6; box-shadow: inset 0 -1px 0 #5be0c6; }
+  .walk-text .hit-sp { background: rgba(142,162,255,.22); color: #8ea2ff; box-shadow: inset 0 -1px 0 #8ea2ff; }
+  .walk-text .hit-ref { background: rgba(255,200,87,.22); color: #ffc857; box-shadow: inset 0 -1px 0 #ffc857; }
+  .walk-say {
+    margin-top: 14px; min-height: 52px; color: var(--text); font-size: 15px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .walk-say .n {
+    font-family: var(--mono); font-size: 12px; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; flex: none;
+  }
+  .walk-controls { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .walk-controls button {
+    font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    cursor: pointer;
+  }
+  .walk-controls button:hover { border-color: var(--accent); }
+  .walk-controls button.primary { background: var(--accent); color: #0a0c18; border-color: transparent; }
+  [data-theme="light"] .walk-controls button.primary { color: #fff; }
+  .walk-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .walk-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+  .lg-w { background: #5be0c6; } .lg-sp { background: #8ea2ff; } .lg-ref { background: #ffc857; }
+
+  /* spellings */
+  .spell-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .spell-tabs button {
+    font-family: var(--mono); font-size: 12.5px; padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer;
+  }
+  .spell-tabs button.active { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
+  .spell-body pre { margin: 0 0 12px; }
+  .spell-out {
+    font-family: var(--mono); font-size: 13.5px; color: var(--muted);
+    border-left: 2px solid var(--accent-2); padding: 2px 12px; margin: 0;
+    overflow-x: auto; white-space: pre-wrap;
+  }
+  .spell-out b { color: var(--accent-2); font-weight: 500; }
+
+  /* escape */
+  .esc-picks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .esc-picks button {
+    font-family: var(--mono); font-size: 13px; padding: 5px 11px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer;
+  }
+  .esc-picks button.active { border-color: var(--accent); background: var(--accent-soft); }
+  .esc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .esc-cell { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--code-bg); }
+  .esc-cell .d { font-size: 12px; color: #8b8fae; font-family: var(--mono); }
+  .esc-cell .v { font-family: var(--mono); font-size: 15px; color: #5be0c6; margin-top: 6px; word-break: break-all; }
+  .esc-cell .w { font-size: 12.5px; color: #6b698a; margin-top: 8px; }
+
+  /* clusters */
+  .cl-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 0; }
+  .cl {
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+    background: var(--code-bg); font-family: var(--mono); font-size: 20px; color: #d9d8f0;
+    min-width: 92px; text-align: center;
+  }
+  .cl small { display: block; font-size: 11px; color: #6b698a; margin-top: 4px; }
+
+  /* lower */
+  .low-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .low-col h4 { margin: 0 0 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .low-col ul { list-style: none; margin: 0; padding: 0; }
+  .low-col li {
+    font-family: var(--mono); font-size: 13.5px; padding: 7px 10px; border-radius: 7px;
+    border: 1px solid var(--line); margin-bottom: 6px; background: var(--code-bg); color: #d9d8f0;
+  }
+  .low-col.yes li { border-left: 2px solid #5be0c6; }
+  .low-col.no li { border-left: 2px solid #ffc857; }
+
+  @media (width <= 760px) {
+    .esc-grid { grid-template-columns: minmax(0, 1fr); }
+    .low-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("moonregex-theme");
+      var light = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+      document.documentElement.setAttribute("data-theme", saved || (light ? "light" : "dark"));
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="stars"></div>
+<div class="grid-lines"></div>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./index.html"><span class="dot"></span>moon<span class="acc">regex</span></a>
+    <nav class="nav-links" aria-label="site">
+      <a class="hide-sm" href="./index.html">Home</a>
+      <a href="./guide.html">Guide</a>
+      <a href="./api.html">API</a>
+      <button class="theme-toggle" type="button" aria-label="Switch theme">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>
+      </button>
+      <a class="cta" href="https://github.com/moonbitstack/moonregex" aria-label="Repository on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="side">
+    <h4>Demos</h4>
+    <ol>
+      <li><a href="#walk">A match, step by step</a></li>
+      <li><a href="#spellings">Three spellings</a></li>
+      <li><a href="#escape">Escape, three ways</a></li>
+      <li><a href="#clusters">Grapheme clusters</a></li>
+      <li><a href="#lower">What lowers</a></li>
+    </ol>
+    <h4>Elsewhere</h4>
+    <ul>
+      <li><a href="./guide.html">Guide</a></li>
+      <li><a href="./api.html">API reference</a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <h1 class="docs-title">Watch it <span class="reg">decide</span>.</h1>
+    <p class="docs-lede">
+      Four runs, with the output this library actually gave. Nothing here is
+      computed in the browser: the patterns were compiled by moonregex, and what
+      you step through is what it answered.
+    </p>
+
+    <h2 id="walk"><span class="num">01</span>A match, step by step</h2>
+    <div class="demo-block">
+      <div class="demo-head">
+        <h3><code>(?P&lt;w&gt;\w+)\s+\1</code> over <code>go go no</code></h3>
+        <span class="badge">python · 1 match</span>
+      </div>
+      <p class="demo-note">A backreference makes the pattern say “the same word twice”. The engine records the group, then asks it back.</p>
+      <div class="walk-text" id="walktext"></div>
+      <div class="walk-say" id="walksay"><span class="n">0</span><span id="walksaytext">Press <b>step</b> to watch the engine work.</span></div>
+      <div class="walk-controls">
+        <button class="primary" id="walknext" type="button">step →</button>
+        <button id="walkreset" type="button">reset</button>
+      </div>
+      <div class="walk-legend">
+        <span><i class="lg-w"></i>group <code>w</code></span>
+        <span><i class="lg-sp"></i><code>\s+</code></span>
+        <span><i class="lg-ref"></i><code>\1</code></span>
+      </div>
+    </div>
+
+    <h2 id="spellings"><span class="num">02</span>One pattern, three spellings</h2>
+    <div class="demo-block">
+      <div class="demo-head">
+        <h3>a date, written three ways</h3>
+        <span class="badge">same answer</span>
+      </div>
+      <p class="demo-note">The same <code>(?&lt;year&gt;\d{4})-(?&lt;month&gt;\d{2})</code>, written for Python's grammar, for the lexmatch grammar the core library speaks, and assembled from the combinators.</p>
+      <div class="spell-tabs" id="spelltabs">
+        <button class="active" data-k="py" type="button">python</button>
+        <button data-k="core" type="button">lexmatch</button>
+        <button data-k="built" type="button">combinators</button>
+      </div>
+      <div class="spell-body">
+        <pre><code id="spellcode"></code></pre>
+        <p class="spell-out" id="spellout"></p>
+      </div>
+    </div>
+
+    <h2 id="escape"><span class="num">03</span>Escape, three ways</h2>
+    <div class="demo-block">
+      <div class="demo-head">
+        <h3>the same string, escaped for three grammars</h3>
+        <span class="badge">recorded</span>
+      </div>
+      <p class="demo-note">Escaping depends on what the grammar treats as special, so <code>escape</code> takes a dialect. Pick a string to compare.</p>
+      <div class="esc-picks" id="escpicks"></div>
+      <div class="esc-grid" id="escgrid"></div>
+    </div>
+
+    <h2 id="clusters"><span class="num">04</span>Grapheme clusters</h2>
+    <div class="demo-block">
+      <div class="demo-head">
+        <h3><code>\X</code> over <code>é👨‍👩‍👧🇯🇵</code></h3>
+        <span class="badge">3 clusters, 9 code points</span>
+      </div>
+      <p class="demo-note">A letter with its accent, a family joined by zero-width joiners, and a flag — each one cluster, whatever it costs in code points.</p>
+      <div class="cl-row" id="clrow"></div>
+      <div class="walk-controls">
+        <button class="primary" id="clnext" type="button">next cluster →</button>
+        <button id="clreset" type="button">reset</button>
+      </div>
+      <p class="spell-out" id="clout" style="margin-top:14px"></p>
+    </div>
+
+    <h2 id="lower"><span class="num">05</span>What lowers onto the core engine</h2>
+    <div class="demo-block">
+      <div class="demo-head">
+        <h3><code>Pattern::lower</code></h3>
+        <span class="badge">10 patterns</span>
+      </div>
+      <p class="demo-note">A pattern the core engine can run is handed to it as a <code>@string.Regex</code>. The rest stay here — that is the line between the two engines.</p>
+      <div class="low-grid">
+        <div class="low-col yes">
+          <h4>lowers → @string.Regex</h4>
+          <ul>
+            <li>abc</li>
+            <li>a(b+)c</li>
+            <li>[a-z]+</li>
+            <li>(?&lt;y&gt;\d{4})</li>
+          </ul>
+        </div>
+        <div class="low-col no">
+          <h4>stays here</h4>
+          <ul>
+            <li>\bab\b</li>
+            <li>^ab$</li>
+            <li>(a)\1</li>
+            <li>a(?=b)</li>
+            <li>\X</li>
+            <li>(?&gt;ab)</li>
+          </ul>
+        </div>
+      </div>
+      <p class="demo-note" style="margin-top:12px">
+        <code>\bab\b</code> and <code>^ab$</code> are the two that surprise people:
+        the core engine's word boundary is ASCII, and its <code>$</code> does not
+        sit before a trailing newline, so neither is the same assertion this
+        library means.
+      </p>
+    </div>
+
+    <p style="margin-top:34px"><a href="./guide.html">Next: the guide →</a></p>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>moonregex — Apache-2.0.</div>
+    <div class="foot-links">
+      <a href="./index.html">Home</a>
+      <a href="./guide.html">Guide</a>
+      <a href="./api.html">API</a>
+      <a href="https://github.com/moonbitstack/moonregex">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ---- 01 · the walkthrough -------------------------------------------------
+  (function () {
+    var TEXT = "go go no";
+    var el = document.getElementById("walktext");
+    var say = document.getElementById("walksaytext");
+    var num = document.querySelector("#walksay .n");
+    // Recorded from the library: one match, whole (0,5), group w (0,2).
+    var STEPS = [
+      { at: 0, spans: [], say: "The scan starts at 0 and the pattern tries to match here." },
+      { at: 1, spans: [[0, 2, "hit-w"]], say: "“\\w+” takes “go”. Group “w” now holds (0, 2)." },
+      { at: 2, spans: [[0, 2, "hit-w"], [2, 3, "hit-sp"]], say: "“\\s+” takes the space at (2, 3)." },
+      { at: 3, spans: [[0, 2, "hit-w"], [2, 3, "hit-sp"], [3, 5, "hit-ref"]], say: "“\\1” asks group “w” for “go” again — and gets it at (3, 5)." },
+      { at: 4, spans: [[0, 5, "hit"]], say: "The whole match is (0, 5) = “go go”. The scan resumes at 5 and finds nothing more, so there is one match." }
+    ];
+    var step = 0;
+
+    function render() {
+      var s = STEPS[step];
+      var html = "", cur = 0;
+      var spans = s.spans.slice().sort(function (a, b) { return a[0] - b[0]; });
+      for (var i = 0; i < spans.length; i++) {
+        var a = spans[i][0], b = spans[i][1], cls = spans[i][2];
+        html += TEXT.slice(cur, a);
+        if (cls === "hit") html += '<span class="hit-w">' + TEXT.slice(a, b) + "</span>";
+        else html += '<span class="' + cls + '">' + TEXT.slice(a, b) + "</span>";
+        cur = b;
+      }
+      html += TEXT.slice(cur);
+      el.innerHTML = html;
+      say.innerHTML = s.say;
+      num.textContent = s.at;
+    }
+
+    document.getElementById("walknext").addEventListener("click", function () {
+      step = (step + 1) % STEPS.length;
+      render();
+    });
+    document.getElementById("walkreset").addEventListener("click", function () {
+      step = 0;
+      render();
+    });
+    render();
+  })();
+
+  // ---- 02 · three spellings -------------------------------------------------
+  (function () {
+    var SPELL = {
+      py: {
+        code:
+'<span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?P&lt;year&gt;\\d{4})-(?P&lt;month&gt;\\d{2})"</span>)\n' +
+'p.search(<span class="c-str">"on 2026-10-28"</span>)',
+        out: 'match (3, 10) · year = "2026" (3, 7) · month = "10" (8, 10)'
+      },
+      core: {
+        code:
+'<span class="c-com">// the lexmatch grammar has no \\d — its classes are written out</span>\n' +
+'<span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?&lt;year&gt;[0-9]{4})-(?&lt;month&gt;[0-9]{2})"</span>,\n' +
+'  dialect=@moonregex.lexmatch_dialect)',
+        out: 'match (3, 10) · year = "2026" (3, 7) · month = "10" (8, 10)'
+      },
+      built: {
+        code:
+'<span class="c-kw">let</span> year = @moonregex.Pattern::string(<span class="c-str">"\\d{4}"</span>).capture(<span class="c-str">"year"</span>)\n' +
+'<span class="c-kw">let</span> dash = @moonregex.Pattern::string(<span class="c-str">"-"</span>)\n' +
+'<span class="c-kw">let</span> month = @moonregex.Pattern::string(<span class="c-str">"\\d{2}"</span>).capture(<span class="c-str">"month"</span>)\n' +
+'<span class="c-kw">let</span> p = year + dash + month',
+        out: 'match (3, 10) · year = "2026" (3, 7) · month = "10" (8, 10)'
+      }
+    };
+    var codeEl = document.getElementById("spellcode");
+    var outEl = document.getElementById("spellout");
+    var tabs = document.getElementById("spelltabs");
+    function set(key) {
+      codeEl.innerHTML = SPELL[key].code;
+      outEl.innerHTML = "<b>" + key + "</b> → " + SPELL[key].out;
+    }
+    tabs.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-k]");
+      if (!btn) return;
+      Array.prototype.forEach.call(tabs.children, function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      set(btn.getAttribute("data-k"));
+    });
+    set("py");
+  })();
+
+  // ---- 03 · escape ----------------------------------------------------------
+  (function () {
+    // Recorded output of @moonregex.escape for each dialect.
+    var DATA = [
+      { s: "a.b", py: "a\\.b", ecma: "\\x61\\.b", lex: "a\\.b" },
+      { s: "1+1", py: "1\\+1", ecma: "\\x31\\+1", lex: "1\\+1" },
+      { s: "a b", py: "a\\ b", ecma: "\\x61\\x20b", lex: "a b" },
+      { s: "x-y", py: "x\\-y", ecma: "\\x78\\x2Dy", lex: "x\\-y" },
+      { s: "[x]", py: "\\[x\\]", ecma: "\\[x\\]", lex: "\\[x\\]" },
+      { s: "a$b", py: "a\\$b", ecma: "\\x61\\$b", lex: "a\\$b" }
+    ];
+    var picks = document.getElementById("escpicks");
+    var grid = document.getElementById("escgrid");
+
+    function render(index) {
+      var row = DATA[index];
+      grid.innerHTML =
+        cell("Python", row.py, "re.escape: what can mean something takes a backslash") +
+        cell("Ecma262", row.ecma, "RegExp.escape: punctuation in hex, plus a leading alphanumeric") +
+        cell("Lexmatch", row.lex, "the core grammar's metacharacters; spaces stay as they are");
+      Array.prototype.forEach.call(picks.children, function (b, i) {
+        b.classList.toggle("active", i === index);
+      });
+    }
+    function cell(dialect, value, why) {
+      return '<div class="esc-cell"><div class="d">' + dialect + '</div><div class="v">' +
+        value.replace(/&/g, "&amp;").replace(/</g, "&lt;") +
+        '</div><div class="w">' + why + "</div></div>";
+    }
+
+    DATA.forEach(function (row, i) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = row.s;
+      btn.addEventListener("click", function () { render(i); });
+      picks.appendChild(btn);
+    });
+    render(0);
+  })();
+
+  // ---- 04 · clusters --------------------------------------------------------
+  (function () {
+    var CLUSTERS = [
+      { text: "é", cps: 2, note: "e + combining acute (U+0301)" },
+      { text: "👨‍👩‍👧", cps: 5, note: "family, joined by ZWJ" },
+      { text: "🇯🇵", cps: 2, note: "regional-indicator pair" }
+    ];
+    var row = document.getElementById("clrow");
+    var out = document.getElementById("clout");
+    var at = -1;
+
+    CLUSTERS.forEach(function (c) {
+      var div = document.createElement("div");
+      div.className = "cl";
+      div.innerHTML = c.text + "<small>" + c.cps + " code points</small>";
+      row.appendChild(div);
+    });
+
+    function render() {
+      var cells = row.children;
+      Array.prototype.forEach.call(cells, function (el, i) {
+        el.style.borderColor = i === at ? "var(--accent)" : "var(--line)";
+        el.style.background = i === at ? "var(--accent-soft)" : "var(--code-bg)";
+      });
+      if (at < 0) {
+        out.innerHTML = "\\X over the string gives <b>3</b> matches.";
+        return;
+      }
+      var c = CLUSTERS[at];
+      out.innerHTML = "cluster <b>" + (at + 1) + "</b> = " + c.text +
+        " — " + c.cps + " code points (" + c.note + ")";
+    }
+    document.getElementById("clnext").addEventListener("click", function () {
+      at = at + 1 >= CLUSTERS.length ? 0 : at + 1;
+      render();
+    });
+    document.getElementById("clreset").addEventListener("click", function () {
+      at = -1;
+      render();
+    });
+    render();
+  })();
+</script>
+<script src="./assets/site.js"></script>
+</body>
+</html>
