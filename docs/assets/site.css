@@ -29,9 +29,16 @@
   --c-com: #85839f;
   --c-num: #ffc857;
 
-  --sb-track: #05070f;
-  --sb-thumb: #555fa0;
-  --sb-thumb-hover: #6a75b9;
+  /* Scrollbars are painted from `--sb-*`; `--sb-*-base` is what the theme
+     actually wants. The split exists so the page's own bar can be emptied at
+     scroll 0 without emptying every content scroller with it — see the reveal
+     rule further down. */
+  --sb-track-base: #05070f;
+  --sb-thumb-base: #555fa0;
+  --sb-thumb-hover-base: #6a75b9;
+  --sb-track: var(--sb-track-base);
+  --sb-thumb: var(--sb-thumb-base);
+  --sb-thumb-hover: var(--sb-thumb-hover-base);
 
   /* A card's shadow is a token: on a dark page it has to be a wide, low
      black blur, on a light one a tight, faint blue one — the same rule would
@@ -80,9 +87,9 @@
   --shadow-raise: 0 14px 30px -22px rgba(21, 26, 62, 0.28);
   --shadow-nav: 0 8px 22px -18px rgba(21, 26, 62, 0.35);
 
-  --sb-track: #e2e5f4;
-  --sb-thumb: #7881ad;
-  --sb-thumb-hover: #5f6899;
+  --sb-track-base: #e2e5f4;
+  --sb-thumb-base: #7881ad;
+  --sb-thumb-hover-base: #5f6899;
 
   --glow-a: rgba(63, 81, 207, 0.12);
   --glow-b: rgba(10, 143, 122, 0.08);
@@ -93,19 +100,20 @@
 
 html {
   scroll-behavior: smooth;
-  /* Reserve the strip whether or not the page scrolls: no layout shift when a
-     page grows (the playground's results, say), and the bar is there from the
-     first paint rather than appearing once something overflows. */
+  /* Reserve the strip whether or not the page scrolls, so a page that grows
+     (the playground's results, say) never shifts sideways when the bar
+     appears. */
   scrollbar-gutter: stable;
 }
 
 /* Firefox has no `::-webkit-scrollbar`, so it gets the two standard
    properties. Chrome honours them *as well as* the pseudo-elements and ends up
    painting a second, thinner bar inside the same gutter — two stubs at the top
-   and bottom of the page that make the scrollbar look broken at scroll 0. One
-   path or the other, never both. */
+   and bottom of the page that make the scrollbar look broken. One path or the
+   other, never both. `body` is named because the page's `overflow-x` hands the
+   viewport scroll to the body box, and the bar is then resolved there. */
 @supports not selector(::-webkit-scrollbar) {
-  html {
+  html, body {
     scrollbar-width: thin;
     scrollbar-color: var(--sb-thumb) var(--sb-track);
   }
@@ -133,6 +141,30 @@ html {
 /* No arrow buttons: Chrome draws them on Windows, and a 3px stub above the
    thumb reads as a second, broken scrollbar. */
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* At the very top of a page the page's own bar empties out, so the opening
+   frame is one unbroken surface; it fills back in on the first pixel of scroll
+   (`html.is-scrolled`, set by site.js) and empties again at 0. Only paint
+   changes — the bar keeps its 12px, so nothing moves.
+
+   The emptying is done through the tokens, not by qualifying the
+   `::-webkit-scrollbar-*` selectors with `html:not(.is-scrolled)`: Chrome
+   resolves those per scroller and drops the entire bar as soon as a scoped
+   rule meets the unscoped width rule, which leaves the page with no visible
+   scrollbar at all once you scroll. */
+html:not(.is-scrolled) {
+  --sb-track: transparent;
+  --sb-thumb: transparent;
+  --sb-thumb-hover: transparent;
+}
+
+/* Content scrollers keep their bar at every scroll position: they are content,
+   not the page. Each sheet that owns scrollers opts them back in. */
+pre, .sig {
+  --sb-track: var(--sb-track-base);
+  --sb-thumb: var(--sb-thumb-base);
+  --sb-thumb-hover: var(--sb-thumb-hover-base);
+}
 
 body {
   margin: 0;

@@ -1,5 +1,5 @@
-// moonregex site — shared behaviour: theme, live matcher, tabs, scrollspy,
-// copy buttons, reveal-on-scroll, and the showcase demos.
+// moonregex site — shared behaviour: theme, page scrollbar, live matcher, tabs,
+// scrollspy, copy buttons, reveal-on-scroll, and the showcase demos.
 (function () {
   "use strict";
 
@@ -9,6 +9,30 @@
   // Reveal-on-scroll needs the class to be present before the styles apply;
   // without this script the CSS leaves everything visible.
   root.classList.add("js");
+
+  // ---- page scrollbar ----------------------------------------------------
+  // The page bar is hidden while the viewport sits at the very top, so the
+  // opening frame is one unbroken surface, and shows from the first pixel of
+  // scroll. The gutter itself is reserved in CSS, so this only changes paint,
+  // never layout. A rAF-throttled listener is enough: the check is one number
+  // and a class toggle that no-ops while the state is unchanged.
+  var atTop = null;
+  var syncBar = function () {
+    var top = (window.pageYOffset || root.scrollTop || 0) <= 0;
+    if (top === atTop) return;
+    atTop = top;
+    root.classList.toggle("is-scrolled", !top);
+  };
+  var barQueued = false;
+  document.addEventListener("scroll", function () {
+    if (barQueued) return;
+    barQueued = true;
+    window.requestAnimationFrame(function () { barQueued = false; syncBar(); });
+  }, { passive: true });
+  // A reload can land mid-page (the browser restores the position before this
+  // script runs), in which case the bar is due immediately.
+  syncBar();
+  window.addEventListener("pageshow", syncBar);
 
   // ---- theme -------------------------------------------------------------
   function stored() {

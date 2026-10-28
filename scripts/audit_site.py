@@ -195,6 +195,12 @@ if __name__ == "__main__":
             low = data["low"]
             total += len(low)
             print(f"\n== {page} [{theme}] checked {data['checked']}, below AA: {len(low)}")
+            # A page that reports the other palette measured the wrong thing:
+            # the theme was forced before the page's own script could put it
+            # back, so the numbers below are not about this theme at all.
+            if data["theme"] != theme:
+                print(f"   !! measured as {data['theme']!r}, expected {theme!r}")
+                total += 1
             for item in low[:12]:
                 print(f"   {item['ratio']:>5}:1 (need {item['need']}) {item['tag']}.{item['cls']} "
                       f"{item['size']:.0f}px {item['color']} on {item['bg']} :: {item['text']!r}")
