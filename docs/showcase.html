@@ -28,13 +28,13 @@
   .walk-text {
     font-family: var(--mono); font-size: 17px; letter-spacing: 0.02em;
     padding: 18px 16px; border-radius: 10px; background: var(--code-bg);
-    border: 1px solid var(--line); color: #d9d8f0; white-space: pre;
+    border: 1px solid var(--line); color: var(--code-text); white-space: pre;
     overflow-x: auto;
   }
   .walk-text span { border-radius: 4px; padding: 2px 0; transition: background .25s, color .25s; }
-  .walk-text .hit-w { background: rgba(91,224,198,.22); color: #5be0c6; box-shadow: inset 0 -1px 0 #5be0c6; }
-  .walk-text .hit-sp { background: rgba(142,162,255,.22); color: #8ea2ff; box-shadow: inset 0 -1px 0 #8ea2ff; }
-  .walk-text .hit-ref { background: rgba(255,200,87,.22); color: #ffc857; box-shadow: inset 0 -1px 0 #ffc857; }
+  .walk-text .hit-w { background: color-mix(in srgb, var(--c-str) 20%, transparent); color: var(--c-str); box-shadow: inset 0 -1px 0 var(--c-str); }
+  .walk-text .hit-sp { background: color-mix(in srgb, var(--c-kw) 20%, transparent); color: var(--c-kw); box-shadow: inset 0 -1px 0 var(--c-kw); }
+  .walk-text .hit-ref { background: color-mix(in srgb, var(--c-num) 22%, transparent); color: var(--c-num); box-shadow: inset 0 -1px 0 var(--c-num); }
   .walk-say {
     margin-top: 14px; min-height: 52px; color: var(--text); font-size: 15px;
     display: flex; gap: 10px; align-items: flex-start;
@@ -54,7 +54,7 @@
   [data-theme="light"] .walk-controls button.primary { color: #fff; }
   .walk-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--muted); }
   .walk-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
-  .lg-w { background: #5be0c6; } .lg-sp { background: #8ea2ff; } .lg-ref { background: #ffc857; }
+  .lg-w { background: var(--c-str); } .lg-sp { background: var(--c-kw); } .lg-ref { background: var(--c-num); }
 
   /* spellings */
   .spell-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -80,18 +80,18 @@
   .esc-picks button.active { border-color: var(--accent); background: var(--accent-soft); }
   .esc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .esc-cell { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--code-bg); }
-  .esc-cell .d { font-size: 12px; color: #8b8fae; font-family: var(--mono); }
-  .esc-cell .v { font-family: var(--mono); font-size: 15px; color: #5be0c6; margin-top: 6px; word-break: break-all; }
-  .esc-cell .w { font-size: 12.5px; color: #6b698a; margin-top: 8px; }
+  .esc-cell .d { font-size: 12px; color: var(--c-com); font-family: var(--mono); }
+  .esc-cell .v { font-family: var(--mono); font-size: 15px; color: var(--c-str); margin-top: 6px; word-break: break-all; }
+  .esc-cell .w { font-size: 12.5px; color: var(--c-com); margin-top: 8px; }
 
   /* clusters */
   .cl-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 0; }
   .cl {
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
-    background: var(--code-bg); font-family: var(--mono); font-size: 20px; color: #d9d8f0;
+    background: var(--code-bg); font-family: var(--mono); font-size: 20px; color: var(--code-text);
     min-width: 92px; text-align: center;
   }
-  .cl small { display: block; font-size: 11px; color: #6b698a; margin-top: 4px; }
+  .cl small { display: block; font-size: 11px; color: var(--c-com); margin-top: 4px; }
 
   /* lower */
   .low-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -99,10 +99,10 @@
   .low-col ul { list-style: none; margin: 0; padding: 0; }
   .low-col li {
     font-family: var(--mono); font-size: 13.5px; padding: 7px 10px; border-radius: 7px;
-    border: 1px solid var(--line); margin-bottom: 6px; background: var(--code-bg); color: #d9d8f0;
+    border: 1px solid var(--line); margin-bottom: 6px; background: var(--code-bg); color: var(--code-text);
   }
-  .low-col.yes li { border-left: 2px solid #5be0c6; }
-  .low-col.no li { border-left: 2px solid #ffc857; }
+  .low-col.yes li { border-left: 2px solid var(--c-str); }
+  .low-col.no li { border-left: 2px solid var(--c-num); }
 
   @media (width <= 760px) {
     .esc-grid { grid-template-columns: minmax(0, 1fr); }
@@ -128,19 +128,26 @@
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="./index.html"><span class="dot"></span>moon<span class="acc">regex</span></a>
-    <nav class="nav-links" aria-label="site">
-      <a class="hide-sm" href="./index.html">Home</a>
-      <a href="./guide.html">Guide</a>
-      <a href="./api.html">API</a>
+    <div class="nav-tools">
+      <nav class="nav-links" id="nav-panel" aria-label="site">
+        <a href="./index.html">Home</a>
+        <a class="on" href="./showcase.html" aria-current="page">Showcase</a>
+        <a href="./guide.html">Guide</a>
+        <a href="./api.html">API</a>
+      </nav>
       <button class="theme-toggle" type="button" aria-label="Switch theme">
         <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
         <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>
       </button>
       <a class="cta" href="https://github.com/moonbitstack/moonregex" aria-label="Repository on GitHub">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        GitHub
+        <span class="lbl">GitHub</span>
       </a>
-    </nav>
+      <button class="nav-burger" type="button" aria-expanded="false" aria-controls="nav-panel" aria-label="Open the menu">
+        <svg class="bar-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        <svg class="bar-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 

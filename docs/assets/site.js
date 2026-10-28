@@ -43,6 +43,35 @@
     });
   }
 
+  // ---- the small-screen menu --------------------------------------------
+  // Below 860px the links live behind the burger. It closes itself on a pick,
+  // on Escape, on an outside click, and when the window grows back.
+  var burger = document.querySelector(".nav-burger");
+  var panel = document.getElementById("nav-panel");
+  if (burger && panel) {
+    var setMenu = function (open) {
+      panel.classList.toggle("open", open);
+      burger.setAttribute("aria-expanded", open ? "true" : "false");
+      burger.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+    };
+    burger.addEventListener("click", function (event) {
+      event.stopPropagation();
+      setMenu(!panel.classList.contains("open"));
+    });
+    panel.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setMenu(false);
+    });
+    document.addEventListener("click", function (event) {
+      if (!panel.contains(event.target) && !burger.contains(event.target)) setMenu(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") setMenu(false);
+    });
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 860) setMenu(false);
+    });
+  }
+
   // ---- live matcher ------------------------------------------------------
   var SAMPLE = "the moonregex matcher scans moonbit and moonlight for every moon-shaped word in the text";
   var patEl = document.getElementById("pat");
