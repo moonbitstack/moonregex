@@ -184,11 +184,9 @@ img, svg { max-width: 100%; }
     inset -18px -22px 46px rgba(60, 70, 140, 0.35);
   opacity: 0.9;
 }
-[data-theme="light"] .moon {
-  background: radial-gradient(circle at 34% 30%, #ffffff 0%, #f2f0e4 40%, #ddd8c4 70%, #c3bda6 100%);
-  box-shadow: 0 0 70px 18px rgba(200, 190, 150, 0.35), inset -14px -18px 40px rgba(150, 140, 110, 0.25);
-  opacity: 0.75;
-}
+/* By day the page is paper, and a pale disc on paper reads as a table-tennis
+   ball rather than a moon: the sky keeps its moon only at night. */
+[data-theme="light"] .moon { display: none; }
 @media (width <= 900px) { .moon { display: none; } }
 
 /* ---------- nav ---------- */
