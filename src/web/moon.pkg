@@ -1,0 +1,9 @@
+// The browser hook: the library compiled to JavaScript for the showcase page.
+// `fn main` publishes one entry point on `globalThis`, and the page calls it
+// with a pattern, flags, text and a matching function. Everything else lives
+// in `web/engine`, which builds on every backend and is what the tests cover.
+pkgtype(kind: "executable")
+
+import {
+  "moonbitstack/moonregex/web/engine",
+}

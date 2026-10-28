@@ -8,6 +8,8 @@ for body text, 3:1 for large text.
 
     python scripts/audit_site.py            # all four pages, both themes
     python scripts/audit_site.py guide.html # one page
+    python scripts/audit_site.py --pre "document.querySelector('.pg input').value='('" \
+        --delay 3000 showcase.html          # audit a state, not the landing one
 
 Exit status is 0 when everything passes, 1 otherwise, so it can gate a change.
 Chrome is found in the usual places, or set CHROME to its path.
@@ -42,7 +44,7 @@ CHROME = find_chrome()
 
 AUDIT = r"""
 <script>
-window.addEventListener("load", function () {
+window.__auditCollect = function () {
   function parse(c) {
     var m = c.match(/rgba?\(([^)]+)\)/);
     if (!m) return null;
@@ -117,34 +119,44 @@ window.addEventListener("load", function () {
       });
     }
   });
-  var probe = {
+  return {
     theme: document.documentElement.getAttribute("data-theme"),
     checked: seen,
     low: out
   };
-  var pre = document.createElement("pre");
-  pre.id = "audit";
-  pre.textContent = JSON.stringify(probe);
-  pre.style.display = "none";
-  document.body.appendChild(pre);
-  document.title = "AUDIT " + out.length;
+};
+window.addEventListener("load", function () {
+  // A page with an interactive state to reach (the playground's error, say)
+  // sets window.__auditDelay and drives the page itself; everything else
+  // measures as soon as the page is up.
+  var delay = window.__auditDelay || 0;
+  setTimeout(function () {
+    var probe = window.__auditCollect();
+    var pre = document.createElement("pre");
+    pre.id = "audit";
+    pre.textContent = JSON.stringify(probe);
+    pre.style.display = "none";
+    document.body.appendChild(pre);
+    document.title = "AUDIT " + probe.low.length;
+  }, delay);
 });
 </script>
 </body>"""
 
 
-def run(page: str, theme: str) -> dict:
+def run(page: str, theme: str, pre: str = "", delay: int = 0) -> dict:
     src = (DOCS / page).read_text(encoding="utf-8")
     # The theme is forced *after* site.js runs, which would otherwise put the
     # system preference back.
     force = f'<script>document.documentElement.setAttribute("data-theme","{theme}");</script>'
-    src = src.replace("</body>", force + AUDIT)
+    setup = f"<script>window.__auditDelay={delay};{pre}</script>" if (pre or delay) else ""
+    src = src.replace("</body>", force + setup + AUDIT)
     tmp = DOCS / f"_audit_{theme}.html"
     tmp.write_text(src, encoding="utf-8")
     try:
         proc = subprocess.run(
             [CHROME, "--headless=new", "--disable-gpu", "--dump-dom",
-             "--virtual-time-budget=4000", "--window-size=1440,900",
+             f"--virtual-time-budget={6000 + delay * 3}", "--window-size=1440,900",
              tmp.as_uri()],
             capture_output=True, text=True, timeout=90,
         )
@@ -158,11 +170,26 @@ def run(page: str, theme: str) -> dict:
 
 
 if __name__ == "__main__":
-    pages = sys.argv[1:] or ["index.html", "guide.html", "showcase.html", "api.html"]
+    args = sys.argv[1:]
+    pre = ""
+    delay = 0
+    pages = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--pre":
+            pre = args[i + 1]
+            i += 2
+        elif args[i] == "--delay":
+            delay = int(args[i + 1])
+            i += 2
+        else:
+            pages.append(args[i])
+            i += 1
+    pages = pages or ["index.html", "guide.html", "showcase.html", "api.html"]
     total = 0
     for theme in ("dark", "light"):
         for page in pages:
-            data = run(page, theme)
+            data = run(page, theme, pre, delay)
             if not data:
                 continue
             low = data["low"]

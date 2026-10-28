@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>moonregex — showcase</title>
-<meta name="description" content="Four demos with the output the library actually gave: a match walkthrough, one pattern in three spellings, escape in three grammars, and grapheme clusters." />
+<meta name="description" content="A live playground running moonregex itself, compiled to JavaScript — plus a match walkthrough, one pattern in three spellings, escape in three grammars, grapheme clusters, and what lowers onto the core engine." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%23080a13'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -108,6 +108,158 @@
     .esc-grid { grid-template-columns: minmax(0, 1fr); }
     .low-grid { grid-template-columns: minmax(0, 1fr); }
   }
+
+  /* the playground */
+  .pg {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--surface); padding: 18px; margin: 18px 0 40px;
+  }
+  .pg-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding-bottom: 14px; margin-bottom: 14px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .pg-modes {
+    display: inline-flex; gap: 2px; padding: 3px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+  }
+  .pg-modes button {
+    font-family: var(--mono); font-size: 12.5px; padding: 5px 11px;
+    border: 0; border-radius: 7px; background: none; color: var(--muted);
+    cursor: pointer;
+  }
+  .pg-modes button:hover { color: var(--text); }
+  .pg-modes button.on { background: var(--accent); color: #fff; }
+  [data-theme="dark"] .pg-modes button.on { color: #0a0c18; }
+  .pg-flags-wrap {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--faint);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .pg-flags {
+    width: 86px; font-family: var(--mono); font-size: 13px;
+    color: var(--code-text); background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
+    text-transform: none; letter-spacing: 0; outline: none;
+  }
+  .pg-flags:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .pg-engine {
+    font-family: var(--mono); font-size: 11.5px; color: var(--faint);
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .pg-row {
+    display: grid; grid-template-columns: 62px minmax(0, 1fr);
+    gap: 10px; align-items: start; margin: 10px 0;
+  }
+  .pg-label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--faint); padding-top: 11px;
+  }
+  .pg-input, .pg-text {
+    width: 100%; font-family: var(--mono); font-size: 14px;
+    color: var(--code-text); background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 9px;
+    padding: 9px 12px; outline: none;
+  }
+  .pg-input:focus, .pg-text:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .pg-input.is-bad { border-color: var(--mark); }
+  .pg-input.is-bad:focus { box-shadow: 0 0 0 3px var(--mark-soft); }
+  .pg-input::placeholder, .pg-text::placeholder { color: var(--faint); }
+  .pg-text {
+    resize: vertical; min-height: 78px; line-height: 1.6;
+    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
+  }
+
+  /* the error, and where it sits in the pattern */
+  .pg-hint:empty { display: none; }
+  .pg-hint { margin-top: 8px; }
+  .pg-err {
+    border-left: 2px solid var(--mark); background: var(--mark-soft);
+    border-radius: 0 8px 8px 0; padding: 9px 12px;
+  }
+  .pg-msg { font-size: 13.5px; color: var(--text); margin-bottom: 6px; }
+  .pg-echo {
+    margin: 0; padding: 0; border: 0; background: none; border-radius: 0;
+    font-family: var(--mono); font-size: 13px; line-height: 1.45;
+    color: var(--muted); white-space: pre; overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent;
+  }
+  .pg-caret { color: var(--mark); font-weight: 700; }
+  .pg-at { color: var(--muted); }
+
+  /* The rows without a label keep the label column as an indent, so the
+     chips, the marked text and the matches all start where the inputs do. */
+  .pg-samples, .pg-hit, .pg-results { margin-left: 72px; }
+  .pg-samples { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px 72px; }
+  .pg-samples button {
+    font-family: var(--mono); font-size: 11.5px; padding: 4px 10px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: none; color: var(--muted); cursor: pointer;
+  }
+  .pg-samples button:hover { color: var(--text); border-color: var(--accent); }
+
+  .pg-hit {
+    font-family: var(--mono); font-size: 14px; line-height: 1.8;
+    background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 240px; overflow: auto;
+    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
+  }
+  .pg-hit.is-empty::before {
+    content: "the text appears here, matches marked";
+    color: var(--faint); font-style: italic;
+  }
+  .pg-hit mark {
+    background: var(--mark-soft); color: var(--mark);
+    border-radius: 3px; padding: 1px 2px;
+    box-shadow: inset 0 -1px 0 var(--mark);
+  }
+
+  .pg-results {
+    display: grid; gap: 8px; margin-top: 12px;
+    max-height: 320px; overflow: auto;
+    scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track);
+  }
+  .pg-results:empty { display: none; }
+  .pg-match {
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface-2); padding: 10px 12px;
+  }
+  .pg-head {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12.5px; color: var(--faint);
+  }
+  .pg-n { color: var(--accent); }
+  .pg-span { color: var(--faint); }
+  .pg-slice { color: var(--c-str); font-size: 13px; }
+  .pg-groups { list-style: none; margin: 8px 0 0; padding: 0; }
+  .pg-groups li {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12.5px;
+    padding: 4px 0; border-top: 1px dashed var(--line-soft);
+  }
+  .pg-name { color: var(--c-kw); }
+  .pg-eq { color: var(--faint); }
+  .pg-groups code { color: var(--c-str); font-size: 12.5px; }
+  .pg-where { margin-left: auto; color: var(--faint); }
+  .pg-off em { color: var(--faint); font-style: normal; }
+  .pg-empty, .pg-more {
+    font-size: 13.5px; color: var(--muted);
+    border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
+  }
+  .pg-empty code { color: var(--c-str); }
+
+  @media (width <= 620px) {
+    .pg { padding: 14px; }
+    .pg-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .pg-label { padding-top: 0; }
+    .pg-samples, .pg-hit, .pg-results { margin-left: 0; }
+  }
 </style>
 <script>
   (function () {
@@ -155,6 +307,7 @@
   <aside class="side">
     <h4>Demos</h4>
     <ol>
+      <li><a href="#playground">Your pattern, your text</a></li>
       <li><a href="#walk">A match, step by step</a></li>
       <li><a href="#spellings">Three spellings</a></li>
       <li><a href="#escape">Escape, three ways</a></li>
@@ -171,12 +324,50 @@
   <main>
     <h1 class="docs-title">Watch it <span class="reg">decide</span>.</h1>
     <p class="docs-lede">
-      Four runs, with the output this library actually gave. Nothing here is
-      computed in the browser: the patterns were compiled by moonregex, and what
-      you step through is what it answered.
+      The first one is live and yours to drive: the pattern you type runs
+      through moonregex itself, compiled to JavaScript, and answers in the
+      browser. The rest step through output the library gave earlier.
     </p>
 
-    <h2 id="walk"><span class="num">01</span>A match, step by step</h2>
+    <h2 id="playground"><span class="num">01</span>Your pattern, your text</h2>
+    <div class="pg" id="pg">
+      <div class="pg-bar">
+        <div class="pg-modes" id="pgmodes" role="group" aria-label="matching function">
+          <button type="button" data-mode="search" aria-pressed="false">search</button>
+          <button type="button" data-mode="prefix" aria-pressed="false">prefix</button>
+          <button type="button" data-mode="full" aria-pressed="false">full</button>
+          <button type="button" data-mode="findall" class="on" aria-pressed="true">findall</button>
+        </div>
+        <label class="pg-flags-wrap" for="pgflags">
+          flags
+          <input class="pg-flags" id="pgflags" value="" placeholder="im sxa" spellcheck="false" autocomplete="off" aria-label="flags" />
+        </label>
+      </div>
+
+      <div class="pg-row">
+        <label class="pg-label" for="pgpattern">pattern</label>
+        <div>
+          <input class="pg-input" id="pgpattern" type="text" spellcheck="false" autocomplete="off"
+                 placeholder="(?P&lt;name&gt;\w+)" value="(?P&lt;word&gt;\w+)\s+\1"
+                 aria-describedby="pghint" />
+          <div class="pg-hint" id="pghint" role="alert" aria-live="assertive"></div>
+        </div>
+      </div>
+
+      <div class="pg-row">
+        <label class="pg-label" for="pgtext">text</label>
+        <textarea class="pg-text" id="pgtext" rows="2" spellcheck="false"
+                  placeholder="paste the text you want to match">go go no; the the end</textarea>
+      </div>
+
+      <div class="pg-samples" id="pgsamples"></div>
+
+      <div class="pg-hit is-empty" id="pghit"></div>
+      <div class="pg-results" id="pgresults" aria-live="polite"></div>
+      <div class="pg-engine" id="pgengine" aria-live="polite">engine loads when this is in view</div>
+    </div>
+
+    <h2 id="walk"><span class="num">02</span>A match, step by step</h2>
     <div class="demo-block">
       <div class="demo-head">
         <h3><code>(?P&lt;w&gt;\w+)\s+\1</code> over <code>go go no</code></h3>
@@ -196,7 +387,7 @@
       </div>
     </div>
 
-    <h2 id="spellings"><span class="num">02</span>One pattern, three spellings</h2>
+    <h2 id="spellings"><span class="num">03</span>One pattern, three spellings</h2>
     <div class="demo-block">
       <div class="demo-head">
         <h3>a date, written three ways</h3>
@@ -214,7 +405,7 @@
       </div>
     </div>
 
-    <h2 id="escape"><span class="num">03</span>Escape, three ways</h2>
+    <h2 id="escape"><span class="num">04</span>Escape, three ways</h2>
     <div class="demo-block">
       <div class="demo-head">
         <h3>the same string, escaped for three grammars</h3>
@@ -225,7 +416,7 @@
       <div class="esc-grid" id="escgrid"></div>
     </div>
 
-    <h2 id="clusters"><span class="num">04</span>Grapheme clusters</h2>
+    <h2 id="clusters"><span class="num">05</span>Grapheme clusters</h2>
     <div class="demo-block">
       <div class="demo-head">
         <h3><code>\X</code> over <code>é👨‍👩‍👧🇯🇵</code></h3>
@@ -240,7 +431,7 @@
       <p class="spell-out" id="clout" style="margin-top:14px"></p>
     </div>
 
-    <h2 id="lower"><span class="num">05</span>What lowers onto the core engine</h2>
+    <h2 id="lower"><span class="num">06</span>What lowers onto the core engine</h2>
     <div class="demo-block">
       <div class="demo-head">
         <h3><code>Pattern::lower</code></h3>
@@ -461,6 +652,304 @@
       render();
     });
     render();
+  })();
+
+  // ---- 01 · the playground --------------------------------------------------
+  // The one demo that runs the library itself: src/web builds to
+  // docs/assets/moonregex_web.js, and `run` there answers a JSON string.
+  (function () {
+    var patternEl = document.getElementById("pgpattern");
+    if (!patternEl) return;
+    var flagsEl = document.getElementById("pgflags");
+    var textEl = document.getElementById("pgtext");
+    var hintEl = document.getElementById("pghint");
+    var hitEl = document.getElementById("pghit");
+    var listEl = document.getElementById("pgresults");
+    var engineEl = document.getElementById("pgengine");
+    var modesEl = document.getElementById("pgmodes");
+    var samplesEl = document.getElementById("pgsamples");
+
+    var MAX_TEXT = 20000;
+    var firstRun = true;
+    var mode = "findall";
+    var loading = null;
+    var timer = 0;
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function ensureEngine() {
+      if (window.moonregexWeb) return Promise.resolve(true);
+      if (loading) return loading;
+      engineEl.textContent = "engine: loading…";
+      loading = new Promise(function (resolve) {
+        var script = document.createElement("script");
+        script.src = "./assets/moonregex_web.js";
+        script.onload = function () { resolve(!!window.moonregexWeb); };
+        script.onerror = function () { resolve(false); };
+        document.head.appendChild(script);
+      });
+      return loading;
+    }
+
+    // Offsets come back in code points; a JS string is counted in UTF-16
+    // units, so one prefix table turns one into the other.
+    function utf16Index(text) {
+      var cps = Array.from(text), out = [0], i;
+      for (i = 0; i < cps.length; i++) out.push(out[i] + cps[i].length);
+      return out;
+    }
+
+    function clearOutput(message) {
+      hintEl.innerHTML = "";
+      hitEl.innerHTML = "";
+      hitEl.classList.add("is-empty");
+      listEl.innerHTML = "";
+      patternEl.classList.remove("is-bad");
+      if (message) engineEl.textContent = message;
+    }
+
+    function renderError(answer) {
+      var html = '<div class="pg-err"><div class="pg-msg">' +
+        esc(answer.message || "the pattern was refused") + "</div>";
+      if (answer.column > 0) {
+        // The caret sits under the character reading stopped at.
+        var width = Math.min(answer.at, Array.from(patternEl.value).length);
+        var pad = new Array(width + 1).join(" ");
+        html += '<pre class="pg-echo">' + esc(patternEl.value) + "\n" + pad +
+          '<span class="pg-caret">^</span> <span class="pg-at">column ' +
+          answer.column + "</span></pre>";
+      }
+      html += "</div>";
+      hintEl.innerHTML = html;
+      // The text stays visible while the pattern is broken; it simply has
+      // nothing marked in it.
+      hitEl.textContent = textEl.value;
+      hitEl.classList.toggle("is-empty", textEl.value.length === 0);
+      listEl.innerHTML = "";
+      patternEl.classList.toggle("is-bad", answer.column > 0);
+      engineEl.textContent = "moonregex · refused";
+    }
+
+    function groupRows(match) {
+      var rows = "";
+      match.groups.forEach(function (g) {
+        if (g.slot === 0) return; // slot 0 is the match itself, shown above
+        var name = g.name ? g.name : "group " + g.slot;
+        if (g.text === null) {
+          rows += '<li class="pg-off"><span class="pg-name">' + esc(name) +
+            '</span><span class="pg-eq">=</span><em>unset</em>' +
+            '<span class="pg-where">no part</span></li>';
+        } else {
+          rows += "<li><span class=\"pg-name\">" + esc(name) +
+            '</span><span class="pg-eq">=</span><code>"' + esc(g.text) +
+            '"</code><span class="pg-where">' + g.start + "–" + g.end + "</span></li>";
+        }
+      });
+      return rows ? '<ul class="pg-groups">' + rows + "</ul>" : "";
+    }
+
+    function renderMatch(match, index) {
+      return '<div class="pg-match"><div class="pg-head">' +
+        '<span class="pg-n">#' + (index + 1) + "</span>" +
+        '<span class="pg-span">' + match.start + "–" + match.end + "</span>" +
+        '<code class="pg-slice">' + (match.text ? esc(match.text) : "∅") + "</code>" +
+        "</div>" + groupRows(match) + "</div>";
+    }
+
+    function renderResult(answer, text, ms, truncated) {
+      hintEl.innerHTML = "";
+      var idx = utf16Index(text);
+      var html = "";
+      var cursor = 0;
+      var drawn = 0;
+      answer.matches.forEach(function (m) {
+        var s = idx[m.start], e = idx[m.end];
+        if (e <= s || s < cursor) return; // zero-width, or overlapping
+        html += esc(text.slice(cursor, s));
+        html += "<mark>" + esc(text.slice(s, e)) + "</mark>";
+        cursor = e;
+        drawn++;
+      });
+      html += esc(text.slice(cursor));
+      hitEl.innerHTML = html;
+      hitEl.classList.toggle("is-empty", text.length === 0);
+      patternEl.classList.remove("is-bad");
+
+      if (answer.count === 0) {
+        listEl.innerHTML = '<div class="pg-empty">No match for <code>' +
+          esc(patternEl.value) + "</code>" +
+          (mode === "full" ? " — <code>full</code> wants the whole text" : "") +
+          (mode === "prefix" ? " — <code>prefix</code> only looks at the start" : "") +
+          ".</div>";
+      } else {
+        var rows = "";
+        answer.matches.slice(0, 20).forEach(function (m, i) {
+          rows += renderMatch(m, i);
+        });
+        if (answer.count > 20) {
+          rows += '<div class="pg-more">and ' + (answer.count - 20) +
+            " more matches</div>";
+        }
+        listEl.innerHTML = rows;
+      }
+
+      var took = ms < 0.1 ? "< 0.1" : ms.toFixed(1);
+      var summary = "moonregex · js backend · " + answer.count +
+        (answer.count === 1 ? " match" : " matches") + " · " + took + " ms";
+      if (firstRun) {
+        summary += " (first run builds the Unicode tables)";
+        firstRun = false;
+        warmUp();
+      }
+      if (answer.groups > 0) {
+        summary += " · " + answer.groups +
+          (answer.groups === 1 ? " group" : " groups");
+      }
+      if (truncated) summary += " · first " + MAX_TEXT + " characters";
+      engineEl.textContent = summary;
+    }
+
+    // `\w` is cheap to warm; the other families are not, and the samples use
+    // them. Doing it while the page is idle keeps the next click instant.
+    function warmUp() {
+      var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 600); };
+      idle(function () {
+        try {
+          window.moonregexWeb.run("\\s", "", " ", "search");
+          window.moonregexWeb.run("\\p{Script=Han}", "", "漢", "search");
+          window.moonregexWeb.run("(?i)a", "", "A", "search");
+        } catch (error) { /* a warm-up that fails is not an error */ }
+      });
+    }
+
+    function run() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(function () {
+        var pattern = patternEl.value;
+        if (!pattern) { clearOutput("moonregex · idle"); return; }
+        var text = textEl.value;
+        var truncated = text.length > MAX_TEXT;
+        if (truncated) text = text.slice(0, MAX_TEXT);
+        ensureEngine().then(function (ok) {
+          if (!ok) { clearOutput("engine failed to load"); return; }
+          var started = performance.now();
+          var raw;
+          try {
+            raw = window.moonregexWeb.run(pattern, flagsEl.value, text, mode);
+          } catch (error) {
+            renderError({ message: "the engine threw: " + error.message });
+            return;
+          }
+          var elapsed = performance.now() - started;
+          var answer = JSON.parse(raw);
+          if (!answer.ok) { renderError(answer); return; }
+          renderResult(answer, text, elapsed, truncated);
+        });
+      }, 150);
+    }
+
+    function setMode(next, button) {
+      mode = next;
+      Array.prototype.forEach.call(modesEl.children, function (b) {
+        var on = b === button;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      run();
+    }
+
+    modesEl.addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-mode]");
+      if (button) setMode(button.getAttribute("data-mode"), button);
+    });
+
+    var SAMPLES = [
+      {
+        label: "a repeated word",
+        pattern: "(?P<word>\\w+)\\s+\\1",
+        flags: "",
+        text: "go go no; the the end",
+        mode: "findall"
+      },
+      {
+        label: "a date",
+        pattern: "(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})",
+        flags: "",
+        text: "on 2026-10-28, and again on 1999-01-02",
+        mode: "findall"
+      },
+      {
+        label: "Han script",
+        pattern: "\\p{Script=Han}+",
+        flags: "",
+        text: "漢字 and kana 東京",
+        mode: "findall"
+      },
+      {
+        label: "ignore case",
+        pattern: "moon \\w+",
+        flags: "i",
+        text: "Moon river, moon lake",
+        mode: "findall"
+      },
+      {
+        label: "whole text",
+        pattern: "\\d+",
+        flags: "",
+        text: "1234",
+        mode: "full"
+      },
+      {
+        label: "a broken one",
+        pattern: "(?<name>\\w+",
+        flags: "",
+        text: "watch the caret point at it",
+        mode: "findall"
+      }
+    ];
+
+    SAMPLES.forEach(function (sample) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = sample.label;
+      button.addEventListener("click", function () {
+        patternEl.value = sample.pattern;
+        flagsEl.value = sample.flags;
+        textEl.value = sample.text;
+        mode = sample.mode;
+        Array.prototype.forEach.call(modesEl.children, function (b) {
+          var on = b.getAttribute("data-mode") === mode;
+          b.classList.toggle("on", on);
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        run();
+      });
+      samplesEl.appendChild(button);
+    });
+
+    patternEl.addEventListener("input", run);
+    flagsEl.addEventListener("input", run);
+    textEl.addEventListener("input", run);
+
+    // The bundle is 2.5 MB: it loads when the section is close, not with the
+    // page. Typing before then waits on the same promise.
+    if ("IntersectionObserver" in window) {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.disconnect();
+          ensureEngine().then(run);
+        });
+      }, { rootMargin: "500px" });
+      observer.observe(document.getElementById("pg"));
+    } else {
+      ensureEngine().then(run);
+    }
   })();
 </script>
 <script src="./assets/site.js"></script>

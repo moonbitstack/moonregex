@@ -1,0 +1,7 @@
+// The playground's engine as a plain library: a pattern, flags, text and a
+// matching function in; a JSON string out. It builds on every backend, which
+// is what lets the tests run here rather than in a browser.
+import {
+  "moonbitstack/moonregex",
+  "moonbitstack/moonregex/parse",
+}

@@ -41,6 +41,12 @@ jobs:
           python3 scripts/gen_api.py
           git diff --exit-code docs/api.html
 
+      # The showcase's playground calls the library itself, so the bundle is
+      # rebuilt here rather than trusted from the commit: what ships must match
+      # the code that just built.
+      - name: browser build
+        run: python3 scripts/build_web.py
+
       - uses: actions/configure-pages@v6
         with:
           enablement: true
