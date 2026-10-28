@@ -39,8 +39,22 @@ fn main raise {
     (@moonregex.prefix("\\d+", "order 42") is None).to_string(),
   )
 
-  // findall collects one capture per match.
-  println("findall: " + show(@moonregex.findall("(\\w+)=(\\d+)", "a=1 b=2")))
+  // findall collects one capture per match; a pattern with two of them has to
+  // say which, because Python answers a tuple there.
+  println(
+    "findall: " +
+    show(
+      @moonregex.findall("(\\w+)=(\\d+)", "a=1 b=2", group=@moonregex.Num(n=1)),
+    ),
+  )
+  // finditer hands over the matches themselves, groups and all.
+  let walk = StringBuilder::StringBuilder()
+  for m in @moonregex.finditer("(\\w+)=(\\d+)", "a=1 b=2") {
+    walk.write_string(
+      " " + m.group(1).unwrap_or("?") + ":" + m.group(2).unwrap_or("?"),
+    )
+  }
+  println("finditer:" + walk.to_string())
 
   // split keeps the captured separators.
   println("split: " + show(@moonregex.split("(\\s+)", "a  b\tc")))

@@ -100,7 +100,7 @@ which one, or walk `finditer` for matches that carry them all.
 <!-- nocheck -->
 ```moonbit
 @moonregex.findall("(\\w+)=(\\d+)", "a=1")            // raises Ambiguous
-@moonregex.findall("(\\w+)=(\\d+)", "a=1", group=1)   // ["a"]
+@moonregex.findall("(\\w+)=(\\d+)", "a=1", group=Num(n=1))   // ["a"]
 ```
 
 ### Flags

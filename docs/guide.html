@@ -205,7 +205,7 @@ m.group(<span class="c-num">2</span>)   <span class="c-com">// Some("b")</span><
       the call is refused until you name one:</p>
     <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(\\w+)=(\\d+)"</span>)
 p.findall(<span class="c-str">"a=1"</span>)                <span class="c-com">// raises Ambiguous(groups=2)</span>
-p.findall(<span class="c-str">"a=1"</span>, group=<span class="c-num">1</span>)       <span class="c-com">// ["a"]</span>
+p.findall(<span class="c-str">"a=1"</span>, group=Num(n=<span class="c-num">1</span>))   <span class="c-com">// ["a"]</span>
 p.finditer(<span class="c-str">"a=1"</span>).length()       <span class="c-com">// 1 — and the Match has both</span></code></pre>
 
     <h2 id="replace"><span class="num">04</span>Replacing and splitting</h2>
