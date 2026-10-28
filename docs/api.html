@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>moonregex — API reference</title>
+<meta name="description" content="Every public type, function and value moonregex exports, generated from the packages' interfaces and their documentation." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%230a0b14'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0b14; --bg-2: #0e1020; --surface: #12142a;
+    --border: rgba(255,255,255,0.08); --text: #eceaf6; --muted: #9a98b5;
+    --faint: #6b698a; --accent: #8ea2ff; --accent-2: #5be0c6; --mark: #ffc857;
+    --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body, button, input, textarea, select { font-variant-ligatures: no-contextual; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--text); font-family: var(--body); line-height: 1.65; font-size: 16px;
+    background: radial-gradient(1000px 600px at 88% -10%, rgba(142,162,255,0.13), transparent 60%),
+                linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-attachment: fixed;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: 0.88em; }
+  .nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); background: rgba(10,11,20,0.82); border-bottom: 1px solid var(--border); }
+  .wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
+  .brand { font-family: var(--display); font-weight: 600; font-size: 19px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .brand .acc { color: var(--accent); }
+  .nav-links { display: flex; align-items: center; gap: 4px; }
+  .nav-links a { color: var(--muted); font-size: 14.5px; padding: 7px 11px; border-radius: 8px; }
+  .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); text-decoration: none; }
+  .nav-links a.cta { color: var(--text); border: 1px solid var(--border); }
+  .layout { display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 44px; padding: 36px 0 80px; }
+  .side { position: sticky; top: 84px; align-self: start; font-size: 14.5px; }
+  .side h4 { margin: 0 0 10px; font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .side ul { list-style: none; margin: 0; padding: 0; }
+  .side li a { display: block; color: var(--muted); padding: 5px 10px; border-radius: 0 8px 8px 0; border-left: 2px solid transparent; }
+  .side li a:hover { color: var(--text); background: rgba(255,255,255,0.04); text-decoration: none; }
+  main { min-width: 0; }
+  h1 { font-family: var(--display); font-size: 36px; letter-spacing: -0.02em; margin: 8px 0 6px; }
+  h1 .reg { color: var(--mark); }
+  .lede { color: var(--muted); margin: 0 0 8px; }
+  .pkg { padding-top: 30px; }
+  .pkg h2 { font-family: var(--display); font-size: 26px; margin: 30px 0 2px; scroll-margin-top: 84px; }
+  .pkg .blurb { color: var(--muted); margin: 4px 0 2px; }
+  .pkg .slug code { color: var(--faint); font-size: 13px; }
+  .pkg h3 { font-family: var(--display); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin: 30px 0 8px; }
+  .type { border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin: 12px 0; background: rgba(18,20,42,0.6); }
+  .type h4 { margin: 0 0 4px; font-family: var(--display); font-size: 17px; }
+  .type h4 code { color: var(--accent-2); font-size: 16px; }
+  .members { list-style: none; margin: 8px 0 0; padding: 0; }
+  .members li { padding: 8px 0; border-top: 1px solid var(--border); }
+  .members li:first-child { border-top: none; }
+  .sig { display: block; color: #cfd6ff; font-size: 13.5px; overflow-x: auto; white-space: nowrap; }
+  .desc { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+  .desc p { margin: 4px 0; }
+  .desc code { color: var(--accent-2); background: rgba(91,224,198,0.08); padding: 0 4px; border-radius: 4px; }
+  footer { border-top: 1px solid var(--border); padding: 28px 0 60px; color: var(--faint); font-size: 14px; }
+  footer .foot-grid { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: #0b0d18; }
+  ::-webkit-scrollbar-thumb { background: #262a45; border-radius: 6px; border: 2px solid #0b0d18; }
+  ::-webkit-scrollbar-thumb:hover { background: #343a5e; }
+  @supports not selector(::-webkit-scrollbar) {
+    html { scrollbar-color: #343a5e #0b0d18; scrollbar-width: thin; }
+  }
+  @media (width <= 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .side { position: static; }
+    .wrap { width: calc(100% - 32px); }
+    h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./index.html"><span class="dot"></span>moon<span class="acc">regex</span></a>
+    <nav class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./guide.html">Guide</a>
+      <a href="./api.html">API</a>
+      <a class="cta" href="https://github.com/moonbitstack/moonregex">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="side">
+    <h4>Packages</h4>
+    <ul>
+<li><a href="#moonregex">The library</a></li>
+<li><a href="#moonregex-parse">parse</a></li>
+<li><a href="#moonregex-exec">exec</a></li>
+<li><a href="#moonregex-prop">prop</a></li>
+<li><a href="#moonregex-glob">glob</a></li>
+    </ul>
+  </aside>
+  <main>
+    <h1>Every <span class="reg">public</span> name.</h1>
+    <p class="lede">Generated from the packages' interfaces and their documentation.
+      Grouped by package; within a package, types first, then functions and values,
+      each in alphabetical order.</p>
+<section class="pkg" id="moonregex">
+<h2>The library</h2>
+<p class="blurb">Patterns, matches and the functions that drive them — the surface a caller meets.</p>
+<p class="slug"><code>moonregex</code></p>
+<h3>Types</h3>
+<div class="type" id="moonregex-Match"><h4><code>Match</code></h4><div class="desc"><p>One match: where it sits in the text, and every group&#x27;s span.</p>
+<p>A span is a code-point range, so <code>start</code> and <code>end</code> read the way Python&#x27;s do — characters, not UTF-16 units — and <code>group</code> slices the original text back out by those offsets.</p></div><ul class="members"><li><code class="sig">after(Self) -&gt; StringView</code><div class="desc"><p>The text after the match — core&#x27;s <code>MatchResult::after</code>.</p></div></li><li><code class="sig">before(Self) -&gt; StringView</code><div class="desc"><p>The text before the match — core&#x27;s <code>MatchResult::before</code>.</p></div></li><li><code class="sig">captures(Self, group? : GroupKey) -&gt; Array[(Int32, Int32)] raise @parse.Refused</code><div class="desc"><p>Every capture of <code>group</code>, as code-point spans; an empty list when the group took no part — Python&#x27;s <code>Match.captures</code>. Our engine records the last span a group held, so this returns the one span a non-repeated group captured.</p></div></li><li><code class="sig">capturesdict(Self) -&gt; Map[String, Array[(Int32, Int32)]]</code><div class="desc"><p>Named groups to their captured spans — Python&#x27;s <code>Match.capturesdict</code>.</p></div></li><li><code class="sig">content(Self) -&gt; StringView</code><div class="desc"><p>The matched text — core&#x27;s <code>MatchResult::content</code>, and Python&#x27;s <code>group(0)</code>.</p></div></li><li><code class="sig">end(Self, group? : GroupKey) -&gt; Int32 raise @parse.Refused</code><div class="desc"><p>Code-point offset just past where the whole match ends.</p></div></li><li><code class="sig">endpos(Self) -&gt; Int32</code><div class="desc"><p>The <code>endpos</code> the search was bounded by — Python&#x27;s <code>Match.endpos</code>.</p></div></li><li><code class="sig">expand(Self, String) -&gt; String raise @parse.Refused</code><div class="desc"><p>Expand the Python replacement language in <code>template</code> against this match — Python&#x27;s <code>Match.expand</code>.</p></div></li><li><code class="sig">fuzzy_changes(Self) -&gt; (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])</code><div class="desc"><p>The individual edits of a fuzzy match, as <code>(substitutions, insertions, deletions)</code> each a list of <code>(string_offset, pattern_offset)</code>; three empty lists when the pattern was not fuzzy — Python&#x27;s <code>Match.fuzzy_changes</code>.</p></div></li><li><code class="sig">fuzzy_counts(Self) -&gt; (Int32, Int32, Int32)</code><div class="desc"><p>The edit counts of a fuzzy match, as <code>(substitutions, insertions, deletions)</code>; all zero when the pattern was not fuzzy — Python&#x27;s <code>Match.fuzzy_counts</code>.</p></div></li><li><code class="sig">group(Self, group? : GroupKey, default? : String?) -&gt; String? raise @parse.Refused</code><div class="desc"><p>The substring the group captured, or <code>default</code> (preset <code>None</code>) if it took no part — Python&#x27;s <code>Match.group</code>.</p></div></li><li><code class="sig">groupdict(Self, default? : String?) -&gt; Map[String, String]</code><div class="desc"><p>Named groups to their captured strings, <code>default</code> filling those that took no part — Python&#x27;s <code>Match.groupdict</code>.</p></div></li><li><code class="sig">groups(Self, default? : String?) -&gt; Array[String?]</code><div class="desc"><p>All capturing groups (1..n) as strings, <code>None</code> for those that did not take part — Python&#x27;s <code>Match.groups</code>.</p></div></li><li><code class="sig">lastgroup(Self) -&gt; String?</code><div class="desc"><p>The name of the group <code>lastindex</code> points at, or <code>None</code> — Python&#x27;s <code>Match.lastgroup</code>.</p></div></li><li><code class="sig">lastindex(Self) -&gt; Int32?</code><div class="desc"><p>The number of the highest group that took part, or <code>None</code> — Python&#x27;s <code>Match.lastindex</code>.</p></div></li><li><code class="sig">marks(Self) -&gt; Array[String]</code><div class="desc"><p>The names of the marks <code>(*MARK:name)</code> set during the match, in the order they were set — an empty list when none were.</p></div></li><li><code class="sig">partial(Self) -&gt; Bool</code><div class="desc"><p>Whether this match is a partial match — <code>regex.Match.partial</code>. True when the pattern was compiled with <code>partial=true</code>.</p></div></li><li><code class="sig">pattern(Self) -&gt; Pattern</code><div class="desc"><p>The <code>Pattern</code> that produced this match.</p></div></li><li><code class="sig">pos(Self) -&gt; Int32</code><div class="desc"><p>The <code>pos</code> the search started at — Python&#x27;s <code>Match.pos</code>.</p></div></li><li><code class="sig">re(Self) -&gt; Pattern</code><div class="desc"><p>The <code>Pattern</code> that produced this match — Python&#x27;s <code>Match.re</code>.</p></div></li><li><code class="sig">slices(Self, group? : GroupKey) -&gt; Array[String] raise @parse.Refused</code><div class="desc"><p>The substrings the group captured, or an empty list when it took no part — Python&#x27;s <code>Match.slices</code>.</p></div></li><li><code class="sig">span(Self, group? : GroupKey) -&gt; (Int32, Int32) raise @parse.Refused</code><div class="desc"><p>The <code>(start, end)</code> span of a group.</p></div></li><li><code class="sig">start(Self, group? : GroupKey) -&gt; Int32 raise @parse.Refused</code><div class="desc"><p>Code-point offset where the whole match begins.</p></div></li><li><code class="sig">string(Self) -&gt; String</code><div class="desc"><p>The subject text.</p></div></li></ul></div>
+<div class="type" id="moonregex-Pattern"><h4><code>Pattern</code></h4><div class="desc"><p>A compiled pattern: the tree it came from, the flat program it became, and the source, so it can answer what Python&#x27;s <code>re</code> answers of a <code>Pattern</code> — its string, its flags, how many groups, and what they are named.</p></div><ul class="members"><li><code class="sig">add(Self, Self) -&gt; Self</code></li><li><code class="sig">capture(Self, String) -&gt; Self raise @parse.Refused</code><div class="desc"><p>This pattern wrapped in a named capture group, as <code>Regex::capture</code> in core.</p>
+<p>The group is numbered after the ones the pattern already has, and <code>groupindex</code> gains <code>name</code>.</p></div></li><li><code class="sig">dialect(Self) -&gt; @parse.Dialect</code><div class="desc"><p>The dialect the pattern was read under.</p></div></li><li><code class="sig">dump(Self) -&gt; String</code><div class="desc"><p>The syntax tree re-printed, as Python&#x27;s <code>Pattern.dump</code> would.</p></div></li><li><code class="sig">findall(Self, String, group? : GroupKey, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; Array[St…</code><div class="desc"><p>All non-overlapping matches, as <code>findall</code> at the module level.</p></div></li><li><code class="sig">finditer(Self, String, pos? : Int32, endpos? : Int32, overlapped? : Bool, limit? : Int32) -&gt; Array[Match] raise @parse.…</code><div class="desc"><p>All matches as <code>Match</code> objects, as <code>finditer</code> at the module level.</p></div></li><li><code class="sig">flags(Self) -&gt; @parse.Flags</code><div class="desc"><p>The effective flags.</p></div></li><li><code class="sig">full(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>Match the whole region <code>pos..endpos</code>.</p></div></li><li><code class="sig">groupindex(Self) -&gt; Map[String, Array[Int32]]</code><div class="desc"><p>Group name to slot, as Python&#x27;s <code>Pattern.groupindex</code>.</p></div></li><li><code class="sig">groups(Self) -&gt; Int32</code><div class="desc"><p>How many capturing groups the pattern has, group 0 not counted — Python&#x27;s <code>Pattern.groups</code>.</p></div></li><li><code class="sig">lor(Self, Self) -&gt; Self</code></li><li><code class="sig">lower(Self) -&gt; @string.Regex?</code><div class="desc"><p>The pattern as a core <code>@string.Regex</code>, when the core engine can run it.</p>
+<p>The core engine speaks one grammar, so this answers only for the patterns that fit inside it: literals, classes, <code>.</code>, <code>^</code>, <code>$</code>, <code>\b</code>, <code>\B</code>, groups, alternation, quantifiers up to 256. Anything else — backreferences, lookaround, conditionals, recursion, atomic groups, fuzzy matching, <code>\X</code>, Unicode word boundaries, Python&#x27;s <code>$</code> — answers <code>None</code>, and the pattern runs on this library&#x27;s own engine instead.</p>
+<p>The result is an ordinary <code>@string.Regex</code>: it can be handed to core&#x27;s <code>execute</code>, <code>find</code>, <code>split</code>, <code>replace_by</code>, or to the lexer.</p></div></li><li><code class="sig">partial(Self) -&gt; Bool</code><div class="desc"><p>Whether the pattern was compiled for partial matching.</p></div></li><li><code class="sig">pattern(Self) -&gt; String</code><div class="desc"><p>The pattern&#x27;s source text.</p></div></li><li><code class="sig">prefix(Self, String, pos? : Int32, limit? : Int32) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>Match only at <code>pos</code>.</p></div></li><li><code class="sig">repeat(Self, min? : Int32, max? : Int32, greedy? : Bool) -&gt; Self raise @parse.Refused</code><div class="desc"><p>This pattern repeated, as <code>Regex::repeat</code> in core: <code>min</code> to <code>max</code> times, greedily unless <code>greedy</code> is off.</p></div></li><li><code class="sig">scanner(Self, String) -&gt; Scanner</code><div class="desc"><p>Bind a <code>Pattern</code> to a text so its methods can scan that text incrementally.</p></div></li><li><code class="sig">search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>Scan <code>text</code> for the leftmost match.</p></div></li><li><code class="sig">split(Self, String, maxsplit? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; Array[String?] raise @parse.Re…</code><div class="desc"><p>Split <code>text</code> on the pattern, as <code>split</code> at the module level.</p></div></li><li><code class="sig">string(StringView) -&gt; Self</code><div class="desc"><p>A pattern that matches <code>text</code> literally, as <code>@string.Regex::string</code> does.</p>
+<p>Nothing in <code>text</code> is read as syntax — the caller does not have to escape it first.</p></div></li><li><code class="sig">sub(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; String raise @parse.Refused</code><div class="desc"><p>Replace matches with <code>repl</code>, as <code>sub</code> at the module level.</p></div></li><li><code class="sig">sub_with(Self, String, (Match) -&gt; String raise @parse.Refused, count? : Int32, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>Replace matches with <code>f(match)</code>, as <code>sub_with</code> at the module level.</p></div></li><li><code class="sig">subf(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; String raise @parse.Refused</code><div class="desc"><p>Replace matches with <code>repl</code>, as <code>regex.subf</code> — <code>repl</code> is a format template whose fields name groups (<code>{}</code>, <code>{0}</code>, <code>{name}</code>, <code>{0[0]}</code>), with an optional <code>:spec</code>.</p></div></li><li><code class="sig">subfn(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; (String, Int32) raise @pa…</code><div class="desc"><p>Replace matches with <code>repl</code>, returning the new text and the count, as <code>regex.subfn</code>.</p></div></li><li><code class="sig">subn(Self, String, String, count? : Int32, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; (String, Int32) raise @par…</code><div class="desc"><p>Replace matches with <code>repl</code>, returning the new text and the count, as <code>subn</code> at the module level.</p></div></li><li><code class="sig">subn_with(Self, String, (Match) -&gt; String raise @parse.Refused, count? : Int32, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>Replace matches with <code>f(match)</code>, as <code>subn_with</code> at the module level.</p></div></li></ul></div>
+<div class="type" id="moonregex-Scanner"><h4><code>Scanner</code></h4><div class="desc"><p>A <code>Scanner</code> walks a fixed text from left to right, each call picking up where the last left off — Python&#x27;s <code>regex.Scanner</code>, and the loop <code>re</code>&#x27;s <code>finditer</code> runs internally. Build one with <code>Pattern::scanner</code>.</p></div><ul class="members"><li><code class="sig">findall(Self, group? : GroupKey, overlapped? : Bool) -&gt; Array[String?] raise @parse.Refused</code><div class="desc"><p>Every remaining match from the current position, as group strings, advancing to the end of the text — Python&#x27;s <code>Scanner.findall</code>.</p></div></li><li><code class="sig">finditer(Self, overlapped? : Bool) -&gt; Array[Match] raise @parse.Refused</code><div class="desc"><p>Every remaining match from the current position, as <code>Match</code> objects, advancing to the end of the text — Python&#x27;s <code>Scanner.finditer</code>.</p></div></li><li><code class="sig">full(Self) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>A full match of the region from the current position, advancing past it; <code>None</code> otherwise — Python&#x27;s <code>Scanner.full</code>.</p></div></li><li><code class="sig">prefix(Self) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>A match anchored at the current position, advancing past it; <code>None</code> if the pattern does not match there — Python&#x27;s <code>Scanner.match</code>.</p></div></li><li><code class="sig">search(Self) -&gt; Match? raise @parse.Refused</code><div class="desc"><p>The next match from the current position, advancing past it; <code>None</code> once the text is exhausted — Python&#x27;s <code>Scanner.search</code>.</p></div></li><li><code class="sig">split(Self, maxsplit? : Int32) -&gt; Array[String?] raise @parse.Refused</code><div class="desc"><p>Split the remaining text on the pattern, advancing to the end — Python&#x27;s <code>Scanner.split</code>.</p></div></li><li><code class="sig">sub(Self, String, count? : Int32) -&gt; String raise @parse.Refused</code><div class="desc"><p>Replace every remaining match with <code>repl</code>, returning the new text — Python&#x27;s <code>Scanner.sub</code>.</p></div></li><li><code class="sig">subn(Self, String, count? : Int32) -&gt; (String, Int32) raise @parse.Refused</code><div class="desc"><p>Replace every remaining match with <code>repl</code>, returning the new text and advancing to the end — Python&#x27;s <code>Scanner.subn</code> / <code>Scanner.sub</code>.</p></div></li></ul></div>
+<h3>Functions</h3>
+<ul class="members">
+<li><code class="sig">compile(StringView, flags? : @parse.Flags, dialect? : @parse.Dialect, lists? : Map[String, Array[String]], partial? : Bool) -&gt; Pattern rais…</code><div class="desc"><p>Compile <code>pattern</code> into a <code>Pattern</code>.</p>
+<p><code>flags</code> and <code>dialect</code> set the grammar; <code>lists</code> feeds <code>\L&lt;name&gt;</code> named lists; <code>partial</code> turns on partial matching. A pattern the grammar refuses is refused here, with where reading stopped.</p></div></li>
+<li><code class="sig">escape(StringView, dialect? : @parse.Dialect, special_only? : Bool, literal_spaces? : Bool) -&gt; String</code><div class="desc"><p>Escape <code>pattern</code> so the result matches it literally, under <code>dialect</code>.</p>
+<p>The three grammars do not agree on what needs escaping, so the same string comes back spelled three ways:</p>
+<p>- <code>Python</code> — Python&#x27;s <code>re.escape</code>: the characters that can mean something to   the grammar are backslashed, everything else is left alone. With   <code>special_only</code> off every non-alphanumeric is escaped; <code>literal_spaces</code>   stops spaces from being escaped. - <code>Ecma262</code> — <code>RegExp.escape</code> of ECMA-262: punctuation that is not a syntax   character becomes <code>\x..</code>, syntax characters are backslashed, and a   leading alphanumeric is spelled <code>\x..</code> too so the result can never read   as a quantifier&#x27;s neighbour. - <code>Lexmatch</code> — the <code>@string.Regex</code> grammar: its metacharacters are   backslashed and control characters are spelled in the escapes that   grammar knows (<code>\n</code>, <code>\t</code>, <code>\u{..}</code>), never <code>\x..</code>.</p></div></li>
+<li><code class="sig">findall(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, group? : GroupKey, overlapped? : Bool, pos? : Int32, endpos?…</code><div class="desc"><p>All non-overlapping matches, as Python&#x27;s <code>re.findall</code>.</p>
+<p>With no group named and the pattern holding one or none, the matches (or the single group) are returned. With two or more groups and no <code>group</code> given, the call is ambiguous and refused — pass <code>group</code> to say which to collect, or use <code>finditer</code> to walk <code>Match</code> objects that carry them all.</p></div></li>
+<li><code class="sig">finditer(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>All matches as <code>Match</code> objects, as Python&#x27;s <code>re.finditer</code>.</p></div></li>
+<li><code class="sig">full(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[Stri…</code><div class="desc"><p>Match the whole region <code>pos..endpos</code> (Python&#x27;s <code>re.fullmatch</code>).</p></div></li>
+<li><code class="sig">prefix(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, limit? : Int32, lists? : Map[String, Array[Strin…</code><div class="desc"><p>Match only at <code>pos</code> (Python&#x27;s <code>re.match</code>): fail unless the pattern matches where the scan begins, not somewhere later in the text.</p></div></li>
+<li><code class="sig">search(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[St…</code><div class="desc"><p>Scan <code>text</code> for the leftmost match, as Python&#x27;s <code>re.search</code>.</p></div></li>
+<li><code class="sig">split(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, maxsplit? : Int32, pos? : Int32, endpos? : Int32, limit? : Int3…</code><div class="desc"><p>Split <code>text</code> on the pattern, as Python&#x27;s <code>re.split</code>.</p></div></li>
+<li><code class="sig">struct Scanner {</code></li>
+<li><code class="sig">sub(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? : I…</code><div class="desc"><p>Replace matches with <code>repl</code>, as Python&#x27;s <code>re.sub</code>.</p></div></li>
+<li><code class="sig">sub_with(StringView, (Match) -&gt; String raise @parse.Refused, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos?…</code><div class="desc"><p>Replace matches with the result of <code>f(match)</code>, as Python&#x27;s <code>re.sub</code> with a callable replacement.</p></div></li>
+<li><code class="sig">subf(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>Replace matches with <code>repl</code>, as <code>regex.subf</code> — <code>repl</code> is a format template whose fields name groups (<code>{}</code>, <code>{0}</code>, <code>{name}</code>, <code>{0[0]}</code>).</p></div></li>
+<li><code class="sig">subfn(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>Replace matches with <code>repl</code>, returning the new text and the count, as <code>regex.subfn</code>.</p></div></li>
+<li><code class="sig">subn(StringView, String, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos? : Int32, endpos? : Int32, limit? :…</code><div class="desc"><p>Replace matches with <code>repl</code>, returning the new text and how many matches were replaced, as Python&#x27;s <code>re.subn</code>.</p></div></li>
+<li><code class="sig">subn_with(StringView, (Match) -&gt; String raise @parse.Refused, String, flags? : @parse.Flags, dialect? : @parse.Dialect, count? : Int32, pos…</code><div class="desc"><p>Replace matches with <code>f(match)</code>, returning the new text and the count, as Python&#x27;s <code>re.subn</code> with a callable replacement.</p></div></li>
+</ul>
+<h3>Values</h3>
+<ul class="members">
+<li><code class="sig">let a : @parse.Flags</code></li>
+<li><code class="sig">let ascii : @parse.Flags</code><div class="desc"><p><code>ascii</code> — Python&#x27;s <code>re.ASCII</code>.</p></div></li>
+<li><code class="sig">let b : @parse.Flags</code></li>
+<li><code class="sig">let bestmatch : @parse.Flags</code><div class="desc"><p><code>bestmatch</code> — <code>regex.BESTMATCH</code>.</p></div></li>
+<li><code class="sig">let default_version : @parse.Version</code><div class="desc"><p>The version the engine reads a Python pattern under when none is asked for.</p></div></li>
+<li><code class="sig">let dialect : @parse.Dialect</code><div class="desc"><p>The preset dialect: Python&#x27;s <code>re</code>.</p></div></li>
+<li><code class="sig">let dotall : @parse.Flags</code><div class="desc"><p><code>dotall</code> — Python&#x27;s <code>re.DOTALL</code>.</p></div></li>
+<li><code class="sig">let e : @parse.Flags</code></li>
+<li><code class="sig">let ecma262 : @parse.Dialect</code><div class="desc"><p>The ECMA-262 <code>RegExp</code> dialect — JSON Schema and OpenAPI &quot;string&quot; patterns.</p></div></li>
+<li><code class="sig">let enhancematch : @parse.Flags</code><div class="desc"><p><code>enhancematch</code> — <code>regex.ENHANCEMATCH</code>.</p></div></li>
+<li><code class="sig">let f : @parse.Flags</code></li>
+<li><code class="sig">let flags : @parse.Flags</code><div class="desc"><p>The preset flags, for callers who want to tweak one and keep the rest.</p></div></li>
+<li><code class="sig">let fullcase : @parse.Flags</code><div class="desc"><p><code>fullcase</code> — Python&#x27;s <code>re.FULLCASE</code>.</p></div></li>
+<li><code class="sig">let i : @parse.Flags</code></li>
+<li><code class="sig">let ignorecase : @parse.Flags</code><div class="desc"><p><code>ignorecase</code> — Python&#x27;s <code>re.IGNORECASE</code>.</p></div></li>
+<li><code class="sig">let lexmatch_dialect : @parse.Dialect</code><div class="desc"><p>The MoonBit <code>lexmatch</code> dialect — <code>@string.Regex</code> and the lexer.</p></div></li>
+<li><code class="sig">let m : @parse.Flags</code></li>
+<li><code class="sig">let multiline : @parse.Flags</code><div class="desc"><p><code>multiline</code> — Python&#x27;s <code>re.MULTILINE</code>.</p></div></li>
+<li><code class="sig">let p : @parse.Flags</code></li>
+<li><code class="sig">let posix : @parse.Flags</code><div class="desc"><p><code>posix</code> — <code>regex.POSIX</code>.</p></div></li>
+<li><code class="sig">let python : @parse.Dialect</code><div class="desc"><p>The Python <code>re</code> dialect — the default, and the one most callers want.</p></div></li>
+<li><code class="sig">let r : @parse.Flags</code></li>
+<li><code class="sig">let reverse : @parse.Flags</code><div class="desc"><p><code>reverse</code> — <code>regex.REVERSE</code>.</p></div></li>
+<li><code class="sig">let s : @parse.Flags</code></li>
+<li><code class="sig">let u : @parse.Flags</code></li>
+<li><code class="sig">let unicode : @parse.Flags</code><div class="desc"><p><code>unicode</code> — Python&#x27;s <code>re.UNICODE</code>.</p></div></li>
+<li><code class="sig">let v0 : @parse.Flags</code></li>
+<li><code class="sig">let v1 : @parse.Flags</code></li>
+<li><code class="sig">let verbose : @parse.Flags</code><div class="desc"><p><code>verbose</code> — Python&#x27;s <code>re.VERBOSE</code>.</p></div></li>
+<li><code class="sig">let version : String</code><div class="desc"><p>The library version, as <code>regex.__version__</code> reports it.</p></div></li>
+<li><code class="sig">let version0 : @parse.Flags</code><div class="desc"><p><code>version0</code> — <code>regex.VERSION0</code>.</p></div></li>
+<li><code class="sig">let version0_value : @parse.Version</code><div class="desc"><p>The <code>V0</code> behaviour set, as a <code>Version</code> value — <code>regex.VERSION0</code>&#x27;s target.</p></div></li>
+<li><code class="sig">let version1 : @parse.Flags</code><div class="desc"><p><code>version1</code> — <code>regex.VERSION1</code>.</p></div></li>
+<li><code class="sig">let version1_value : @parse.Version</code><div class="desc"><p>The <code>V1</code> behaviour set, as a <code>Version</code> value — <code>regex.VERSION1</code>&#x27;s target.</p></div></li>
+<li><code class="sig">let version_info : (Int32, Int32, Int32)</code><div class="desc"><p>The library version split into <code>(major, minor, patch)</code>, as <code>regex.__version_info__</code> reports it.</p></div></li>
+<li><code class="sig">let w : @parse.Flags</code></li>
+<li><code class="sig">let word : @parse.Flags</code><div class="desc"><p><code>word</code> — <code>regex.WORD</code>.</p></div></li>
+<li><code class="sig">let x : @parse.Flags</code></li>
+</ul>
+</section>
+<section class="pkg" id="moonregex-parse">
+<h2>parse</h2>
+<p class="blurb">One syntax tree for three grammars: Python, ECMA-262 and lexmatch.</p>
+<p class="slug"><code>moonregex/parse</code></p>
+<h3>Types</h3>
+<div class="type" id="moonregex-parse-Ast"><h4><code>Ast</code></h4><div class="desc"><p>A parsed pattern: the tree, and what the parse learned about it.</p>
+<p><code>flags</code> is the compile-time flags with the pattern&#x27;s own global inline flags merged in — what <code>Pattern::flags</code> answers.</p></div><ul class="members"><li><code class="sig">built(Node, groups~ : Int32, groupindex~ : Map[String, Array[Int32]], flags~ : Flags) -&gt; Self</code><div class="desc"><p>An <code>Ast</code> assembled from parts rather than parsed, so patterns can be composed in code and still be the same kind of value as a parsed one.</p></div></li><li><code class="sig">dump(Self) -&gt; String</code><div class="desc"><p>The syntax tree as text: what <code>Pattern::dump</code> answers.</p>
+<p>Not the pattern — a parse and re-print loses spacing and comments, and folds flags into the nodes — but close enough to read a pattern back from, which is what tests and debugging want.</p></div></li><li><code class="sig">flags(Self) -&gt; Flags</code><div class="desc"><p>The effective flags.</p></div></li><li><code class="sig">groupindex(Self) -&gt; Map[String, Array[Int32]]</code><div class="desc"><p>Group name to the slots carrying it.</p></div></li><li><code class="sig">groups(Self) -&gt; Int32</code><div class="desc"><p>How many capture groups the pattern has.</p></div></li><li><code class="sig">named_lists(Self) -&gt; Map[String, Array[String]]</code><div class="desc"><p>The named lists the pattern declared with <code>\L&lt;name&gt;</code>.</p></div></li><li><code class="sig">root(Self) -&gt; Node</code><div class="desc"><p>The tree on its own, for the executor.</p></div></li><li><code class="sig">to_lexmatch(Self) -&gt; String?</code><div class="desc"><p>The tree as a <code>lexmatch</code> pattern — what the core library&#x27;s engine reads.</p>
+<p><code>None</code> when the tree uses something that grammar cannot say, which is the line between the two engines: everything above it can be handed to the core library, everything below has to run here.</p></div></li></ul></div>
+<div class="type" id="moonregex-parse-Flags"><h4><code>Flags</code></h4><div class="desc"><p>The switches a pattern can carry.</p>
+<p>A record rather than a bitmask, because every one of these is a thing a reader may want to look at, set, or refuse — <code>(?a)</code> inside a scoped group changes what <code>\w</code> means for that group alone, and a bitmask cannot be asked about politely.</p>
+<p>Flags are resolved into the syntax tree at parse time: <code>(?s:.)</code> puts the dotall behaviour inside the node, so the executor never consults them.</p></div><ul class="members"><li><code class="sig">new(ignorecase? : Bool, multiline? : Bool, dotall? : Bool, verbose? : Bool, ascii? : Bool, unicode? : Bool, unicode_set…</code><div class="desc"><p>Build flags, leaving unset switches at their preset.</p>
+<p>A flag that is only meaningful in one dialect is accepted everywhere and refused by the parser when the grammar cannot honour it — <code>verbose</code> under ECMA-262, for instance — so that the mistake is named where it happens.</p></div></li></ul></div>
+<div class="type" id="moonregex-parse-Node"><h4><code>Node</code></h4><div class="desc"><p>One node of the syntax tree every dialect is lowered into.</p>
+<p>The tree is resolved: flags have been folded into the nodes that care (<code>(?s:.)</code> is an <code>Any</code> that eats newlines, <code>(?i)k</code> is a class holding both cases), so the executor never asks which grammar a node came from.</p></div><ul class="members"><li><code class="sig">shift_slots(Self, Int32) -&gt; Self</code><div class="desc"><p>The tree with every capture slot moved up by <code>by</code>.</p>
+<p>Composing two patterns renumbers the right-hand one&#x27;s groups so the result is numbered as one written pattern would be — the left operand keeps <code>1..n</code>, the right one continues at <code>n+1</code>.</p></div></li></ul></div>
+<h3>Functions</h3>
+<ul class="members">
+<li><code class="sig">captured(Ast, name~ : String) -&gt; Ast raise Refused</code><div class="desc"><p><code>a.capture(name)</code> — one more group, numbered after the ones already there.</p></div></li>
+<li><code class="sig">concat(Ast, Ast) -&gt; Ast</code><div class="desc"><p>One after the other: <code>a + b</code>.</p></div></li>
+<li><code class="sig">ecma_parse(StringView) -&gt; Ast raise Refused</code><div class="desc"><p>Parse <code>pattern</code> as an ECMA-262 <code>RegExp</code> — the grammar JSON Schema and OpenAPI mean by a &quot;string&quot; pattern, and what a browser hands <code>new RegExp</code>.</p>
+<p>The tree is the same one Python&#x27;s <code>re</code> reads into; only the dialect differs, so the executor never asks which grammar a node came from.</p></div></li>
+<li><code class="sig">ecma_parse_with(StringView, Flags) -&gt; Ast raise Refused</code><div class="desc"><p>Parse an ECMA-262 <code>RegExp</code> with the flags already chosen by the caller.</p></div></li>
+<li><code class="sig">either(Ast, Ast) -&gt; Ast</code><div class="desc"><p>One or the other: <code>a | b</code>.</p></div></li>
+<li><code class="sig">enum Anchor {</code></li>
+<li><code class="sig">enum Cond {</code></li>
+<li><code class="sig">enum Look {</code></li>
+<li><code class="sig">enum Node {</code></li>
+<li><code class="sig">enum Recurse {</code></li>
+<li><code class="sig">enum RecurseCond {</code></li>
+<li><code class="sig">enum VerbKind {</code></li>
+<li><code class="sig">lexmatch_parse(StringView) -&gt; Ast raise Refused</code><div class="desc"><p>Parse <code>pattern</code> as a MoonBit <code>lexmatch</code> literal — the grammar MoonBit&#x27;s own <code>@string.Regex</code> speaks, the lexer uses, and <code>lexmatch</code> documents.</p></div></li>
+<li><code class="sig">lexmatch_parse_with(StringView, Flags) -&gt; Ast raise Refused</code><div class="desc"><p>Parse a <code>lexmatch</code> literal with the flags already chosen by the caller.</p></div></li>
+<li><code class="sig">literal(StringView) -&gt; Ast</code><div class="desc"><p>An <code>Ast</code> matching exactly <code>text</code>, character for character.</p></div></li>
+<li><code class="sig">parse(StringView, flags? : Flags, dialect? : Dialect, lists? : Map[String, Array[String]]) -&gt; Ast raise Refused</code><div class="desc"><p>Read a pattern into the syntax tree.</p>
+<p><code>flags</code> are the compile-time flags; the pattern&#x27;s own global inline flags are merged into them as they are met, and the merged result is what <code>Ast::flags</code> answers.</p></div></li>
+<li><code class="sig">repeated(Ast, min~ : Int32, max? : Int32, greedy~ : Bool) -&gt; Ast raise Refused</code><div class="desc"><p><code>a.repeat(…)</code>.</p></div></li>
+<li><code class="sig">struct Ast {</code></li>
+<li><code class="sig">struct FuzzySpec {</code></li>
+</ul>
+<h3>Values</h3>
+<ul class="members">
+<li><code class="sig">let dialect : Dialect</code><div class="desc"><p>The dialect a pattern is read under when the caller does not say.</p></div></li>
+<li><code class="sig">let flags : Flags</code><div class="desc"><p>Everything off, <code>unicode</code> on, version <code>V0</code>.</p>
+<p>This is the preset every default argument points at, so a pattern written with no flags at all behaves the way Python&#x27;s <code>re</code> does by default.</p></div></li>
+</ul>
+</section>
+<section class="pkg" id="moonregex-exec">
+<h2>exec</h2>
+<p class="blurb">The compiled program and the backtracking engine that runs it.</p>
+<p class="slug"><code>moonregex/exec</code></p>
+<h3>Types</h3>
+<div class="type" id="moonregex-exec-Program"><h4><code>Program</code></h4><div class="desc"><p>A compiled pattern: the flat program, the sub-programs for groups and other constructs, and how many capture groups it has (group 0 not counted).</p></div><ul class="members"><li><code class="sig">full(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -&gt; MatchResult? raise @parse.Refused</code><div class="desc"><p>Match the whole region <code>pos..endpos</code> (Python&#x27;s <code>full</code>).</p></div></li><li><code class="sig">prefix(Self, String, pos? : Int32, limit? : Int32) -&gt; MatchResult? raise @parse.Refused</code><div class="desc"><p>Match only at <code>pos</code> (Python&#x27;s <code>match</code>).</p></div></li><li><code class="sig">search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32, must_advance? : Bool) -&gt; MatchResult? raise @parse.…</code><div class="desc"><p>Search left to right from <code>pos</code> to <code>endpos</code>, returning the leftmost match.</p></div></li></ul></div>
+<h3>Functions</h3>
+<ul class="members">
+<li><code class="sig">compile(@parse.Ast) -&gt; Program</code><div class="desc"><p>Compile a parsed pattern into the flat program.</p></div></li>
+<li><code class="sig">struct MatchResult {</code></li>
+<li><code class="sig">struct Program {</code></li>
+</ul>
+</section>
+<section class="pkg" id="moonregex-prop">
+<h2>prop</h2>
+<p class="blurb">Code-point sets, the Unicode property lookups behind `\\p{…}`, and case folding.</p>
+<p class="slug"><code>moonregex/prop</code></p>
+<h3>Types</h3>
+<div class="type" id="moonregex-prop-CharSet"><h4><code>CharSet</code></h4><div class="desc"><p>A set of code points, kept as sorted disjoint inclusive ranges.</p>
+<p>Character classes, <code>\p{...}</code>, <code>\w</code> and the rest are all this one shape, so the set algebra a pattern needs — union for <code>[a-z]</code>, difference for <code>--</code>, intersection for <code>&amp;&amp;</code>, complement for <code>[^…]</code> — lives here once.</p></div><ul class="members"><li><code class="sig">any() -&gt; Self</code><div class="desc"><p>Every code point, surrogates included.</p></div></li><li><code class="sig">complement(Self) -&gt; Self</code><div class="desc"><p>Complement over every code point: what <code>[^…]</code> means.</p></div></li><li><code class="sig">contains(Self, Int32) -&gt; Bool</code><div class="desc"><p>Whether a code point is in the set.</p></div></li><li><code class="sig">difference(Self, Self) -&gt; Self</code><div class="desc"><p>Difference: the V1 set algebra&#x27;s <code>--</code>.</p></div></li><li><code class="sig">empty() -&gt; Self</code><div class="desc"><p>The empty set.</p></div></li><li><code class="sig">fold(Self) -&gt; Self</code><div class="desc"><p>Close the set under simple case folding: add the folded form of everything in it, and the unfolded form of everything that folds into it.</p>
+<p>This is what <code>(?i)</code> does to a class at parse time: fold the pattern, not the input, so the executor stays a plain membership test. Only single code point folds exist here, so <code>ß</code> does not grow an <code>ss</code> — matching it against <code>SS</code> is out of scope, exactly as it is in Python&#x27;s <code>re</code>.</p></div></li><li><code class="sig">intersection(Self, Self) -&gt; Self</code><div class="desc"><p>Intersection: the V1 set algebra&#x27;s <code>&amp;&amp;</code>.</p></div></li><li><code class="sig">is_empty(Self) -&gt; Bool</code><div class="desc"><p>Whether the set holds nothing.</p></div></li><li><code class="sig">of(Array[(Int32, Int32)]) -&gt; Self</code><div class="desc"><p>Build a set from ranges, sorting and merging them first.</p>
+<p>The input may be in any order and may overlap; the stored form is always sorted, disjoint and coalesced, which is what makes <code>contains</code> a binary search and the algebra linear.</p></div></li><li><code class="sig">ranges(Self) -&gt; Array[(Int32, Int32)]</code><div class="desc"><p>The stored ranges, sorted and disjoint.</p></div></li><li><code class="sig">single(Int32) -&gt; Self</code><div class="desc"><p>A set holding exactly one code point.</p></div></li><li><code class="sig">symmetric_difference(Self, Self) -&gt; Self</code><div class="desc"><p>Symmetric difference: the V1 set algebra&#x27;s <code>~~</code>.</p></div></li><li><code class="sig">union(Self, Self) -&gt; Self</code><div class="desc"><p>Union: <code>[a-z]</code> or, in the V1 set algebra, <code>||</code>.</p></div></li></ul></div>
+<h3>Functions</h3>
+<ul class="members">
+<li><code class="sig">binary(StringView) -&gt; CharSet?</code><div class="desc"><p>A binary property: <code>Alphabetic</code>, <code>White_Space</code>, <code>Emoji</code>.</p></div></li>
+<li><code class="sig">block(StringView) -&gt; CharSet?</code><div class="desc"><p>A block: <code>Basic Latin</code>, <code>BasicLatin</code>, <code>CJK Unified Ideographs</code>.</p>
+<p>A block is one range, so the usual answer needs no walk at all; the walk is only for spellings the UCD&#x27;s reader does not take.</p></div></li>
+<li><code class="sig">category(StringView) -&gt; CharSet?</code><div class="desc"><p>A general category: <code>L</code>, <code>Lu</code>, <code>Uppercase_Letter</code>, <code>casedletter</code>.</p></div></li>
+<li><code class="sig">char_of_name(StringView) -&gt; Int32?</code><div class="desc"><p>The code point a Unicode character name denotes — what <code>\N{name}</code> answers from. Names are read loosely, the way <code>unicodedata.lookup</code> reads them.</p></div></li>
+<li><code class="sig">digit() -&gt; CharSet</code><div class="desc"><p><code>\d</code>: decimal digits, and only those.</p></div></li>
+<li><code class="sig">fold(Char) -&gt; Char</code><div class="desc"><p>The simple fold of a code point; a code point with no fold is its own.</p></div></li>
+<li><code class="sig">fold_pairs() -&gt; Array[(Int32, Int32)]</code><div class="desc"><p>The fold pairs, sorted by source — what a class is closed under.</p></div></li>
+<li><code class="sig">property(StringView) -&gt; CharSet?</code><div class="desc"><p>Any property, however it is spelled — the shape <code>\p{...}</code> takes.</p>
+<p><code>name=value</code> is accepted too: <code>Script=Latin</code>, <code>General_Category=Lu</code>, <code>Block=CJK Unified Ideographs</code>. The left side picks the table, the right side the entry; without it, every table is searched in the order a Unicode name would be looked up: category, script, block, binary property.</p></div></li>
+<li><code class="sig">script(StringView) -&gt; CharSet?</code><div class="desc"><p>A script: <code>Latin</code>, <code>Latn</code>, <code>Han</code>.</p>
+<p>The short code and the long name are one name to the UCD, so the name is resolved through the UCD&#x27;s own reader first and only then looked up.</p></div></li>
+<li><code class="sig">space() -&gt; CharSet</code><div class="desc"><p><code>\s</code>: the White_Space property.</p></div></li>
+<li><code class="sig">struct CharSet {</code></li>
+<li><code class="sig">version() -&gt; String</code><div class="desc"><p>Which Unicode the answers follow.</p></div></li>
+<li><code class="sig">word() -&gt; CharSet</code><div class="desc"><p><code>\w</code> under the Python and mrab spellings: letters, numbers and the underscore. Python&#x27;s own words for it are &quot;alphanumeric (as <code>str.isalnum</code> has it) plus <code>_</code>&quot;, which is exactly these categories.</p></div></li>
+</ul>
+<h3>Values</h3>
+<ul class="members">
+<li><code class="sig">let ascii_digit : CharSet</code></li>
+<li><code class="sig">let ascii_space : CharSet</code></li>
+<li><code class="sig">let ascii_word : CharSet</code><div class="desc"><p>The same three, restricted to ASCII, which is what the <code>A</code> flag and the ECMA-262 dialect without <code>u</code> mean by them.</p></div></li>
+</ul>
+</section>
+<section class="pkg" id="moonregex-glob">
+<h2>glob</h2>
+<p class="blurb">Shell globbing — `fnmatch`, `Glob` and `GlobSet`.</p>
+<p class="slug"><code>moonregex/glob</code></p>
+<h3>Types</h3>
+<div class="type" id="moonregex-glob-Glob"><h4><code>Glob</code></h4><div class="desc"><p>A compiled glob: a pattern plus the regex it became.</p></div><ul class="members"><li><code class="sig">compile(StringView, ignorecase? : Bool) -&gt; Self raise @parse.Refused</code><div class="desc"><p>Compile a path glob.</p>
+<p><code>*</code> matches a run of characters that are not separators; <code>**</code> matches a run that may include them (zero or more path segments); <code>?</code> matches one non-separator character; <code>[...]</code> is a character class; <code>{a,b}</code> is an alternation; and <code>\</code> escapes the next character. Both <code>/</code> and <code>\</code> are treated as separators, so Windows and POSIX paths match the same pattern.</p></div></li><li><code class="sig">matches(Self, String) -&gt; Bool raise @parse.Refused</code><div class="desc"><p>Whether <code>path</code> matches the glob, as a whole anchored match.</p></div></li><li><code class="sig">pattern(Self) -&gt; String</code><div class="desc"><p>The pattern this glob was compiled from.</p></div></li></ul></div>
+<div class="type" id="moonregex-glob-GlobSet"><h4><code>GlobSet</code></h4><div class="desc"><p>A set of globs matched together — the workhorse behind an ignore file or a list of include patterns.</p></div><ul class="members"><li><code class="sig">compile(Array[String], ignorecase? : Bool) -&gt; Self raise @parse.Refused</code><div class="desc"><p>Compile several patterns into one set.</p></div></li><li><code class="sig">matches(Self, String) -&gt; Array[Int32] raise @parse.Refused</code><div class="desc"><p>The indices of every pattern in the set that matches <code>path</code>.</p></div></li><li><code class="sig">matches_any(Self, String) -&gt; Bool raise @parse.Refused</code><div class="desc"><p>Whether any pattern in the set matches <code>path</code>.</p></div></li><li><code class="sig">patterns(Self) -&gt; Array[String]</code><div class="desc"><p>The patterns the set was compiled from, in order.</p></div></li></ul></div>
+<h3>Functions</h3>
+<ul class="members">
+<li><code class="sig">filter(Array[String], StringView, ignorecase? : Bool) -&gt; Array[String] raise @parse.Refused</code><div class="desc"><p>The names that match <code>pat</code>, in the order given (Python&#x27;s <code>fnmatch.filter</code>).</p></div></li>
+<li><code class="sig">filter_paths(Array[String], StringView, ignorecase? : Bool) -&gt; Array[String] raise @parse.Refused</code><div class="desc"><p>The paths that match the glob <code>pattern</code>, in the order given.</p></div></li>
+<li><code class="sig">fnmatch(String, StringView, ignorecase? : Bool) -&gt; Bool raise @parse.Refused</code><div class="desc"><p>Whether <code>name</code> matches the shell pattern <code>pat</code>.</p>
+<p>By default the match is case-sensitive (POSIX <code>fnmatch</code>). Pass <code>ignorecase=true</code> to fold case first, the way <code>fnmatch</code> does on a case-insensitive filesystem.</p></div></li>
+<li><code class="sig">fnmatchcase(String, StringView) -&gt; Bool raise @parse.Refused</code><div class="desc"><p><code>fnmatch</code> without any case folding — an exact, case-sensitive match.</p></div></li>
+<li><code class="sig">match_path(String, StringView, ignorecase? : Bool) -&gt; Bool raise @parse.Refused</code><div class="desc"><p>Match one <code>path</code> against one glob <code>pattern</code> (compiling the pattern inline).</p></div></li>
+<li><code class="sig">struct Glob {</code></li>
+<li><code class="sig">struct GlobSet {</code></li>
+<li><code class="sig">translate(StringView) -&gt; String</code><div class="desc"><p>Turn a shell/fnmatch pattern into a regex fragment (no anchors).</p>
+<p><code>*</code> and <code>?</code> become <code>.*</code> and <code>.</code>; <code>[...]</code> becomes a character class (with <code>!</code> or <code>^</code> for negation); <code>{a,b,c}</code> becomes an alternation; and <code>\</code> escapes the next character. This is the <code>fnmatch</code> reading, where <code>*</code> may cross a path separator.</p></div></li>
+</ul>
+</section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>moonregex — Apache-2.0.</div>
+    <div>
+      <a href="./index.html">Home</a> ·
+      <a href="./guide.html">Guide</a> ·
+      <a href="https://github.com/moonbitstack/moonregex">GitHub</a> ·
+      <a href="https://mooncakes.io/docs/moonbitstack/moonregex">Mooncakes</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

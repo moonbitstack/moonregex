@@ -1,219 +1,231 @@
+<div align="center">
+
 # moonregex
 
-Regular expressions for MoonBit — the interface Python's `re` gave everyone, the
-[mrab-regex](https://github.com/mrabarnett/mrab-regex) superset behind it, and the
-ECMA-262 dialect that JSON Schema and OpenAPI actually mean.
+**Regular expressions for MoonBit** — Python's `re` interface, the `regex` superset
+behind it, and the ECMA-262 grammar that JSON Schema and OpenAPI mean.
 
-MoonBit's own `@string.Regex` is a different language, and deliberately so — core
-states it is not ECMA-262 compliant by design and will not carry the Unicode
-tables. Anything that has to agree with a JavaScript engine, or with Python, needs
-this instead.
+[Homepage](https://moonbitstack.github.io/moonregex/) ·
+[Guide](https://moonbitstack.github.io/moonregex/guide.html) ·
+[API](https://moonbitstack.github.io/moonregex/api.html) ·
+[Mooncakes](https://mooncakes.io/docs/moonbitstack/moonregex)
 
-> **Status: implemented.** The full surface — `Pattern`/`Match`, the `re`-shaped
-> module functions, the Python and ECMA-262 dialects, the `regex` superset and a
-> `glob`/`fnmatch` layer — is in place, with tests running green on every target.
+</div>
 
-> **Homepage:** <https://moonbitstack.github.io/moonregex/> — generated API docs live
-> under `/api`.
-
+<!-- nocheck -->
 ```moonbit
-// The Python `re` surface, on every backend.
-@moonregex.search(pattern, text)
-@moonregex.match_at(pattern, text)
-@moonregex.fullmatch(pattern, text)
-@moonregex.findall(pattern, text)
-@moonregex.finditer(pattern, text)
-@moonregex.split(pattern, text)
-@moonregex.sub(pattern, replacement, text)
-@moonregex.subn(pattern, replacement, text)
+let year = @moonregex.search("\\d{4}", "copyright 2026").unwrap()
+year.content()            // "2026"
+year.start()              // 10
+@moonregex.sub("\\s+", " ", "a   b  c")   // "a b c"
 ```
 
-The quickest way to see it work is `moon run src/examples/tour` — it runs the whole
-tour end to end.
+A pattern is read by one of three grammars, lowered into a single syntax tree,
+and run by one engine, so the same pattern behaves the same way on every
+backend.
 
-## Why a second regex
-
-`@string.Regex` is fast and well suited to lexing, but it is its own grammar and
-stops short of ECMA-262. Three callers keep turning up with three different
-grammars, and the library makes the grammar a parameter rather than a fork:
-
-| `dialect` | Who asks for it |
+| | |
 |:--|:--|
-| `Python` (the preset) | Anyone reaching for a regex library and expecting `(?P<name>…)`, `\A`, `\Z` to mean what they mean everywhere else |
-| `Ecma262` | JSON Schema's `pattern`, OpenAPI's `pattern` — both defined as ECMA-262 §22.2, and neither forgiving about it |
-| `Lexmatch` | MoonBit's own `@string.Regex` spelling, for callers who already wrote it |
-
-## Configuration, and its precedence
-
-Every module function accepts the same four knobs, and they resolve in a fixed
-order so the result is never ambiguous:
-
-| Argument | What it sets | Default |
-|:--|:--|:--|
-| `dialect~` | the grammar — `Python`, `Ecma262` or `Lexmatch` | `Python` |
-| `flags~` | the flag set (`Flags`) | `@moonregex.flags` |
-| `lists?` | named lists for `\L<name>` | none |
-| `partial~` | partial matching | `false` |
-
-**Precedence, highest first:**
-
-1. An argument passed at the call site — `search(pattern, text, flags=…)`.
-2. The package defaults — `@moonregex.flags`, `@moonregex.dialect`.
-3. The compiled `Pattern`, once `compile` has run.
-
-`compile` bakes `dialect`, `flags`, `lists` and `partial` into the `Pattern`.
-The `Pattern::` methods (`search`, `findall`, `sub`, …) then use those baked-in
-settings and **ignore** any `flags~`/`dialect~` you pass to them — you configure
-once, at compile time, and the match is reproducible. The module functions are a
-convenience that compile on every call, so their arguments win over the defaults
-but are still overridden by an explicit `compile`.
-
-`Flags` is a record, so you toggle one bit without naming the rest:
-
-```moonbit
-// keep every default flag, flip on ignorecase
-let rx = @moonregex.compile(r"[A-Z]+", flags=@moonregex.Flags::new(ignorecase=true))
-```
-
-## The dialects
-
-| Dialect | Named groups | Lookbehind | Notes |
-|:--|:--|:--|:--|
-| `Python` | `(?P<name>…)` and `(?<name>…)` | variable-length, via the superset | the default; closest to CPython `re` |
-| `Ecma262` | `(?<name>…)` and `(?'name'…)` | supported by the engine | the grammar JSON Schema and OpenAPI rely on |
-| `Lexmatch` | `@string.Regex` spelling | as the lexer expects | for MoonBit-native patterns |
-
-The grammar is lowered into one syntax tree, flags and all, so the engine never
-asks which dialect a node came from — and the same pattern gives the same answer
-on every target.
-
-## Four targets, one answer
-
-| Target | How |
-|:--|:--|
-| `js` | runs through the host where that is the natural fit for the dialect |
-| `wasm`, `wasm-gc`, `native` | parse, lower, and run here |
-
-**The same pattern returns the same match on all four.** That is what the shared
-test set is for, and why the cases are not split per target.
-
-## Packages
-
-| Package | What it covers |
-|:--|:--|
-| `moonregex` | `Pattern` and `Match`, shaped as Python's `re`, plus the module functions |
-| `parse` | the three grammars into one syntax tree, flags and all |
-| `exec` | the backtracking engine — backreferences, lookaround, conditionals, recursion, fuzzy matching |
-| `prop` | `\p{…}`: the Unicode property tables, generated, version recorded |
-| `glob` | `fnmatch`, `Glob` and `GlobSet` — shell globbing on top of the engine |
-
-## Shell globbing
-
-The `glob` package turns shell patterns into regexes and lets the engine match
-them, so the dialects and Unicode handling come for free:
-
-```moonbit
-// fnmatch: * and ? cross a separator, [..] is a class, {a,b} an alternation
-@glob.fnmatch("cat.txt", "*.txt")          // true
-@glob.filter(["a.txt", "b.csv"], "*.txt")  // ["a.txt"]
-
-// Glob: * stops at a separator, ** crosses them, both / and \ are separators
-let g = @glob.Glob::compile("src/**/*.mbt")
-g.matches("src/parse/lex.mbt")             // true
-g.matches("src/lex.mbt")                   // true  (** spans zero dirs too)
-```
-
-## Fuzzy matching
-
-For a run of literals or character classes, `moonregex` performs approximate
-matching with a bounded edit distance, spelled the way mrab-regex spells it:
-
-```moonbit
-// a total error budget of one (insertion, deletion or substitution)
-@moonregex.fullmatch("(?:hello){e<=1}", "hellp")  // Some(_) — p -> o
-
-// budgets can be scoped to one operation
-@moonregex.fullmatch("(?:abc){i<=1}", "abcd")    // Some(_) — one insertion
-@moonregex.fullmatch("(?:abc){d<=1}", "ab")      // Some(_) — one deletion
-@moonregex.fullmatch("(?:abc){s<=1}", "abd")     // Some(_) — one substitution
-```
-
-The matcher consumes as much text as the budget allows, so an exact prefix still
-wins when no edit is needed. A weighted budget (`2i+1d+1s<=3`) and fuzzy groups
-whose inner node is not a literal or class run are matched exactly for now, and
-the syntax is still accepted.
-
-The spent budget is reported on the match: `fuzzy_counts` gives `(sub, ins, del)`
-and `fuzzy_changes` the individual edits, so a caller can see exactly how a near
-miss was aligned.
-
-```moonbit
-let m = @moonregex.search("(?:foo){e<=2}", "fox").unwrap()
-m.fuzzy_counts()   // (1, 0, 0) — one substitution
-```
-
-## The full `regex` surface
-
-Beyond the `re` functions above, `moonregex` carries the whole Python `regex`
-module API so a port is drop-in:
-
-```moonbit
-// Named flag constants (lower-case; Python spells them upper-case).
-@moonregex.compile("hello", flags=@moonregex.i)      // IGNORECASE
-@moonregex.compile("^b",  flags=@moonregex.m)        // MULTILINE
-@moonregex.compile("a.b", flags=@moonregex.s)        // DOTALL
-
-// `Pattern` methods, plus `scanner` for incremental scanning.
-let sc = @moonregex.compile(r"\d+").scanner("a1 b22")
-sc.search()   // Some("1")
-sc.search()   // Some("22")
-
-// `Match` carries what Python's does.
-let m = @moonregex.search(r"(?P<w>\w+) \1", "go go").unwrap()
-m.pos()            // 0
-m.endpos()         // 5
-m.expand(r"\g<w>") // "go"
-m.captures()       // [(0, 5)]
-```
-
-Format substitution (`regex.subf` / `subfn`) is here too — the replacement is
-a `str.format`-shaped template whose fields name groups:
-
-```moonbit
-@moonregex.subf(r"\d+", "({})", "order 42")       // "order (42)"
-@moonregex.compile(r"(?P<w>\w+)=(?P<n>\d+)").subf(
-  "a=1 b=22", "{n}:{w}")                          // "1:a 22:b"
-```
-
-Type aliases `RegexFlag` and `RegexError` mirror `regex.RegexFlag` and
-`regex.error`; `template`, `purge`, `version` and `version_info` are kept for
-compatibility. See `docs/architecture.md` for the full interface contract.
-
-The control verbs are complete too — `(*ACCEPT)`, `(*FAIL)`, `(*COMMIT)`,
-`(*PRUNE)`, `(*SKIP)`, `(*THEN)`, `(*MARK:name)` (read back with
-`Match.marks()`), `(*LIMIT_MATCH:n)`, `(*LIMIT_RECURSION:n)`, `(*VERSION)` and
-`(*FENCE)` — alongside the PCRE/Perl escapes `\R` (line break), `\h`/`\H`
-(horizontal whitespace), `\v`/`\V` (vertical whitespace), `\N` (not newline),
-`\e`, named characters `\N{name}` (`\N{EM DASH}`, `\N{CJK UNIFIED
-IDEOGRAPH-4E00}`), braced/relative backreferences `\g{name}`/`\g{n}`/`\g{-1}`,
-branch reset `(?|…)`, `(?(DEFINE)…)` and recursion conditions `(?(R)…)`.
-
-```moonbit
-@moonregex.fullmatch("a(*COMMIT)b", "ab")        // None — the commit aborts
-@moonregex.fullmatch("\\R", "\u{2028}")          // Some(_) — a line separator
-@moonregex.fullmatch("(?|(a)|(b))", "b")         // Some(_) — branch reset
-```
-
-## Examples
-
-`src/examples/tour` is the canonical demo — `moon run src/examples/tour` exercises search,
-groups, substitution, flags, the ECMA-262 dialect and the glob layer in one run.
+| `Python` (the default) | `re` as Python 3.15 documents it, plus everything the `regex` package adds |
+| `Ecma262` | ECMA-262 §22.2, the grammar JSON Schema and OpenAPI patterns are written in |
+| `Lexmatch` | the grammar the core library's `@string.Regex` and the lexer speak |
 
 ## Install
 
 ```bash
 moon add moonbitstack/moonregex
 ```
+
+## The names it uses
+
+The module functions are the `re` ones, with three renames — one concept, one
+name, and the name says where the match has to fall:
+
+| Python | moonregex | where the match must be |
+|:--|:--|:--|
+| `re.search` | `search` | anywhere, leftmost first |
+| `re.match` | `prefix` | at the position the scan starts |
+| `re.fullmatch` | `full` | the whole region |
+| `re.sub` with a function | `sub_with` | — |
+| `re.subn` with a function | `subn_with` | — |
+
+`match` is not used because in most languages it means what Python calls
+`search`, and Python itself has soft-deprecated it in favour of `prefixmatch`.
+Reading an ECMA-262 pattern next to a Python one, a name that means two things
+is worse than a name nobody has seen before. `Pattern::search`, `Pattern::prefix`
+and `Pattern::full` are the same three.
+
+<!-- nocheck -->
+```moonbit
+let p = @moonregex.compile("[a-z]+")
+p.search("  hello ")   // Some(_) — at 2
+p.prefix("  hello ")   // None    — the scan starts at 0
+p.full("hello")        // Some(_)
+```
+
+## The interface
+
+Module functions compile on every call. `compile` once, then use the `Pattern`
+methods, when a pattern is used more than once.
+
+| Function | Returns |
+|:--|:--|
+| `compile(pattern, flags~, dialect~, lists?, partial~)` | `Pattern` |
+| `search` / `prefix` / `full` | `Match?` |
+| `findall` | `Array[String?]` |
+| `finditer` | `Array[Match]` |
+| `split` | `Array[String?]` |
+| `sub` / `subn` / `subf` / `subfn` | `String` or `(String, Int)` |
+| `sub_with` / `subn_with` | `String` or `(String, Int)` |
+| `escape(string, dialect~, special_only~, literal_spaces~)` | `String` |
+
+`Pattern` answers `pattern`, `flags`, `dialect`, `groups`, `groupindex`,
+`named_lists`, `partial`, `dump`, and the same matching methods without the
+compile options. `Match` answers `group`, `groups`, `groupdict`, `start`, `end`,
+`span`, `captures`, `starts`, `ends`, `spans`, `capturesdict`, `allcaptures`,
+`allspans`, `expand`, `expandf`, `pos`, `endpos`, `lastindex`, `lastgroup`, `re`,
+`string`, `content`, `before`, `after`, `fuzzy_counts`, `fuzzy_changes`, `marks`
+and `partial`.
+
+A group is addressed by number or by name — `trait GroupKey` is implemented by
+`Int` and by `String`, so `m.group(1)` and `m.group("year")` both work.
+
+### Groups, and the one place a list cannot answer
+
+`findall` collects the whole match when the pattern has no groups, the single
+group when it has one — and refuses when it has two or more, because Python
+answers a tuple there and a statically typed list cannot. Pass `group` to say
+which one, or walk `finditer` for matches that carry them all.
+
+<!-- nocheck -->
+```moonbit
+@moonregex.findall("(\\w+)=(\\d+)", "a=1")            // raises Ambiguous
+@moonregex.findall("(\\w+)=(\\d+)", "a=1", group=1)   // ["a"]
+```
+
+### Flags
+
+`Flags` is a record, not a bitmask: `Flags::new(ignorecase=true)` sets one
+switch and leaves the rest, and `@moonregex.flags` is all of them off.
+
+`ignorecase`, `multiline`, `dotall`, `verbose`, `ascii`, `unicode`,
+`unicode_sets`, `fullcase`, `bestmatch`, `enhancematch`, `posix`, `reverse`,
+`word`, and `version` (`V0` / `V1`).
+
+The common ones also have their inline spelling — `(?i)`, `(?m)`, `(?s)`,
+`(?x)`, `(?a)` and the scoped `(?i:…)` — which needs no flag argument at all.
+
+### Escape
+
+`escape` follows the grammar it is told to follow, because the three do not
+agree on what is special:
+
+| Dialect | `escape("a.b")` | rule |
+|:--|:--|:--|
+| `Python` | `a\.b` | `re.escape`: the characters that can mean something take a backslash |
+| `Ecma262` | `\x61\.b` | `RegExp.escape`: punctuation is spelled in hex, and a leading alphanumeric too |
+| `Lexmatch` | `a\.b` | the `@string.Regex` metacharacters, with `\u{…}` for the invisible ones |
+
+## The three grammars
+
+<!-- nocheck -->
+```moonbit
+// Python: named group, `\A`, backreference — the default.
+@moonregex.findall("(?P<w>\\w+)\\s+\\1", "go go no")
+
+// ECMA-262: what a JSON Schema `pattern` means.
+@moonregex.compile("^[a-z]+$", dialect=@moonregex.ecma262)
+
+// lexmatch: a pattern already written for the core library.
+@moonregex.compile("[[:digit:]]+", dialect=@moonregex.lexmatch_dialect)
+```
+
+Choose by where the pattern comes from. A pattern a person wrote for text
+processing is `Python`; a pattern from a schema, a form, or a JavaScript
+codebase is `Ecma262`; a pattern from a MoonBit lexer is `Lexmatch`.
+
+The dialects differ where the standards differ: `\A` and `\Z` exist only in
+Python, `$` sits before a trailing newline only in Python, `\w` is ASCII in
+ECMA-262, and `[[:alpha:]]` is a class escape only in the superset. Each of
+those is settled while reading the pattern, not while matching it.
+
+## Standing next to the core engine
+
+The core library ships a regular-expression engine of its own, reached through
+`@string.Regex` and the `lexmatch` grammar. This library uses it where it can
+and runs the rest itself.
+
+- **A pattern that says nothing the core engine cannot say lowers onto it.**
+  `Pattern::lower` answers the `@string.Regex` for it, or `None`. Backreferences,
+  lookaround, conditionals, recursion, atomic groups, fuzzy matching, `\X`,
+  Unicode word boundaries and Python's `$` answer `None` — those run here.
+- **The combinators are the same five**, with the same meaning: `Pattern::string`,
+  `+`, `|`, `repeat`, `capture`. A pattern assembled in code and a pattern
+  written as text are the same kind of value.
+- **A match carries both views**: `content`, `before` and `after` as core spells
+  them, next to `group`, `span` and the rest.
+
+<!-- nocheck -->
+```moonbit
+let year = @moonregex.Pattern::string("\\d{4}").capture("year")
+let dash = @moonregex.Pattern::string("-")
+let month = @moonregex.Pattern::string("\\d{2}").capture("month")
+let date = year + dash + month
+
+let m = date.prefix("2026-10").unwrap()
+m.group(group=@moonregex.Name(n="month"))   // Some("10")
+
+// `lower` hands the pattern to the core engine when it fits.
+match date.lower() {
+  Some(core) => core.execute("2026-10") is Some(_)   // true
+  None => false
+}
+```
+
+## Step limits
+
+A backtracking engine can be talked into taking a very long time. Every call
+carries a step ceiling — ten million by default, the number PCRE2 uses — and
+raises `Exceeded(limit~, got~)` rather than hanging. `limit~` raises or lowers it
+per call.
+
+## Partial matching
+
+With `partial=true`, a pattern that has matched everything it can but could go
+on matching if the text continued answers a match with `Match::partial` set —
+what a streaming parser needs to know that it should wait for more input.
+
+## What it does not do
+
+| Not implemented | Why |
+|:--|:--|
+| `re.LOCALE` | MoonBit has no locale; `re` itself only offers it for bytes and advises against it |
+| `re.DEBUG` | the library does not print; `Pattern::dump` returns the tree as text instead |
+| `re.purge` | there is no global pattern cache to clear |
+| ECMA's `g`, `y`, `d` | they are ways of calling, not properties of a pattern: `g` is `findall`/`finditer`/`count=0`, `y` is `prefix(pos=)`, `d` is what `span` has always answered |
+| `Match.detach_string`, `Match.regs` | strings are immutable here, and `spans` covers `regs` |
+
+## Where it differs from the references
+
+Everything else follows the reference implementations case by case, checked
+against generated vectors. These are the places where a decision was taken
+instead:
+
+| Case | Here | The reference |
+|:--|:--|:--|
+| `match` | not offered; `prefix` is the same thing | `re.match`, soft-deprecated in 3.15 |
+| Runaway patterns | `Exceeded` after ten million steps | no limit |
+| `\N` without a name | any character but a newline | `re` refuses it; `regex` reads a literal `N` under V0 |
+| `\v`, `\V` | the vertical tab under V0, the vertical-space class under V1 | `re` always means the tab |
+| `\e`, `\Q…\E`, `\K` | accepted | `re` refuses them |
+| `(?<name>…)` | accepted in the Python dialect too | `re` wants `(?P<name>…)` |
+| `[[:alpha:]]` | a class escape in every dialect | `re` reads it as a set of characters |
+| Refusal offsets | where reading stopped | Python's convention differs per error |
+| A group repeated over an empty tail | keeps the captures of the empty turn (`(a*)*` leaves group 1 at the end) | ECMA-262 clears them |
+| Astral characters | offsets count code points | ECMA-262 counts UTF-16 code units |
+| Property names | Unicode loose matching in every dialect | ECMA-262 is case- and space-sensitive |
+| A name used twice | allowed in the ECMA dialect anywhere | `re` refuses it; ECMA-262 only across alternatives |
+| `v`-mode nested classes | `[[a-z]--[aeiou]]` is not read as a class expression | ECMA-262 reads them |
 
 ## Licence
 

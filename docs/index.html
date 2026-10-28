@@ -355,8 +355,8 @@
       <a class="brand" href="#top"><span class="dot"></span>moon<span class="acc">regex</span></a>
       <nav class="nav-links">
         <a class="txt" href="#features">Features</a>
-        <a class="txt" href="#code">Examples</a>
-        <a class="txt" href="./api/module.mbt.html">API</a>
+        <a class="txt" href="./guide.html">Guide</a>
+        <a class="txt" href="./api.html">API</a>
         <a class="cta" href="https://github.com/moonbitstack/moonregex">GitHub</a>
       </nav>
     </div>
@@ -374,8 +374,8 @@
           recursion, fuzzy matching and shell globs, on every target.
         </p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="#code">See it work</a>
-          <a class="btn btn-ghost" href="./api/module.mbt.html">Read the API</a>
+          <a class="btn btn-primary" href="./guide.html">Read the guide</a>
+          <a class="btn btn-ghost" href="./api.html">Read the API</a>
         </div>
       </div>
 
@@ -487,7 +487,7 @@
           <span class="tabs" id="tabs">
             <button class="active" data-k="search">search</button>
             <button data-k="groups">groups</button>
-            <button data-k="sub">sub_by</button>
+            <button data-k="sub">sub_with</button>
             <button data-k="glob">glob</button>
             <button data-k="fuzzy">fuzzy</button>
             <button data-k="scanner">scanner</button>
@@ -510,7 +510,7 @@
         <div class="copy" style="margin-top:10px">© 2026 Leo Cheng · Apache-2.0</div>
       </div>
       <div style="display:flex;gap:28px;flex-wrap:wrap">
-        <a href="./api/module.mbt.html">API docs</a>
+        <a href="./api.html">API docs</a>
         <a href="https://github.com/moonbitstack/moonregex">GitHub</a>
         <a href="https://github.com/moonbitstack/moonregex/blob/master/README.md">README</a>
         <a href="https://github.com/moonbitstack/moonregex/blob/master/src/examples/tour/main.mbt">Tour</a>
@@ -585,7 +585,7 @@
 '<span class="c-com">// search anywhere, or force a start-anchored match</span>\n' +
 '<span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>).unwrap()\n' +
 'm.group().unwrap()                 <span class="c-com">// "42"</span>\n' +
-'@moonregex.match_at(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>)  <span class="c-com">// None</span>\n' +
+'@moonregex.prefix(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>)  <span class="c-com">// None</span>\n' +
 '\n' +
 '<span class="c-com">// collect one capture per match</span>\n' +
 '@moonregex.findall(<span class="c-str">"(\\w+)=(\\d+)"</span>, <span class="c-str">"a=1 b=2"</span>)  <span class="c-com">// ["a","1","b","2"]</span>',
@@ -600,7 +600,7 @@
 
     sub:
 '<span class="c-com">// substitute with a callable replacement</span>\n' +
-'<span class="c-kw">let</span> upper = @moonregex.sub_by(\n' +
+'<span class="c-kw">let</span> upper = @moonregex.sub_with(\n' +
 '  <span class="c-str">"(\\w+)"</span>,\n' +
 '  <span class="c-kw">fn</span>(m) -&gt; String raise @moonregex.Refused {\n' +
 '    <span class="c-kw">match</span> m.group() { Some(s) =&gt; s.to_upper() None =&gt; <span class="c-str">""</span> }\n' +
@@ -619,7 +619,7 @@
 
     fuzzy:
 '<span class="c-com">// fuzzy: a bounded edit budget over a literal run</span>\n' +
-'<span class="c-kw">let</span> m = @moonregex.fullmatch(<span class="c-str">"(?:hello){e&lt;=1}"</span>, <span class="c-str">"hellp"</span>)\n' +
+'<span class="c-kw">let</span> m = @moonregex.full(<span class="c-str">"(?:hello){e&lt;=1}"</span>, <span class="c-str">"hellp"</span>)\n' +
 '<span class="c-com">// Some(_) — one substitution, p -&gt; o</span>\n' +
 '\n' +
 '<span class="c-com">// scoped budgets: insertions, deletions, substitutions</span>\n' +

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>moonregex — guide</title>
+<meta name="description" content="A progressive guide to moonregex: matching, groups, replacement, flags, the three dialects, Unicode properties, and the bridge to MoonBit's own regular-expression engine." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%238ea2ff'/%3E%3Ccircle cx='21' cy='12' r='11' fill='%230a0b14'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0b14;
+    --bg-2: #0e1020;
+    --surface: #12142a;
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #eceaf6;
+    --muted: #9a98b5;
+    --faint: #6b698a;
+    --accent: #8ea2ff;
+    --accent-2: #5be0c6;
+    --mark: #ffc857;
+    --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body, button, input, textarea, select { font-variant-ligatures: no-contextual; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background:
+      radial-gradient(1000px 600px at 85% -10%, rgba(142, 162, 255, 0.14), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-attachment: fixed;
+    color: var(--text); font-family: var(--body); line-height: 1.7; font-size: 16.5px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); background: rgba(10, 11, 20, 0.82); border-bottom: 1px solid var(--border); }
+  .wrap { width: min(1080px, calc(100% - 48px)); margin: 0 auto; }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
+  .brand { font-family: var(--display); font-weight: 600; font-size: 19px; color: var(--text); letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .brand .acc { color: var(--accent); }
+  .nav-links { display: flex; align-items: center; gap: 4px; }
+  .nav-links a { color: var(--muted); font-size: 14.5px; padding: 7px 11px; border-radius: 8px; }
+  .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); text-decoration: none; }
+  .nav-links a.cta { color: var(--text); border: 1px solid var(--border); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 48px; padding: 44px 0 80px; }
+  .side { position: sticky; top: 86px; align-self: start; font-size: 14.5px; }
+  .side h4 { margin: 0 0 10px; font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .side ol { list-style: none; margin: 0 0 22px; padding: 0; counter-reset: step; }
+  .side li { counter-increment: step; margin: 2px 0; }
+  .side li a { color: var(--muted); display: block; padding: 5px 10px 5px 30px; border-radius: 8px; position: relative; border-left: 2px solid transparent; }
+  .side li a::before { content: counter(step); position: absolute; left: 8px; color: var(--faint); font-family: var(--mono); font-size: 12px; }
+  .side li a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); text-decoration: none; }
+  .side li a.on { color: var(--text); background: rgba(142, 162, 255, 0.1); border-left-color: var(--accent); border-radius: 0 8px 8px 0; }
+
+  main { min-width: 0; }
+  h1 { font-family: var(--display); font-size: 40px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 12px; }
+  h1 .reg { color: var(--mark); }
+  h2 { font-family: var(--display); font-size: 25px; letter-spacing: -0.01em; margin: 54px 0 10px; scroll-margin-top: 86px; }
+  h2 .num { color: var(--faint); font-family: var(--mono); font-size: 15px; margin-right: 10px; }
+  h3 { font-family: var(--display); font-size: 18px; margin: 28px 0 6px; }
+  p { margin: 12px 0; color: #d6d4e6; }
+  .lede { font-size: 18.5px; color: var(--muted); }
+  ul, ol { color: #d6d4e6; padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { font-family: var(--mono); font-size: 0.88em; background: rgba(142, 162, 255, 0.1); color: #cfd6ff; padding: 1.5px 5px; border-radius: 5px; }
+  pre {
+    background: #0c0e1c; border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; overflow-x: auto; margin: 16px 0; font-size: 13.8px; line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; color: #d9d8f0; white-space: pre; }
+  .c-kw { color: #8ea2ff; }
+  .c-str { color: #5be0c6; }
+  .c-com { color: #6b698a; }
+  .c-num { color: #ffc857; }
+  .out { border-left: 2px solid var(--accent-2); background: rgba(91, 224, 198, 0.06); padding: 2px 14px; border-radius: 0 8px 8px 0; margin: 10px 0 18px; color: var(--muted); font-size: 14.5px; }
+  .out code { background: none; color: var(--accent-2); }
+  .note { border-left: 2px solid var(--mark); background: rgba(255, 200, 87, 0.07); padding: 2px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; color: #e4dfc9; font-size: 14.8px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.8px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--faint); font-weight: 500; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  td code { font-size: 0.9em; }
+  footer { border-top: 1px solid var(--border); padding: 30px 0 60px; color: var(--faint); font-size: 14px; }
+  footer .foot-grid { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: #0b0d18; }
+  ::-webkit-scrollbar-thumb { background: #262a45; border-radius: 6px; border: 2px solid #0b0d18; }
+  ::-webkit-scrollbar-thumb:hover { background: #343a5e; }
+  @supports not selector(::-webkit-scrollbar) {
+    html { scrollbar-color: #343a5e #0b0d18; scrollbar-width: thin; }
+  }
+  @media (width <= 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 24px; }
+    .side { position: static; }
+    .side ol { display: flex; flex-wrap: wrap; gap: 4px; }
+    .side li a { padding: 5px 10px 5px 26px; }
+    h1 { font-size: 31px; }
+    .wrap { width: calc(100% - 32px); }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./index.html"><span class="dot"></span>moon<span class="acc">regex</span></a>
+    <nav class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./guide.html">Guide</a>
+      <a href="./api.html">API</a>
+      <a class="cta" href="https://github.com/moonbitstack/moonregex" aria-label="Repository on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="side">
+    <h4>Guide</h4>
+    <ol id="toc">
+      <li><a href="#first">First match</a></li>
+      <li><a href="#anchors">Where a match may fall</a></li>
+      <li><a href="#groups">Groups</a></li>
+      <li><a href="#replace">Replacing and splitting</a></li>
+      <li><a href="#flags">Flags</a></li>
+      <li><a href="#dialects">Three grammars</a></li>
+      <li><a href="#unicode">Unicode</a></li>
+      <li><a href="#core">The core engine</a></li>
+      <li><a href="#limits">Limits and streams</a></li>
+      <li><a href="#globs">Globs</a></li>
+    </ol>
+    <h4>Elsewhere</h4>
+    <ol style="counter-reset: none">
+      <li><a href="./api.html" style="padding-left:10px">API reference</a></li>
+      <li><a href="./index.html" style="padding-left:10px">Home</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <h1>Find what you meant,<br /><span class="reg">not what you typed.</span></h1>
+    <p class="lede">A regular-expression engine written in MoonBit: three grammars, one
+      syntax tree, one executor, the same answers on every backend. This guide goes
+      from the first match to the parts that surprise people.</p>
+
+    <h2 id="first"><span class="num">01</span>First match</h2>
+    <pre><code>moon add moonbitstack/moonregex</code></pre>
+    <pre><code><span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"\\d{4}"</span>, <span class="c-str">"copyright 2026"</span>).unwrap()</code></pre>
+    <div class="out"><code>m.content()</code> is <code>"2026"</code>; <code>m.start()</code> is <code>10</code>,
+      <code>m.end()</code> is <code>14</code>.</div>
+    <p><code>search</code> compiles the pattern, scans left to right, and answers the
+      leftmost match as a <code>Match?</code>. When a pattern is used more than once,
+      compile it first — the module functions compile on every call.</p>
+    <pre><code><span class="c-kw">let</span> year = @moonregex.compile(<span class="c-str">"\\d{4}"</span>)
+year.findall(<span class="c-str">"1999 and 2026"</span>)   <span class="c-com">// ["1999", "2026"]</span></code></pre>
+    <p>A pattern that does not compile raises <code>Refused</code>, which carries a
+      message and where reading stopped:</p>
+    <pre><code><span class="c-kw">try</span> {
+  @moonregex.compile(<span class="c-str">"(a"</span>)
+} <span class="c-kw">catch</span> {
+  @moonregex.Pattern(msg~, at~, ..) =&gt; println(msg)   <span class="c-com">// missing ), unterminated group</span>
+}</code></pre>
+
+    <h2 id="anchors"><span class="num">02</span>Where a match may fall</h2>
+    <p>Three functions answer the same question with a different answer to
+      “where”:</p>
+    <table>
+      <thead><tr><th>Call</th><th>Python's name</th><th>The match must</th></tr></thead>
+      <tbody>
+        <tr><td><code>search</code></td><td><code>re.search</code></td><td>be anywhere, leftmost first</td></tr>
+        <tr><td><code>prefix</code></td><td><code>re.match</code></td><td>start where the scan starts</td></tr>
+        <tr><td><code>full</code></td><td><code>re.fullmatch</code></td><td>cover the whole region</td></tr>
+      </tbody>
+    </table>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"[a-z]+"</span>)
+p.search(<span class="c-str">"  hello "</span>)   <span class="c-com">// Some(_) — at 2</span>
+p.prefix(<span class="c-str">"  hello "</span>)   <span class="c-com">// None    — the scan starts at 0</span>
+p.full(<span class="c-str">"hello"</span>)        <span class="c-com">// Some(_)</span></code></pre>
+    <p>All three take <code>pos=</code> and <code>endpos=</code>, which bound the
+      region without changing what <code>^</code> and <code>$</code> mean.</p>
+
+    <h2 id="groups"><span class="num">03</span>Groups</h2>
+    <p>Parentheses capture, and a name reaches the same slot as its number:</p>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?&lt;year&gt;\\d{4})-(?&lt;month&gt;\\d{2})"</span>)
+<span class="c-kw">let</span> m = p.search(<span class="c-str">"on 2026-10-28"</span>).unwrap()
+m.group(<span class="c-num">1</span>)              <span class="c-com">// Some("2026")</span>
+m.group(<span class="c-str">"month"</span>)        <span class="c-com">// Some("10")</span>
+m.span(<span class="c-str">"month"</span>)         <span class="c-com">// Some((13, 15))</span>
+m.groups()            <span class="c-com">// [Some("2026"), Some("10")]</span>
+m.groupdict()         <span class="c-com">// {"year": Some("2026"), "month": Some("10")}</span></code></pre>
+    <p>A group that took no part answers <code>None</code>, not an empty string —
+      the difference matters in patterns with alternation:</p>
+    <pre><code><span class="c-kw">let</span> m = @moonregex.compile(<span class="c-str">"(a)|(b)"</span>).search(<span class="c-str">"b"</span>).unwrap()
+m.group(<span class="c-num">1</span>)   <span class="c-com">// None</span>
+m.group(<span class="c-num">2</span>)   <span class="c-com">// Some("b")</span></code></pre>
+    <p><code>findall</code> takes one group and answers its text; with two or more
+      groups Python answers a tuple, and since a list of strings cannot say that,
+      the call is refused until you name one:</p>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(\\w+)=(\\d+)"</span>)
+p.findall(<span class="c-str">"a=1"</span>)                <span class="c-com">// raises Ambiguous(groups=2)</span>
+p.findall(<span class="c-str">"a=1"</span>, group=<span class="c-num">1</span>)       <span class="c-com">// ["a"]</span>
+p.finditer(<span class="c-str">"a=1"</span>).length()       <span class="c-com">// 1 — and the Match has both</span></code></pre>
+
+    <h2 id="replace"><span class="num">04</span>Replacing and splitting</h2>
+    <pre><code>@moonregex.sub(<span class="c-str">"\\s+"</span>, <span class="c-str">" "</span>, <span class="c-str">"a   b  c"</span>)        <span class="c-com">// "a b c"</span>
+@moonregex.subn(<span class="c-str">"\\d"</span>, <span class="c-str">"#"</span>, <span class="c-str">"a1b2"</span>)            <span class="c-com">// ("a#b#", 2)</span>
+@moonregex.split(<span class="c-str">"\\s*,\\s*"</span>, <span class="c-str">"a , b,c"</span>)      <span class="c-com">// ["a", "b", "c"]</span></code></pre>
+    <p>A replacement is a template: <code>\1</code>, <code>\g&lt;name&gt;</code>, and
+      <code>\g&lt;0&gt;</code> for the whole match. When the replacement is computed,
+      <code>sub_with</code> takes the <code>Match</code> and answers the text:</p>
+    <pre><code>@moonregex.sub(<span class="c-str">"(\\w+)@(\\w+)"</span>, <span class="c-str">"\g&lt;2&gt;:\g&lt;1&gt;"</span>, <span class="c-str">"u@h"</span>)   <span class="c-com">// "h:u"</span>
+@moonregex.sub_with(<span class="c-str">"\\d+"</span>, m =&gt; <span class="c-str">"&lt;"</span> + m.content() + <span class="c-str">"&gt;"</span>, <span class="c-str">"a1b"</span>)</code></pre>
+    <div class="out"><code>"a&lt;1&gt;b"</code></div>
+    <p><code>split</code> keeps the captured groups in the result, the way Python
+      does; a group that took no part is <code>None</code>, which is why the answer is
+      <code>Array[String?]</code>.</p>
+
+    <h2 id="flags"><span class="num">05</span>Flags</h2>
+    <p>Flags are a record, so one switch is set and the rest stay as they were:</p>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"hello"</span>, flags=@moonregex.Flags::new(ignorecase=<span class="c-kw">true</span>))
+p.full(<span class="c-str">"HeLLo"</span>)   <span class="c-com">// Some(_)</span></code></pre>
+    <p>The common ones also have an inline spelling, which is part of the pattern
+      and needs no argument — and works inside a scoped group:</p>
+    <pre><code>@moonregex.compile(<span class="c-str">"(?i)hello"</span>).full(<span class="c-str">"HELLO"</span>)        <span class="c-com">// Some(_)</span>
+@moonregex.compile(<span class="c-str">"(?i:hello) world"</span>).full(<span class="c-str">"HELLO world"</span>)  <span class="c-com">// Some(_)</span>
+@moonregex.compile(<span class="c-str">"(?i:hello) world"</span>).full(<span class="c-str">"HELLO WORLD"</span>)  <span class="c-com">// None</span></code></pre>
+    <p><code>multiline</code> moves <code>^</code> and <code>$</code> to line
+      boundaries, <code>dotall</code> lets <code>.</code> cross a newline,
+      <code>verbose</code> drops whitespace and <code>#</code> comments from the
+      pattern, and <code>ascii</code> narrows <code>\w</code>, <code>\d</code>,
+      <code>\s</code> and <code>\b</code> to their ASCII reading.</p>
+
+    <h2 id="dialects"><span class="num">06</span>Three grammars</h2>
+    <p>The grammar is a parameter, not a fork:</p>
+    <table>
+      <thead><tr><th>Dialect</th><th>Written by</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><code>Python</code></td><td>a person, for text</td><td><code>(?P&lt;w&gt;\w+)\s+\1</code></td></tr>
+        <tr><td><code>Ecma262</code></td><td>a schema, a form, JavaScript</td><td><code>^[a-z]+$</code></td></tr>
+        <tr><td><code>Lexmatch</code></td><td>a MoonBit lexer</td><td><code>[[:digit:]]+</code></td></tr>
+      </tbody>
+    </table>
+    <pre><code>@moonregex.compile(<span class="c-str">"^[a-z]+$"</span>, dialect=@moonregex.ecma262).full(<span class="c-str">"abc"</span>)  <span class="c-com">// Some(_)</span>
+@moonregex.compile(<span class="c-str">"^[a-z]+$"</span>, dialect=@moonregex.ecma262).full(<span class="c-str">"ABC"</span>)  <span class="c-com">// None</span></code></pre>
+    <p>The differences are the standards' own, and they are settled while reading
+      the pattern:</p>
+    <table>
+      <thead><tr><th>Construct</th><th>Python</th><th>ECMA-262</th></tr></thead>
+      <tbody>
+        <tr><td>named group</td><td><code>(?P&lt;n&gt;…)</code>, also <code>(?&lt;n&gt;…)</code></td><td><code>(?&lt;n&gt;…)</code></td></tr>
+        <tr><td><code>$</code> without <code>m</code></td><td>also before a final newline</td><td>only at the end of the text</td></tr>
+        <tr><td><code>\w</code>, <code>\d</code></td><td>Unicode</td><td>ASCII, unless spelled <code>\p{…}</code></td></tr>
+        <tr><td><code>.</code></td><td>any character but a newline</td><td>the same</td></tr>
+        <tr><td><code>\A</code>, <code>\Z</code></td><td>yes</td><td>no — <code>^</code> and <code>$</code> only</td></tr>
+      </tbody>
+    </table>
+    <div class="note">A pattern from a JSON Schema or an OpenAPI document is
+      ECMA-262 by definition. Reading it with the Python grammar mostly works and
+      is wrong exactly where it matters.</div>
+
+    <h2 id="unicode"><span class="num">07</span>Unicode</h2>
+    <p><code>\p{…}</code> takes a general category, a script, a block or a binary
+      property, under any of their spellings:</p>
+    <pre><code>@moonregex.findall(<span class="c-str">"\\p{Lu}\\p{Ll}+"</span>, <span class="c-str">"Paris and Αθήνα"</span>)   <span class="c-com">// ["Paris", "Αθήνα"]</span>
+@moonregex.compile(<span class="c-str">"\\p{Script=Han}+"</span>).findall(<span class="c-str">"漢字 and kana"</span>)   <span class="c-com">// ["漢字"]</span>
+@moonregex.compile(<span class="c-str">"\\p{Block=Basic Latin}+"</span>).findall(<span class="c-str">"abcé"</span>)  <span class="c-com">// ["abc"]</span></code></pre>
+    <p>The sets come from the Unicode Character Database through the
+      <code>moonucd</code> packages, so the version a pattern is read against is
+      the version the rest of the ecosystem uses. The tables behind them are built
+      the first time a property is asked for, not at load.</p>
+    <p><code>\X</code> matches one grapheme cluster, by the UCD's own segmentation:
+      a letter with its accents, a flag, an emoji with its modifiers.</p>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"\\X"</span>)
+p.search(<span class="c-str">"e\u{301}x"</span>).unwrap().content()   <span class="c-com">// "é" — two code points, one cluster</span></code></pre>
+
+    <h2 id="core"><span class="num">08</span>The core engine</h2>
+    <p>MoonBit's core library has a regular-expression engine of its own, reached
+      through <code>@string.Regex</code> and the <code>lexmatch</code> grammar. This
+      library stands next to it rather than beside it:</p>
+    <ul>
+      <li>A pattern the core engine can run is <em>lowered</em> onto it.
+        <code>Pattern::lower</code> answers the <code>@string.Regex</code>, or
+        <code>None</code> when the pattern says something that engine cannot.</li>
+      <li>The five combinators are the same five, with the same meaning:
+        <code>string</code>, <code>+</code>, <code>|</code>, <code>repeat</code>,
+        <code>capture</code>.</li>
+      <li>A match carries <code>content</code>, <code>before</code> and
+        <code>after</code> as core spells them, next to <code>group</code> and
+        <code>span</code>.</li>
+    </ul>
+    <pre><code><span class="c-kw">let</span> date = @moonregex.Pattern::string(<span class="c-str">"\\d{4}"</span>).capture(<span class="c-str">"year"</span>) +
+  @moonregex.Pattern::string(<span class="c-str">"-"</span>) +
+  @moonregex.Pattern::string(<span class="c-str">"\\d{2}"</span>).capture(<span class="c-str">"month"</span>)
+
+<span class="c-kw">let</span> m = date.prefix(<span class="c-str">"2026-10"</span>).unwrap()
+m.group(<span class="c-str">"month"</span>)    <span class="c-com">// Some("10")</span>
+m.before()        <span class="c-com">// ""</span>
+m.after()         <span class="c-com">// ""</span></code></pre>
+    <p>The same date, written three ways, matches the same way — and the
+      assembled one can be handed to the core engine:</p>
+    <pre><code><span class="c-kw">match</span> date.lower() {
+  Some(core) =&gt; core.execute(<span class="c-str">"2026-10"</span>) <span class="c-kw">is</span> Some(_)   <span class="c-com">// true</span>
+  None =&gt; <span class="c-kw">false</span>
+}</code></pre>
+    <p>Backreferences, lookaround, conditionals, recursion, atomic groups, fuzzy
+      matching, <code>\X</code> and Unicode word boundaries answer
+      <code>None</code>: those run on this library's own engine, which is why the
+      two agree rather than overlap.</p>
+
+    <h2 id="limits"><span class="num">09</span>Limits and streams</h2>
+    <p>Backtracking can be made expensive. Every call carries a step ceiling —
+      ten million by default — and raises rather than hanging:</p>
+    <pre><code><span class="c-kw">try</span> {
+  @moonregex.full(<span class="c-str">"(a+)+b"</span>, <span class="c-str">"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"</span>)
+} <span class="c-kw">catch</span> {
+  @moonregex.Exceeded(limit~, got~) =&gt; println(<span class="c-str">"\hit \{got} steps"</span>)
+  _ =&gt; ()
+}</code></pre>
+    <p><code>limit=</code> sets it per call when a pattern is known to be cheap.
+      <code>partial=true</code> answers a match when the text ends in the middle of
+      one, flagged on the result, which is what a streaming parser needs:</p>
+    <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"\\d{4}-\\d{2}"</span>, partial=<span class="c-kw">true</span>)
+<span class="c-kw">let</span> m = p.prefix(<span class="c-str">"2026-"</span>).unwrap()
+m.partial()   <span class="c-com">// true — more input would finish it</span></code></pre>
+
+    <h2 id="globs"><span class="num">10</span>Globs</h2>
+    <p>Shell patterns are their own grammar, and turn into regular expressions
+      here, so the Unicode handling and the dialects come for free:</p>
+    <pre><code>@glob.fnmatch(<span class="c-str">"cat.txt"</span>, <span class="c-str">"*.txt"</span>)            <span class="c-com">// true</span>
+@glob.filter([<span class="c-str">"a.txt"</span>, <span class="c-str">"b.csv"</span>], <span class="c-str">"*.txt"</span>)  <span class="c-com">// ["a.txt"]</span>
+
+<span class="c-kw">let</span> g = @glob.Glob::compile(<span class="c-str">"src/**/*.mbt"</span>)
+g.matches(<span class="c-str">"src/parse/lex.mbt"</span>)   <span class="c-com">// true</span>
+g.matches(<span class="c-str">"src/lex.mbt"</span>)          <span class="c-com">// true — ** spans no directory too</span></code></pre>
+
+    <p style="margin-top:44px"><a href="./api.html">Next: the API reference →</a></p>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>moonregex — Apache-2.0.</div>
+    <div>
+      <a href="./index.html">Home</a> ·
+      <a href="./api.html">API</a> ·
+      <a href="https://github.com/moonbitstack/moonregex">GitHub</a> ·
+      <a href="https://mooncakes.io/docs/moonbitstack/moonregex">Mooncakes</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  var links = [].slice.call(document.querySelectorAll('#toc a'));
+  var heads = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+  function mark() {
+    var at = 0;
+    for (var i = 0; i < heads.length; i++) {
+      if (heads[i] && heads[i].getBoundingClientRect().top < 140) at = i;
+    }
+    links.forEach(function (a, i) { a.classList.toggle('on', i === at); });
+  }
+  document.addEventListener('scroll', mark, { passive: true });
+  mark();
+</script>
+</body>
+</html>
