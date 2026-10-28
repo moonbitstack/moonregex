@@ -14,7 +14,7 @@
   --line-soft: rgba(255, 255, 255, 0.05);
   --text: #ecebf7;
   --muted: #a3a1bd;
-  --faint: #6f6d8f;
+  --faint: #82809f;
   --accent: #8ea2ff;
   --accent-soft: rgba(142, 162, 255, 0.14);
   --accent-2: #5be0c6;
@@ -26,7 +26,7 @@
   --code-text: #d9d8f0;
   --c-kw: #8ea2ff;
   --c-str: #5be0c6;
-  --c-com: #6f6d8f;
+  --c-com: #85839f;
   --c-num: #ffc857;
 
   --sb-track: #0a0c17;
@@ -61,7 +61,7 @@
   --faint: #6b6e8a;
   --accent: #3f51cf;
   --accent-soft: rgba(63, 81, 207, 0.1);
-  --accent-2: #0a8f7a;
+  --accent-2: #07725f;
   --mark: #9a5b00;
   --mark-soft: rgba(255, 200, 87, 0.28);
 
@@ -73,7 +73,7 @@
   --code-text: #1c1f36;
   --c-kw: #3f45c8;
   --c-str: #0a7d68;
-  --c-com: #797c93;
+  --c-com: #6b6e8a;
   --c-num: #8f5300;
 
   --shadow-card: 0 12px 28px -20px rgba(21, 26, 62, 0.22), 0 2px 6px -4px rgba(21, 26, 62, 0.08);
@@ -121,6 +121,12 @@ body {
 }
 
 a { color: var(--accent); text-decoration: none; }
+/* The outline follows the element's own radius; do not override it here. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--text);
+}
 a:hover { text-decoration: underline; }
 code { font-family: var(--mono); font-size: 0.88em; }
 img, svg { max-width: 100%; }
@@ -232,18 +238,23 @@ img, svg { max-width: 100%; }
   display: inline-grid; place-items: center; margin-left: 4px;
   border-radius: 10px; border: 1px solid var(--line) !important;
   background: var(--surface) !important;
+  /* A button carries the UA's `buttontext`, not the page's colour, which left
+     the moon nearly invisible on the night surface. */
+  color: #fff !important;
 }
+[data-theme="light"] .theme-toggle { color: var(--text) !important; }
 .theme-toggle:hover {
-  color: var(--text) !important; border-color: var(--accent) !important;
+  color: var(--accent) !important; border-color: var(--accent) !important;
 }
 .theme-toggle svg { width: 17px; height: 17px; }
 .nav-burger {
   display: none; width: 36px; height: 36px; padding: 0; margin-left: 4px;
-  place-items: center; cursor: pointer; color: var(--muted);
+  place-items: center; cursor: pointer; color: var(--text);
   border-radius: 10px; border: 1px solid var(--line); background: var(--surface);
 }
 .nav-burger svg { width: 19px; height: 19px; }
 .nav-burger .bar-close { display: none; }
+.nav-burger:hover { color: var(--accent); border-color: var(--accent); }
 .nav-burger[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
 .nav-burger[aria-expanded="true"] .bar-open { display: none; }
 .nav-burger[aria-expanded="true"] .bar-close { display: block; }

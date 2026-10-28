@@ -24,7 +24,6 @@
       var label = theme === "light" ? "Switch to the night theme" : "Switch to the day theme";
       btn.setAttribute("aria-label", label);
       btn.setAttribute("title", label);
-      btn.setAttribute("aria-pressed", theme === "light" ? "true" : "false");
     }
   }
   apply(stored() || (systemPrefersLight() ? "light" : "dark"));
@@ -159,19 +158,70 @@
   }
 
   // ---- copy buttons ------------------------------------------------------
+  // The clipboard API needs a secure context and a permission; when either is
+  // missing the old textarea trick still works, and if that fails too the
+  // button says so instead of pretending.
+  function legacyCopy(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;top:-1000px;left:0;opacity:0";
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(area);
+    return ok;
+  }
+
+  function writeClipboard(text) {
+    // The API needs a secure context, permission and focus; when any of them
+    // is missing the promise can stay pending for ever, so it is raced
+    // against a short timer before falling back.
+    var attempt = new Promise(function (resolve) {
+      if (!navigator.clipboard || !window.isSecureContext) { resolve(false); return; }
+      var settled = false;
+      var settle = function (value) {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      navigator.clipboard.writeText(text).then(
+        function () { settle(true); },
+        function () { settle(false); }
+      );
+      setTimeout(function () { settle(false); }, 700);
+    });
+    return attempt.then(function (ok) {
+      if (ok) return true;
+      if (legacyCopy(text)) return true;
+      throw new Error("copy failed");
+    });
+  }
+
   document.addEventListener("click", function (event) {
-    var btn = event.target.closest(".copy");
+    var btn = event.target.closest("button.copy");
     if (!btn) return;
     var target = document.querySelector(btn.getAttribute("data-copy"));
     if (!target) return;
     var text = target.textContent.trim();
-    var done = function () {
-      var old = btn.textContent;
-      btn.textContent = "copied";
-      setTimeout(function () { btn.textContent = old; }, 1400);
+    var label = btn.textContent;
+    var say = function (word) {
+      btn.textContent = word;
+      setTimeout(function () { btn.textContent = label; }, 1400);
     };
-    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
-    else done();
+    writeClipboard(text).then(
+      function () { say("copied"); },
+      function () {
+        // Nothing to write with: select the text so one key finishes the job.
+        var range = document.createRange();
+        range.selectNodeContents(target);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        say("selected");
+      }
+    );
   });
 
   // ---- reveal ------------------------------------------------------------
