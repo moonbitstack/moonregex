@@ -771,8 +771,6 @@ pub fn compile(ast : @parse.Ast) -> Program {
 /// survives the recursion that implements backtracking.
 priv struct Matcher {
   program : Program
-  /// The subject, kept for the grapheme boundaries `\X` asks the UCD for.
-  text : String
   chars : Array[Int32]
   /// Where the subject ends for the instruction being run. A lookbehind lowers
   /// it to its own position, so the body cannot read past the place the
@@ -795,6 +793,9 @@ priv struct Matcher {
   /// the same position.
   mut attempt : Int32
   mut must_advance : Bool
+  /// Grapheme boundaries for `\X`, worked out once per search: entry `i` is
+  /// true when a cluster ends between code point `i` and `i + 1`.
+  mut graphemes : Array[Bool]?
 }
 
 ///|
@@ -999,7 +1000,19 @@ fn Matcher::run(
       }
       Grapheme =>
         if sp < len {
-          let (_, end) = @segment.grapheme_at(self.text, sp)
+          let bounds = match self.graphemes {
+            Some(b) => b
+            None => {
+              let b = @segment.grapheme_boundaries(self.chars)
+              self.graphemes = Some(b)
+              b
+            }
+          }
+          // Walk to the first boundary at or after `sp`.
+          let mut end = sp + 1
+          while end < len && !bounds[end - 1] {
+            end = end + 1
+          }
           sp = end
           pc = pc + 1
         } else {
@@ -1321,7 +1334,6 @@ pub fn Program::search(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
-    text,
     chars,
     len,
     pos,
@@ -1332,6 +1344,7 @@ pub fn Program::search(
     marks: [],
     attempt: pos,
     must_advance: false,
+    graphemes: None,
   }
   let mut p = pos
   while p <= end {
@@ -1408,7 +1421,6 @@ pub fn Program::prefix(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
-    text,
     chars,
     len: chars.length(),
     pos,
@@ -1419,6 +1431,7 @@ pub fn Program::prefix(
     marks: [],
     attempt: pos,
     must_advance: false,
+    graphemes: None,
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
@@ -1453,7 +1466,6 @@ pub fn Program::full(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
-    text,
     chars,
     len,
     pos,
@@ -1464,6 +1476,7 @@ pub fn Program::full(
     marks: [],
     attempt: pos,
     must_advance: false,
+    graphemes: None,
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {

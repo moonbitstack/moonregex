@@ -205,6 +205,12 @@ test "a grapheme cluster is what the UCD says it is" {
   assert_eq(flag.content(), "🇯🇵")
   let family = p.search("👨‍👩‍👧").unwrap()
   assert_eq(family.content(), "👨‍👩‍👧")
+  // A ZWJ sequence and a regional-indicator pair that follow one another are
+  // two clusters, not one: the boundary falls between them.
+  let both = p.findall("👨‍👩‍👧🇯🇵")
+  assert_eq(both.length(), 2)
+  assert_eq(both[0], Some("👨‍👩‍👧"))
+  assert_eq(both[1], Some("🇯🇵"))
 }
 
 ///|
