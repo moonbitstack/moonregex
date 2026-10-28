@@ -139,7 +139,7 @@ fn walk_spans(
     let parts : Array[String] = []
     let mut slot = 0
     while slot <= p.groups() {
-      let (start, end) = m.span(group=@moonregex.Num(n=slot))
+      let (start, end) = m.span(slot)
       parts.push("\{start} \{end}")
       slot += 1
     }

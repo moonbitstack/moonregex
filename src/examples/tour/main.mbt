@@ -33,7 +33,7 @@ fn show(a : Array[String?]) -> String {
 #coverage.skip
 fn main raise {
   // A plain search and a forced match-at-start.
-  println(@moonregex.search("\\d+", "order 42").unwrap().group().unwrap())
+  println(@moonregex.search("\\d+", "order 42").unwrap().group(0).unwrap())
   println(
     "prefix at the start: " +
     (@moonregex.prefix("\\d+", "order 42") is None).to_string(),
@@ -49,7 +49,7 @@ fn main raise {
   let numbered = @moonregex.sub_with(
     "(\\w+)",
     fn(m) -> String raise @moonregex.Refused {
-      match m.group() {
+      match m.group(0) {
         Some(s) => s.to_upper()
         None => ""
       }
@@ -71,10 +71,7 @@ fn main raise {
   // a named group.
   match @moonregex.search("(?P<word>\\w+)", "see spot") {
     None => ()
-    Some(m) =>
-      println(
-        "named group: " + m.group(group=@moonregex.Name(n="word")).unwrap(),
-      )
+    Some(m) => println("named group: " + m.group("word").unwrap())
   }
 
   // a named Unicode character and a line break.

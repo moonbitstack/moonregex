@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 ///|
-/// A group, as Python's `re` lets you name it: the whole match, a number, or a
-/// name. `Whole` is the preset every group-accepting call falls back to.
-pub(all) enum GroupKey {
+/// Which group a value names: `Whole` for the whole match, `Num` for a
+/// numbered parenthesis, `Name` for a named one.
+///
+/// This is the shape the methods work in. Callers do not have to build it —
+/// `GroupKey` is implemented by `Int`, by `String` and by this type, so
+/// `m.group(1)`, `m.group("year")` and `m.group(Whole)` are one call.
+pub(all) enum Group {
   /// Group 0, the whole match.
   Whole
   /// A group by number; 1 is the first parenthesis, 0 the whole match.
@@ -12,6 +16,39 @@ pub(all) enum GroupKey {
   /// A group by name.
   Name(n~ : String)
 }
+
+///|
+/// What can name a group. Two implementations do the work: a number and a
+/// name, so `m.group(1)` and `m.group("year")` are the same method.
+///
+/// The trait is open: a caller with its own key — a slot number in a table of
+/// its own, say — implements it and the methods take it without a change here.
+pub(open) trait GroupKey {
+  fn to_group(Self) -> Group
+}
+
+///|
+pub impl GroupKey for Int32 with fn to_group(self) -> Group {
+  if self == 0 {
+    Whole
+  } else {
+    Num(n=self)
+  }
+}
+
+///|
+pub impl GroupKey for String with fn to_group(self) -> Group {
+  Name(n=self)
+}
+
+///|
+pub impl GroupKey for Group with fn to_group(self) -> Group {
+  self
+}
+
+///|
+#deprecated
+pub extend Group with GroupKey::{to_group}
 
 ///|
 /// The preset flags, for callers who want to tweak one and keep the rest.
@@ -140,7 +177,7 @@ pub fn findall(
   text : String,
   flags~ : @parse.Flags = @parse.flags,
   dialect~ : @parse.Dialect = @parse.Python,
-  group~ : GroupKey = Whole,
+  group~ : Group = Whole,
   overlapped~ : Bool = false,
   pos~ : Int32 = 0,
   endpos~ : Int32 = -1,

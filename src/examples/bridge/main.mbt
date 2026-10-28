@@ -53,7 +53,7 @@ fn walk(pattern : @moonregex.Pattern, text : String) -> String raise {
     let groups : Array[String] = []
     let mut slot = 1
     while slot <= pattern.groups() {
-      groups.push(m.group(group=@moonregex.Num(n=slot)).unwrap_or("?"))
+      groups.push(m.group(slot).unwrap_or("?"))
       slot += 1
     }
     parts.push(groups.join("/"))

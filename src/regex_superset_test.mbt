@@ -9,7 +9,7 @@ fn sup_whole(
 ) -> String raise @moonregex.Refused {
   match @moonregex.search(pattern, text) {
     None => ""
-    Some(m) => m.group().unwrap()
+    Some(m) => m.group(0).unwrap()
   }
 }
 
@@ -45,7 +45,7 @@ test "(*ACCEPT) ends the match early" {
   assert_true(@moonregex.full("a(*ACCEPT)b", "axyz") is Some(_))
   // And a plain match at the accepted position is exactly that prefix.
   let m = @moonregex.search("a(*ACCEPT).*", "axyz").unwrap()
-  assert_eq(m.group().unwrap(), "a")
+  assert_eq(m.group(0).unwrap(), "a")
 }
 
 ///|

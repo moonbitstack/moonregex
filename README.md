@@ -173,7 +173,7 @@ let month = @moonregex.Pattern::string("\\d{2}").capture("month")
 let date = year + dash + month
 
 let m = date.prefix("2026-10").unwrap()
-m.group(group=@moonregex.Name(n="month"))   // Some("10")
+m.group("month")   // Some("10")
 
 // `lower` hands the pattern to the core engine when it fits.
 match date.lower() {

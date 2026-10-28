@@ -584,7 +584,7 @@
     search:
 '<span class="c-com">// search anywhere, or force a start-anchored match</span>\n' +
 '<span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>).unwrap()\n' +
-'m.group().unwrap()                 <span class="c-com">// "42"</span>\n' +
+'m.group(0).unwrap()                 <span class="c-com">// "42"</span>\n' +
 '@moonregex.prefix(<span class="c-str">"\\d+"</span>, <span class="c-str">"order 42"</span>)  <span class="c-com">// None</span>\n' +
 '\n' +
 '<span class="c-com">// collect one capture per match</span>\n' +
@@ -593,7 +593,7 @@
     groups:
 '<span class="c-com">// named groups, three spellings, one tree</span>\n' +
 '<span class="c-kw">let</span> m = @moonregex.search(<span class="c-str">"(?P&lt;word&gt;\\w+)"</span>, <span class="c-str">"see spot"</span>).unwrap()\n' +
-'m.group(group=@moonregex.Name(n=<span class="c-str">"word"</span>)).unwrap()  <span class="c-com">// "see"</span>\n' +
+'m.group(<span class="c-str">"word"</span>).unwrap()  <span class="c-com">// "see"</span>\n' +
 '\n' +
 '<span class="c-com">// split keeps the captured separators</span>\n' +
 '@moonregex.split(<span class="c-str">"(\\s+)"</span>, <span class="c-str">"a  b\\tc"</span>)  <span class="c-com">// ["a","  ","b","\\t","c"]</span>',
@@ -603,7 +603,7 @@
 '<span class="c-kw">let</span> upper = @moonregex.sub_with(\n' +
 '  <span class="c-str">"(\\w+)"</span>,\n' +
 '  <span class="c-kw">fn</span>(m) -&gt; String raise @moonregex.Refused {\n' +
-'    <span class="c-kw">match</span> m.group() { Some(s) =&gt; s.to_upper() None =&gt; <span class="c-str">""</span> }\n' +
+'    <span class="c-kw">match</span> m.group(0) { Some(s) =&gt; s.to_upper() None =&gt; <span class="c-str">""</span> }\n' +
 '  },\n' +
 '  <span class="c-str">"hello world"</span>,\n' +
 ')\n' +
@@ -628,9 +628,9 @@
     scanner:
 '<span class="c-com">// scan a text left to right, picking up where you left off</span>\n' +
 '<span class="c-kw">let</span> sc = @moonregex.compile(<span class="c-str">"\\d+"</span>).scanner(<span class="c-str">"a1 b22 c333"</span>)\n' +
-'sc.search().unwrap().group()  <span class="c-com">// "1"</span>\n' +
-'sc.search().unwrap().group()  <span class="c-com">// "22"</span>\n' +
-'sc.search().unwrap().group()  <span class="c-com">// "333"</span>\n' +
+'sc.search().unwrap().group(0)  <span class="c-com">// "1"</span>\n' +
+'sc.search().unwrap().group(0)  <span class="c-com">// "22"</span>\n' +
+'sc.search().unwrap().group(0)  <span class="c-com">// "333"</span>\n' +
 '\n' +
 '<span class="c-com">// a Match carries Python\'s extras: expand, pos, endpos</span>\n' +
 '<span class="c-kw">let</span> mm = @moonregex.search(<span class="c-str">"(?P&lt;w&gt;\\w+) \\1"</span>, <span class="c-str">"go go"</span>).unwrap()\n' +

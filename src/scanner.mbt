@@ -26,7 +26,7 @@ pub fn Scanner::search(self : Scanner) -> Match? raise @parse.Refused {
   match self.pattern.search(self.text, pos=self.pos[0]) {
     None => None
     Some(m) => {
-      self.pos[0] = m.end()
+      self.pos[0] = m.end(0)
       Some(m)
     }
   }
@@ -39,7 +39,7 @@ pub fn Scanner::prefix(self : Scanner) -> Match? raise @parse.Refused {
   match self.pattern.prefix(self.text, pos=self.pos[0]) {
     None => None
     Some(m) => {
-      self.pos[0] = m.end()
+      self.pos[0] = m.end(0)
       Some(m)
     }
   }
@@ -52,7 +52,7 @@ pub fn Scanner::full(self : Scanner) -> Match? raise @parse.Refused {
   match self.pattern.full(self.text, pos=self.pos[0]) {
     None => None
     Some(m) => {
-      self.pos[0] = m.end()
+      self.pos[0] = m.end(0)
       Some(m)
     }
   }
@@ -63,7 +63,7 @@ pub fn Scanner::full(self : Scanner) -> Match? raise @parse.Refused {
 /// to the end of the text — Python's `Scanner.findall`.
 pub fn Scanner::findall(
   self : Scanner,
-  group~ : GroupKey = Whole,
+  group~ : Group = Whole,
   overlapped~ : Bool = false,
 ) -> Array[String?] raise @parse.Refused {
   let r = self.pattern.findall(self.text, group~, overlapped~, pos=self.pos[0])

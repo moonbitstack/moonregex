@@ -117,7 +117,7 @@ fn group_text(field : String, m : Match) -> String? raise @parse.Refused {
     return None
   }
   let key = parse_field_key(base)
-  m.group(group=key)
+  m.group(key)
 }
 
 ///|
@@ -145,7 +145,7 @@ fn split_capture(field : String) -> (String, Int32) {
 
 ///|
 /// Turn a field name into a group key: empty or digits → a number, else a name.
-fn parse_field_key(base : String) -> GroupKey {
+fn parse_field_key(base : String) -> Group {
   if base.length() == 0 {
     return Whole
   }

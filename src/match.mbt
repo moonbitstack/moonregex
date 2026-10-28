@@ -31,7 +31,7 @@ pub fn Match::string(self : Match) -> String {
 
 ///|
 /// Map a group key to its slot, refusing keys the pattern does not have.
-fn Match::slot_of(self : Match, group : GroupKey) -> Int32 raise @parse.Refused {
+fn Match::slot_of(self : Match, group : Group) -> Int32 raise @parse.Refused {
   match group {
     Whole => 0
     Num(n~) => {
@@ -59,48 +59,58 @@ fn Match::slot_of(self : Match, group : GroupKey) -> Int32 raise @parse.Refused 
 
 ///|
 /// Code-point offset where the whole match begins.
-pub fn Match::start(
+pub fn[K : GroupKey] Match::start(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
 ) -> Int32 raise @parse.Refused {
-  let slot = self.slot_of(group)
+  let slot = self.slot_of(group.to_group())
   self.result.spans[slot].0
 }
 
 ///|
 /// Code-point offset just past where the whole match ends.
-pub fn Match::end(
+pub fn[K : GroupKey] Match::end(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
 ) -> Int32 raise @parse.Refused {
-  let slot = self.slot_of(group)
+  let slot = self.slot_of(group.to_group())
   self.result.spans[slot].1
 }
 
 ///|
 /// The `(start, end)` span of a group.
-pub fn Match::span(
+pub fn[K : GroupKey] Match::span(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
 ) -> (Int32, Int32) raise @parse.Refused {
-  (self.start(group~), self.end(group~))
+  (self.start(group), self.end(group))
 }
 
 ///|
 /// The substring the group captured, or `default` (preset `None`) if it took no
 /// part — Python's `Match.group`.
-pub fn Match::group(
+pub fn[K : GroupKey] Match::group(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
   default~ : String? = None,
 ) -> String? raise @parse.Refused {
-  let s = self.start(group~)
-  let e = self.end(group~)
+  let s = self.start(group)
+  let e = self.end(group)
   if s < 0 || e < 0 {
     default
   } else {
     Some(slice_cp(self.text, s, e))
   }
+}
+
+///|
+/// `m[1]` and `m["year"]` — indexing is `group`.
+#alias("_[_]")
+pub fn[K : GroupKey] Match::item(
+  self : Match,
+  key : K,
+) -> String? raise @parse.Refused {
+  self.group(key)
 }
 
 ///|
@@ -142,11 +152,11 @@ pub fn Match::expand(
 /// Every capture of `group`, as code-point spans; an empty list when the group
 /// took no part — Python's `Match.captures`. Our engine records the last span a
 /// group held, so this returns the one span a non-repeated group captured.
-pub fn Match::captures(
+pub fn[K : GroupKey] Match::captures(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
 ) -> Array[(Int32, Int32)] raise @parse.Refused {
-  let slot = self.slot_of(group)
+  let slot = self.slot_of(group.to_group())
   let span = self.result.spans[slot]
   if span.0 >= 0 {
     [span]
@@ -174,11 +184,11 @@ pub fn Match::capturesdict(self : Match) -> Map[String, Array[(Int32, Int32)]] {
 ///|
 /// The substrings the group captured, or an empty list when it took no part —
 /// Python's `Match.slices`.
-pub fn Match::slices(
+pub fn[K : GroupKey] Match::slices(
   self : Match,
-  group~ : GroupKey = Whole,
+  group : K,
 ) -> Array[String] raise @parse.Refused {
-  let slot = self.slot_of(group)
+  let slot = self.slot_of(group.to_group())
   let span = self.result.spans[slot]
   if span.0 >= 0 {
     [slice_cp(self.text, span.0, span.1)]
@@ -347,7 +357,7 @@ fn expand(repl : String, m : Match) -> String raise @parse.Refused {
           j += 1
         }
         let key = parse_group_key(name)
-        match m.group(group=key) {
+        match m.group(key) {
           None => ()
           Some(s) => buf.write_string(s)
         }
@@ -360,7 +370,7 @@ fn expand(repl : String, m : Match) -> String raise @parse.Refused {
           j += 1
         }
         let key = Num(n=decimal_of(num))
-        match m.group(group=key) {
+        match m.group(key) {
           None => ()
           Some(s) => buf.write_string(s)
         }
@@ -378,7 +388,7 @@ fn expand(repl : String, m : Match) -> String raise @parse.Refused {
 }
 
 ///|
-fn parse_group_key(name : String) -> GroupKey {
+fn parse_group_key(name : String) -> Group {
   let mut all_digits = name.length() > 0
   for c in name {
     if !(c >= '0' && c <= '9') {

@@ -6,7 +6,7 @@
 fn whole(pattern : String, text : String) -> String raise @moonregex.Refused {
   match @moonregex.search(pattern, text) {
     None => ""
-    Some(m) => m.group().unwrap()
+    Some(m) => m.group(0).unwrap()
   }
 }
 
@@ -15,7 +15,7 @@ fn whole(pattern : String, text : String) -> String raise @moonregex.Refused {
 fn full(pattern : String, text : String) -> String raise @moonregex.Refused {
   match @moonregex.full(pattern, text) {
     None => ""
-    Some(m) => m.group().unwrap()
+    Some(m) => m.group(0).unwrap()
   }
 }
 
@@ -41,9 +41,9 @@ test "full requires the whole region" {
 ///|
 test "capturing groups come back in order" {
   let m = @moonregex.search("(\\w+) (\\w+)", "hello world").unwrap()
-  assert_eq(m.group().unwrap(), "hello world")
-  assert_eq(m.group(group=@moonregex.Num(n=1)).unwrap(), "hello")
-  assert_eq(m.group(group=@moonregex.Num(n=2)).unwrap(), "world")
+  assert_eq(m.group(0).unwrap(), "hello world")
+  assert_eq(m.group(1).unwrap(), "hello")
+  assert_eq(m.group(2).unwrap(), "world")
   assert_eq(m.groups(), [Some("hello"), Some("world")])
   assert_eq(m.lastindex().unwrap(), 2)
 }
@@ -54,7 +54,7 @@ test "named groups populate groupdict" {
   let gd = m.groupdict()
   assert_eq(gd["first"], "hello")
   assert_eq(gd["last"], "world")
-  assert_eq(m.group(group=@moonregex.Name(n="first")).unwrap(), "hello")
+  assert_eq(m.group("first").unwrap(), "hello")
   assert_eq(m.lastgroup().unwrap(), "last")
 }
 
@@ -65,16 +65,16 @@ test "ECMA-262 named groups, both spellings" {
     "see spot",
     dialect=@moonregex.ecma262,
   ).unwrap()
-  assert_eq(a.group(group=@moonregex.Name(n="word")).unwrap(), "see")
+  assert_eq(a.group("word").unwrap(), "see")
   let b = @moonregex.search(
     "(?'word'\\w+)",
     "see spot",
     dialect=@moonregex.ecma262,
   ).unwrap()
-  assert_eq(b.group(group=@moonregex.Name(n="word")).unwrap(), "see")
+  assert_eq(b.group("word").unwrap(), "see")
   // Python keeps its own `(?P<name>` spelling, which must still work.
   let c = @moonregex.search("(?P<w>\\w+)", "x", dialect=@moonregex.python).unwrap()
-  assert_eq(c.group(group=@moonregex.Name(n="w")).unwrap(), "x")
+  assert_eq(c.group("w").unwrap(), "x")
 }
 
 ///|
@@ -130,7 +130,7 @@ test "sub_with rewrites with a callable" {
     @moonregex.sub_with(
       "\\w+",
       fn(m) -> String raise @moonregex.Refused {
-        match m.group() {
+        match m.group(0) {
           Some(s) => s.to_upper()
           None => ""
         }
@@ -179,7 +179,7 @@ test "quantifiers are greedy by default, lazy with ?" {
 ///|
 test "a backreference matches a repeated capture" {
   let m = @moonregex.search("(\\w+) \\1", "hello hello").unwrap()
-  assert_eq(m.group(group=@moonregex.Num(n=1)).unwrap(), "hello")
+  assert_eq(m.group(1).unwrap(), "hello")
   assert_true(@moonregex.search("(\\w+) \\1", "hello world") is None)
 }
 
@@ -200,10 +200,10 @@ test "multiline lets ^ and $ see line edges" {
 ///|
 test "span and start/end are code points" {
   let m = @moonregex.search("世界", "hello 世界 end").unwrap()
-  assert_eq(m.group().unwrap(), "世界")
-  assert_eq(m.start(), 6)
-  assert_eq(m.end(), 8)
-  let s = m.span()
+  assert_eq(m.group(0).unwrap(), "世界")
+  assert_eq(m.start(0), 6)
+  assert_eq(m.end(0), 8)
+  let s = m.span(0)
   assert_eq(s.0, 6)
   assert_eq(s.1, 8)
 }
@@ -212,9 +212,9 @@ test "span and start/end are code points" {
 test "finditer walks every match in order" {
   let ms = @moonregex.finditer("\\d+", "a1 b22 c333")
   assert_eq(ms.length(), 3)
-  assert_eq(ms[0].group().unwrap(), "1")
-  assert_eq(ms[1].group().unwrap(), "22")
-  assert_eq(ms[2].group().unwrap(), "333")
+  assert_eq(ms[0].group(0).unwrap(), "1")
+  assert_eq(ms[1].group(0).unwrap(), "22")
+  assert_eq(ms[2].group(0).unwrap(), "333")
 }
 
 ///|

@@ -59,7 +59,7 @@ test "Match pos and endpos report the search region" {
   let m = @moonregex.search("b+", "abc", pos=1, endpos=3).unwrap()
   assert_eq(m.pos(), 1)
   assert_eq(m.endpos(), 3)
-  assert_eq(m.group().unwrap(), "b")
+  assert_eq(m.group(0).unwrap(), "b")
 }
 
 ///|
@@ -74,9 +74,9 @@ test "Match re returns the pattern and expand substitutes groups" {
 ///|
 test "Match captures and slices list a group's captured text" {
   let m = @moonregex.search("(a+)b", "aaab").unwrap()
-  assert_eq(m.captures(group=@moonregex.Num(n=1)), [(0, 3)])
-  assert_eq(m.slices(group=@moonregex.Num(n=1)), ["aaa"])
-  assert_eq(m.slices(), ["aaab"])
+  assert_eq(m.captures(1), [(0, 3)])
+  assert_eq(m.slices(1), ["aaa"])
+  assert_eq(m.slices(0), ["aaab"])
 }
 
 ///|
@@ -101,11 +101,11 @@ test "fuzzy_counts and fuzzy_changes report the edit distance" {
 test "Scanner search walks the text left to right" {
   let sc = @moonregex.compile("\\d+").scanner("a1 b22 c333")
   let m1 = sc.search().unwrap()
-  assert_eq(m1.group().unwrap(), "1")
+  assert_eq(m1.group(0).unwrap(), "1")
   let m2 = sc.search().unwrap()
-  assert_eq(m2.group().unwrap(), "22")
+  assert_eq(m2.group(0).unwrap(), "22")
   let m3 = sc.search().unwrap()
-  assert_eq(m3.group().unwrap(), "333")
+  assert_eq(m3.group(0).unwrap(), "333")
   assert_true(sc.search() is None)
 }
 
@@ -115,7 +115,7 @@ test "Scanner prefix anchors each call at the cursor" {
   // the space, where `\w+` does not match, so the second call is `None`.
   let sc = @moonregex.compile("\\w+").scanner("foo bar")
   let m1 = sc.prefix().unwrap()
-  assert_eq(m1.group().unwrap(), "foo")
+  assert_eq(m1.group(0).unwrap(), "foo")
   assert_true(sc.prefix() is None)
 }
 
@@ -128,8 +128,8 @@ test "Scanner findall and finditer collect the remainder" {
   let _ = sc2.search()
   let ms = sc2.finditer()
   assert_eq(ms.length(), 2)
-  assert_eq(ms[0].group().unwrap(), "2")
-  assert_eq(ms[1].group().unwrap(), "3")
+  assert_eq(ms[0].group(0).unwrap(), "2")
+  assert_eq(ms[1].group(0).unwrap(), "3")
 }
 
 ///|

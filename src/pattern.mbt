@@ -134,7 +134,7 @@ pub fn Pattern::full(
 pub fn Pattern::findall(
   self : Pattern,
   text : String,
-  group~ : GroupKey = Whole,
+  group~ : Group = Whole,
   overlapped~ : Bool = false,
   pos~ : Int32 = 0,
   endpos~ : Int32 = -1,
@@ -160,7 +160,7 @@ pub fn Pattern::findall(
     // A group that took no part answers the empty string, which is what
     // Python's `findall` collects — `split` and `group` keep the difference.
     out.push(
-      match m.group(group=use_group) {
+      match m.group(use_group) {
         None => Some("")
         Some(g) => Some(g)
       },
@@ -212,20 +212,20 @@ fn Pattern::walk(
       Some(m) => {
         out.push(m)
         if overlapped {
-          p = m.start() + 1
+          p = m.start(0) + 1
           must_advance = false
-        } else if m.end() == m.start() {
+        } else if m.end(0) == m.start(0) {
           // After an empty match Python retries the same position for a
           // non-empty one; ECMA-262's `lastIndex` just moves on by one.
           if self.dialect is @parse.Ecma262 {
-            p = m.end() + 1
+            p = m.end(0) + 1
             must_advance = false
           } else {
-            p = m.end()
+            p = m.end(0)
             must_advance = true
           }
         } else {
-          p = m.end()
+          p = m.end(0)
           must_advance = false
         }
       }
@@ -253,13 +253,13 @@ pub fn Pattern::split(
     if maxsplit != 0 && count >= maxsplit {
       break
     }
-    out.push(Some(slice_cp(text, last, m.start())))
+    out.push(Some(slice_cp(text, last, m.start(0))))
     let mut g = 1
     while g <= ng {
-      out.push(m.group(group=Num(n=g)))
+      out.push(m.group(Num(n=g)))
       g += 1
     }
-    last = m.end()
+    last = m.end(0)
     count += 1
   }
   out.push(Some(slice_cp(text, last, end)))
@@ -374,9 +374,9 @@ fn Pattern::replace(
     if count != 0 && n >= count {
       break
     }
-    buf.write_string(slice_cp(text, last, m.start()))
+    buf.write_string(slice_cp(text, last, m.start(0)))
     buf.write_string(f(m))
-    last = m.end()
+    last = m.end(0)
     n += 1
   }
   buf.write_string(slice_cp(text, last, end))

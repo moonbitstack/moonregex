@@ -33,7 +33,7 @@ pub fn escape(StringView, dialect? : @parse.Dialect, special_only? : Bool, liter
 
 pub let f : @parse.Flags
 
-pub fn findall(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, group? : GroupKey, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Array[String?] raise @parse.Refused
+pub fn findall(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, group? : Group, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Array[String?] raise @parse.Refused
 
 pub fn finditer(StringView, String, flags? : @parse.Flags, dialect? : @parse.Dialect, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32, lists? : Map[String, Array[String]], partial? : Bool) -> Array[Match] raise @parse.Refused
 
@@ -114,28 +114,33 @@ pub let x : @parse.Flags
 // Errors
 
 // Types and methods
-pub(all) enum GroupKey {
+pub(all) enum Group {
   Whole
   Num(n~ : Int32)
   Name(n~ : String)
 }
+#deprecated
+pub fn Group::to_group(Self) -> Self
+pub impl GroupKey for Group
 
 pub(all) struct Match {
   // private fields
 }
 pub fn Match::after(Self) -> StringView
 pub fn Match::before(Self) -> StringView
-pub fn Match::captures(Self, group? : GroupKey) -> Array[(Int32, Int32)] raise @parse.Refused
+pub fn[K : GroupKey] Match::captures(Self, K) -> Array[(Int32, Int32)] raise @parse.Refused
 pub fn Match::capturesdict(Self) -> Map[String, Array[(Int32, Int32)]]
 pub fn Match::content(Self) -> StringView
-pub fn Match::end(Self, group? : GroupKey) -> Int32 raise @parse.Refused
+pub fn[K : GroupKey] Match::end(Self, K) -> Int32 raise @parse.Refused
 pub fn Match::endpos(Self) -> Int32
 pub fn Match::expand(Self, String) -> String raise @parse.Refused
 pub fn Match::fuzzy_changes(Self) -> (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])
 pub fn Match::fuzzy_counts(Self) -> (Int32, Int32, Int32)
-pub fn Match::group(Self, group? : GroupKey, default? : String?) -> String? raise @parse.Refused
+pub fn[K : GroupKey] Match::group(Self, K, default? : String?) -> String? raise @parse.Refused
 pub fn Match::groupdict(Self, default? : String?) -> Map[String, String]
 pub fn Match::groups(Self, default? : String?) -> Array[String?]
+#alias("_[_]")
+pub fn[K : GroupKey] Match::item(Self, K) -> String? raise @parse.Refused
 pub fn Match::lastgroup(Self) -> String?
 pub fn Match::lastindex(Self) -> Int32?
 pub fn Match::marks(Self) -> Array[String]
@@ -143,9 +148,9 @@ pub fn Match::partial(Self) -> Bool
 pub fn Match::pattern(Self) -> Pattern
 pub fn Match::pos(Self) -> Int32
 pub fn Match::re(Self) -> Pattern
-pub fn Match::slices(Self, group? : GroupKey) -> Array[String] raise @parse.Refused
-pub fn Match::span(Self, group? : GroupKey) -> (Int32, Int32) raise @parse.Refused
-pub fn Match::start(Self, group? : GroupKey) -> Int32 raise @parse.Refused
+pub fn[K : GroupKey] Match::slices(Self, K) -> Array[String] raise @parse.Refused
+pub fn[K : GroupKey] Match::span(Self, K) -> (Int32, Int32) raise @parse.Refused
+pub fn[K : GroupKey] Match::start(Self, K) -> Int32 raise @parse.Refused
 pub fn Match::string(Self) -> String
 
 pub(all) struct Pattern {
@@ -156,7 +161,7 @@ pub fn Pattern::add(Self, Self) -> Self
 pub fn Pattern::capture(Self, String) -> Self raise @parse.Refused
 pub fn Pattern::dialect(Self) -> @parse.Dialect
 pub fn Pattern::dump(Self) -> String
-pub fn Pattern::findall(Self, String, group? : GroupKey, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32) -> Array[String?] raise @parse.Refused
+pub fn Pattern::findall(Self, String, group? : Group, overlapped? : Bool, pos? : Int32, endpos? : Int32, limit? : Int32) -> Array[String?] raise @parse.Refused
 pub fn Pattern::finditer(Self, String, pos? : Int32, endpos? : Int32, overlapped? : Bool, limit? : Int32) -> Array[Match] raise @parse.Refused
 pub fn Pattern::flags(Self) -> @parse.Flags
 pub fn Pattern::full(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> Match? raise @parse.Refused
@@ -185,7 +190,7 @@ pub impl BitOr for Pattern
 pub struct Scanner {
   // private fields
 }
-pub fn Scanner::findall(Self, group? : GroupKey, overlapped? : Bool) -> Array[String?] raise @parse.Refused
+pub fn Scanner::findall(Self, group? : Group, overlapped? : Bool) -> Array[String?] raise @parse.Refused
 pub fn Scanner::finditer(Self, overlapped? : Bool) -> Array[Match] raise @parse.Refused
 pub fn Scanner::full(Self) -> Match? raise @parse.Refused
 pub fn Scanner::prefix(Self) -> Match? raise @parse.Refused
@@ -204,3 +209,8 @@ pub using @parse {type Refused}
 pub using @parse {type Version}
 
 // Traits
+pub(open) trait GroupKey {
+  fn to_group(Self) -> Group
+}
+pub impl GroupKey for Int32
+pub impl GroupKey for String

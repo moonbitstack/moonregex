@@ -9,11 +9,11 @@ fn walked(
 ) -> String raise @moonregex.Refused {
   let buf = StringBuilder::StringBuilder()
   for m in pattern.finditer(text) {
-    buf.write_string("\{m.start()}-\{m.end()}")
+    buf.write_string("\{m.start(0)}-\{m.end(0)}")
     let mut slot = 1
     while slot <= pattern.groups() {
       buf.write_string("/")
-      match m.group(group=@moonregex.Num(n=slot)) {
+      match m.group(slot) {
         None => buf.write_string("-")
         Some(g) => buf.write_string(g)
       }
@@ -82,8 +82,8 @@ test "a composed pattern knows its own group names" {
   assert_eq(p.groups(), 2)
   assert_eq(p.groupindex().get("letter").unwrap(), [1])
   let m = p.search("xyz").unwrap()
-  assert_eq(m.group(group=@moonregex.Name(n="letter")), Some("x"))
-  assert_eq(m.group(group=@moonregex.Num(n=2)), Some("y"))
+  assert_eq(m.group("letter"), Some("x"))
+  assert_eq(m.group(2), Some("y"))
 }
 
 ///|
@@ -143,9 +143,9 @@ test "Match carries the core view alongside the Python one" {
   assert_eq(m.content().to_owned(), "bbb")
   assert_eq(m.after().to_owned(), "cc")
   // And the Python spelling of the same three.
-  assert_eq(m.group().unwrap(), "bbb")
-  assert_eq(m.start(), 2)
-  assert_eq(m.end(), 5)
+  assert_eq(m.group(0).unwrap(), "bbb")
+  assert_eq(m.start(0), 2)
+  assert_eq(m.end(0), 5)
 }
 
 ///|
@@ -205,4 +205,17 @@ test "a grapheme cluster is what the UCD says it is" {
   assert_eq(flag.content(), "🇯🇵")
   let family = p.search("👨‍👩‍👧").unwrap()
   assert_eq(family.content(), "👨‍👩‍👧")
+}
+
+///|
+test "a group is reached by number, by name, and by indexing" {
+  let m = @moonregex.search("(?<year>\\d{4})-(\\d{2})", "on 2026-10").unwrap()
+  assert_eq(m.group(1), Some("2026"))
+  assert_eq(m.group("year"), Some("2026"))
+  assert_eq(m.group(@moonregex.Whole), Some("2026-10"))
+  assert_eq(m["year"], Some("2026"))
+  assert_eq(m[2], Some("10"))
+  assert_eq(m.span("year"), (3, 7))
+  assert_eq(m.start(2), 8)
+  assert_eq(m.captures("year"), [(3, 7)])
 }

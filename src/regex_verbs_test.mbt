@@ -52,8 +52,8 @@ test "(*MARK) and (*SKIP) skip past the marked position" {
   // A mark set at the start of the attempt: `(*SKIP:M)` aborts the first
   // branch and resumes the search just past the mark, where `b` then matches.
   let m = @moonregex.search("(*MARK:M)a(*SKIP:M)(*F)|b", "ab").unwrap()
-  assert_eq(m.group().unwrap(), "b")
-  assert_eq(m.start(), 1)
+  assert_eq(m.group(0).unwrap(), "b")
+  assert_eq(m.start(0), 1)
 }
 
 ///|
@@ -79,8 +79,8 @@ test "(*VERSION) and (*FENCE) parse and run" {
 test "branch reset (?|…) renumbers groups per alternative" {
   let m = @moonregex.search("(?|(a)|(b)(c))", "bc").unwrap()
   // Both alternatives capture to group 1; the second also opens group 2.
-  assert_eq(m.group(group=@moonregex.Num(n=1)).unwrap(), "b")
-  assert_eq(m.group(group=@moonregex.Num(n=2)).unwrap(), "c")
+  assert_eq(m.group(1).unwrap(), "b")
+  assert_eq(m.group(2).unwrap(), "c")
   assert_true(@moonregex.full("(?|(a)|(b))", "a") is Some(_))
   assert_true(@moonregex.full("(?|(a)|(b))", "b") is Some(_))
 }
