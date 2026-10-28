@@ -30,8 +30,8 @@
   --c-num: #ffc857;
 
   --sb-track: #05070f;
-  --sb-thumb: #4b5490;
-  --sb-thumb-hover: #5f6ab0;
+  --sb-thumb: #555fa0;
+  --sb-thumb-hover: #6a75b9;
 
   /* A card's shadow is a token: on a dark page it has to be a wide, low
      black blur, on a light one a tight, faint blue one — the same rule would
@@ -81,8 +81,8 @@
   --shadow-nav: 0 8px 22px -18px rgba(21, 26, 62, 0.35);
 
   --sb-track: #e2e5f4;
-  --sb-thumb: #8f97bd;
-  --sb-thumb-hover: #767fae;
+  --sb-thumb: #7881ad;
+  --sb-thumb-hover: #5f6899;
 
   --glow-a: rgba(63, 81, 207, 0.12);
   --glow-b: rgba(10, 143, 122, 0.08);
