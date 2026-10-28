@@ -35,8 +35,8 @@ pub fn Scanner::search(self : Scanner) -> Match? raise @parse.Refused {
 ///|
 /// A match anchored at the current position, advancing past it; `None` if the
 /// pattern does not match there — Python's `Scanner.match`.
-pub fn Scanner::match_at(self : Scanner) -> Match? raise @parse.Refused {
-  match self.pattern.match_at(self.text, pos=self.pos[0]) {
+pub fn Scanner::prefix(self : Scanner) -> Match? raise @parse.Refused {
+  match self.pattern.prefix(self.text, pos=self.pos[0]) {
     None => None
     Some(m) => {
       self.pos[0] = m.end()
@@ -47,9 +47,9 @@ pub fn Scanner::match_at(self : Scanner) -> Match? raise @parse.Refused {
 
 ///|
 /// A full match of the region from the current position, advancing past it;
-/// `None` otherwise — Python's `Scanner.fullmatch`.
-pub fn Scanner::fullmatch(self : Scanner) -> Match? raise @parse.Refused {
-  match self.pattern.fullmatch(self.text, pos=self.pos[0]) {
+/// `None` otherwise — Python's `Scanner.full`.
+pub fn Scanner::full(self : Scanner) -> Match? raise @parse.Refused {
+  match self.pattern.full(self.text, pos=self.pos[0]) {
     None => None
     Some(m) => {
       self.pos[0] = m.end()

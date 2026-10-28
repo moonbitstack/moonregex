@@ -10,26 +10,26 @@
 test "line-break and whitespace escapes match their Unicode sets" {
   // \R and \v match any of the line separators.
   assert_eq(whole("a\\Rb", "a\r\nb"), "") // CR alone is matched by \R, then \n breaks it
-  assert_true(@moonregex.fullmatch("\\R", "\u{2028}") is Some(_)) // line separator
-  assert_true(@moonregex.fullmatch("\\R", "\n") is Some(_))
+  assert_true(@moonregex.full("\\R", "\u{2028}") is Some(_)) // line separator
+  assert_true(@moonregex.full("\\R", "\n") is Some(_))
   // \h matches tab and space but not a newline; \H is its complement.
-  assert_true(@moonregex.fullmatch("\\h+", " \t\u{00A0}") is Some(_))
-  assert_true(@moonregex.fullmatch("\\H", "a") is Some(_))
+  assert_true(@moonregex.full("\\h+", " \t\u{00A0}") is Some(_))
+  assert_true(@moonregex.full("\\H", "a") is Some(_))
   // A newline is not horizontal whitespace, so \H matches it.
-  assert_true(@moonregex.fullmatch("\\H", "\n") is Some(_))
+  assert_true(@moonregex.full("\\H", "\n") is Some(_))
   // \N matches anything but a newline.
-  assert_true(@moonregex.fullmatch("\\N", "x") is Some(_))
-  assert_true(@moonregex.fullmatch("\\N", "\n") is None)
+  assert_true(@moonregex.full("\\N", "x") is Some(_))
+  assert_true(@moonregex.full("\\N", "\n") is None)
 }
 
 ///|
 test "escape char and braced backreferences" {
-  assert_true(@moonregex.fullmatch("\\e", "\u{001B}") is Some(_))
+  assert_true(@moonregex.full("\\e", "\u{001B}") is Some(_))
   // Perl \g{name} / \g{n} next to the \g<…> spelling.
   let pat = @moonregex.compile("(?P<w>\\w+) \\g{w}")
-  assert_true(pat.fullmatch("go go") is Some(_))
+  assert_true(pat.full("go go") is Some(_))
   let pat2 = @moonregex.compile("(\\w+) \\g{1}")
-  assert_true(pat2.fullmatch("go go") is Some(_))
+  assert_true(pat2.full("go go") is Some(_))
 }
 
 ///|
@@ -64,15 +64,15 @@ test "(*MARK) names are reported on the match" {
 
 ///|
 test "(*LIMIT_MATCH:n) and (*LIMIT_RECURSION:n) are accepted" {
-  assert_true(@moonregex.fullmatch("(*LIMIT_MATCH:1000)a", "a") is Some(_))
-  assert_true(@moonregex.fullmatch("(*LIMIT_RECURSION:10)a", "a") is Some(_))
+  assert_true(@moonregex.full("(*LIMIT_MATCH:1000)a", "a") is Some(_))
+  assert_true(@moonregex.full("(*LIMIT_RECURSION:10)a", "a") is Some(_))
 }
 
 ///|
 test "(*VERSION) and (*FENCE) parse and run" {
-  assert_true(@moonregex.fullmatch("a(*VERSION)", "a") is Some(_))
+  assert_true(@moonregex.full("a(*VERSION)", "a") is Some(_))
   // FENCE is a barrier, not a failure: the match still succeeds.
-  assert_true(@moonregex.fullmatch("a(*FENCE)b", "ab") is Some(_))
+  assert_true(@moonregex.full("a(*FENCE)b", "ab") is Some(_))
 }
 
 ///|
@@ -81,23 +81,23 @@ test "branch reset (?|…) renumbers groups per alternative" {
   // Both alternatives capture to group 1; the second also opens group 2.
   assert_eq(m.group(group=@moonregex.Num(n=1)).unwrap(), "b")
   assert_eq(m.group(group=@moonregex.Num(n=2)).unwrap(), "c")
-  assert_true(@moonregex.fullmatch("(?|(a)|(b))", "a") is Some(_))
-  assert_true(@moonregex.fullmatch("(?|(a)|(b))", "b") is Some(_))
+  assert_true(@moonregex.full("(?|(a)|(b))", "a") is Some(_))
+  assert_true(@moonregex.full("(?|(a)|(b))", "b") is Some(_))
 }
 
 ///|
 test "(?(DEFINE)…) declares subroutines and matches empty" {
   // A grammar rule defined once, then called via recursion.
   let pat = @moonregex.compile("(?(DEFINE)(?P<num>\\d+))(?P>num)")
-  assert_true(pat.fullmatch("12345") is Some(_))
+  assert_true(pat.full("12345") is Some(_))
 }
 
 ///|
 test "recursion conditions (?(R)…) select branches" {
   // (?R) is true only inside a recursion, so a balanced-paren pattern works.
   let pat = @moonregex.compile("\\((?:[^()]|(?R))*\\)")
-  assert_true(pat.fullmatch("(a(b)c)") is Some(_))
-  assert_true(pat.fullmatch("(a(b)c") is None)
+  assert_true(pat.full("(a(b)c)") is Some(_))
+  assert_true(pat.full("(a(b)c") is None)
 }
 
 ///|
@@ -109,21 +109,20 @@ test "(*PRUNE) aborts the current position without backtracking" {
 
 ///|
 test "relative backreference \\g{-1} names the last group" {
-  assert_true(@moonregex.fullmatch("(a)\\g{-1}", "aa") is Some(_))
-  assert_true(@moonregex.fullmatch("(a)(b)\\g{-1}", "abb") is Some(_))
-  assert_true(@moonregex.fullmatch("(a)(b)\\g{-1}", "aba") is None)
-  assert_true(@moonregex.fullmatch("(a)(b)\\g{-2}", "aba") is Some(_))
+  assert_true(@moonregex.full("(a)\\g{-1}", "aa") is Some(_))
+  assert_true(@moonregex.full("(a)(b)\\g{-1}", "abb") is Some(_))
+  assert_true(@moonregex.full("(a)(b)\\g{-1}", "aba") is None)
+  assert_true(@moonregex.full("(a)(b)\\g{-2}", "aba") is Some(_))
 }
 
 ///|
 test "\\N{name} matches a named Unicode character" {
-  assert_true(@moonregex.fullmatch("\\N{EM DASH}", "\u{2014}") is Some(_))
-  assert_true(@moonregex.fullmatch("\\N{SNOWMAN}", "\u{2603}") is Some(_))
-  assert_true(@moonregex.fullmatch("\\N{LATIN SMALL LETTER A}", "a") is Some(_))
+  assert_true(@moonregex.full("\\N{EM DASH}", "\u{2014}") is Some(_))
+  assert_true(@moonregex.full("\\N{SNOWMAN}", "\u{2603}") is Some(_))
+  assert_true(@moonregex.full("\\N{LATIN SMALL LETTER A}", "a") is Some(_))
   // Control aliases and algorithmic CJK names.
-  assert_true(@moonregex.fullmatch("\\N{TAB}", "\t") is Some(_))
+  assert_true(@moonregex.full("\\N{TAB}", "\t") is Some(_))
   assert_true(
-    @moonregex.fullmatch("\\N{CJK UNIFIED IDEOGRAPH-4E00}", "\u{4E00}")
-    is Some(_),
+    @moonregex.full("\\N{CJK UNIFIED IDEOGRAPH-4E00}", "\u{4E00}") is Some(_),
   )
 }

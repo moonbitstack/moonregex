@@ -90,7 +90,7 @@ pub fn search(
 ///|
 /// Match only at `pos` (Python's `re.match`): fail unless the pattern matches
 /// where the scan begins, not somewhere later in the text.
-pub fn match_at(
+pub fn prefix(
   pattern : StringView,
   text : String,
   flags~ : @parse.Flags = @parse.flags,
@@ -100,7 +100,7 @@ pub fn match_at(
   lists? : Map[String, Array[String]],
   partial~ : Bool = false,
 ) -> Match? raise @parse.Refused {
-  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).match_at(
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).prefix(
     text,
     pos~,
     limit~,
@@ -109,7 +109,7 @@ pub fn match_at(
 
 ///|
 /// Match the whole region `pos..endpos` (Python's `re.fullmatch`).
-pub fn fullmatch(
+pub fn full(
   pattern : StringView,
   text : String,
   flags~ : @parse.Flags = @parse.flags,
@@ -120,7 +120,7 @@ pub fn fullmatch(
   lists? : Map[String, Array[String]],
   partial~ : Bool = false,
 ) -> Match? raise @parse.Refused {
-  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).fullmatch(
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).full(
     text,
     pos~,
     endpos~,
@@ -310,7 +310,7 @@ pub fn subfn(
 ///|
 /// Replace matches with the result of `f(match)`, as Python's `re.sub` with a
 /// callable replacement.
-pub fn sub_by(
+pub fn sub_with(
   pattern : StringView,
   f : (Match) -> String raise @parse.Refused,
   text : String,
@@ -323,7 +323,7 @@ pub fn sub_by(
   lists? : Map[String, Array[String]],
   partial~ : Bool = false,
 ) -> String raise @parse.Refused {
-  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subn_by(
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subn_with(
     text,
     f,
     count~,
@@ -336,7 +336,7 @@ pub fn sub_by(
 ///|
 /// Replace matches with `f(match)`, returning the new text and the count, as
 /// Python's `re.subn` with a callable replacement.
-pub fn subn_by(
+pub fn subn_with(
   pattern : StringView,
   f : (Match) -> String raise @parse.Refused,
   text : String,
@@ -349,7 +349,7 @@ pub fn subn_by(
   lists? : Map[String, Array[String]],
   partial~ : Bool = false,
 ) -> (String, Int32) raise @parse.Refused {
-  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subn_by(
+  compile(pattern, flags~, dialect~, lists=lists.unwrap_or({}), partial~).subn_with(
     text,
     f,
     count~,
@@ -360,23 +360,46 @@ pub fn subn_by(
 }
 
 ///|
-/// Escape regex metacharacters in `pattern`, as Python's `re.escape`.
+/// Escape `pattern` so the result matches it literally, under `dialect`.
 ///
-/// With `special_only` (the preset) only the characters the grammar treats as
-/// special are escaped; with it off, everything that is not a letter or digit
-/// is. `literal_spaces` leaves spaces unescaped, for callers building a pattern
-/// out of literal fragments.
+/// The three grammars do not agree on what needs escaping, so the same string
+/// comes back spelled three ways:
+///
+/// - `Python` — Python's `re.escape`: the characters that can mean something to
+///   the grammar are backslashed, everything else is left alone. With
+///   `special_only` off every non-alphanumeric is escaped; `literal_spaces`
+///   stops spaces from being escaped.
+/// - `Ecma262` — `RegExp.escape` of ECMA-262: punctuation that is not a syntax
+///   character becomes `\x..`, syntax characters are backslashed, and a
+///   leading alphanumeric is spelled `\x..` too so the result can never read
+///   as a quantifier's neighbour.
+/// - `Lexmatch` — the `@string.Regex` grammar: its metacharacters are
+///   backslashed and control characters are spelled in the escapes that
+///   grammar knows (`\n`, `\t`, `\u{..}`), never `\x..`.
 pub fn escape(
   pattern : StringView,
+  dialect~ : @parse.Dialect = @parse.Python,
   special_only~ : Bool = true,
   literal_spaces~ : Bool = false,
+) -> String {
+  match dialect {
+    @parse.Python => escape_python(pattern, special_only, literal_spaces)
+    @parse.Ecma262 => escape_ecma(pattern)
+    @parse.Lexmatch => escape_lexmatch(pattern, special_only)
+  }
+}
+
+///|
+/// Python's `re.escape`: a fixed set of characters carries a backslash.
+fn escape_python(
+  pattern : StringView,
+  special_only : Bool,
+  literal_spaces : Bool,
 ) -> String {
   let buf = StringBuilder::StringBuilder()
   for c in pattern {
     let code = c.to_int()
-    let is_alnum = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
-      (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
-      (code >= '0'.to_int() && code <= '9'.to_int())
+    let is_alnum = is_ascii_alnum(code)
     let is_space = code == 0x20 ||
       code == 0x09 ||
       code == 0x0A ||
@@ -387,7 +410,7 @@ pub fn escape(
       buf.write_char(c)
     } else if literal_spaces && is_space {
       buf.write_char(c)
-    } else if special_only && !is_special(c) {
+    } else if special_only && !is_python_special(c) {
       buf.write_char(c)
     } else {
       buf.write_char('\\')
@@ -398,7 +421,200 @@ pub fn escape(
 }
 
 ///|
-fn is_special(c : Char) -> Bool {
+/// `RegExp.escape`: the spelling ECMA-262 settled on, whose point is that the
+/// result is safe both as a pattern and as the text of one — no ambiguity
+/// between a literal and a quantifier.
+fn escape_ecma(pattern : StringView) -> String {
+  let buf = StringBuilder::StringBuilder()
+  let chars : Array[Char] = []
+  for c in pattern {
+    chars.push(c)
+  }
+  let mut i = 0
+  while i < chars.length() {
+    let c = chars[i]
+    let code = c.to_int()
+    // A leading alphanumeric could fuse with a quantifier that follows the
+    // escaped text, so the standard spells it out.
+    if i == 0 && is_ascii_alnum(code) {
+      buf.write_string(hex_escape(code, 2))
+    } else {
+      buf.write_string(encode_for_regexp_escape(code))
+    }
+    i += 1
+  }
+  buf.to_string()
+}
+
+///|
+/// The `EncodeForRegExpEscape` table of ECMA-262.
+fn encode_for_regexp_escape(code : Int32) -> String {
+  match code {
+    0x09 => "\\t"
+    0x0A => "\\n"
+    0x0B => "\\v"
+    0x0C => "\\f"
+    0x0D => "\\r"
+    _ =>
+      if is_ecma_syntax_char(code) {
+        "\\" + code.unsafe_to_char().to_string()
+      } else if is_ecma_other_punctuator(code) || code == 0x20 {
+        hex_escape(code, 2)
+      } else if code >= 0xD800 && code <= 0xDFFF {
+        "\\u" + hex_digits(code, 4)
+      } else {
+        // Everything else stands for itself: the standard leaves letters,
+        // digits and non-ASCII text alone.
+        code.unsafe_to_char().to_string()
+      }
+  }
+}
+
+///|
+/// `^ $ \ . * + ? ( ) [ ] { } |` and `/` — the characters a backslash alone
+/// makes literal.
+fn is_ecma_syntax_char(code : Int32) -> Bool {
+  match code {
+    0x5E
+    | 0x24
+    | 0x5C
+    | 0x2E
+    | 0x2A
+    | 0x2B
+    | 0x3F
+    | 0x28
+    | 0x29
+    | 0x5B
+    | 0x5D
+    | 0x7B
+    | 0x7D
+    | 0x7C
+    | 0x2F => true
+    _ => false
+  }
+}
+
+///|
+/// `, - = < > # & ! % : ; @ ~ ' ` "` — punctuation the grammar does not read,
+/// which the standard still spells out so the output is stable.
+fn is_ecma_other_punctuator(code : Int32) -> Bool {
+  match code {
+    0x2C
+    | 0x2D
+    | 0x3D
+    | 0x3C
+    | 0x3E
+    | 0x23
+    | 0x26
+    | 0x21
+    | 0x25
+    | 0x3A
+    | 0x3B
+    | 0x40
+    | 0x7E
+    | 0x27
+    | 0x60
+    | 0x22 => true
+    _ => false
+  }
+}
+
+///|
+/// The `@string.Regex` grammar's escape: its metacharacters take a backslash,
+/// and anything invisible is spelled in an escape that grammar knows.
+fn escape_lexmatch(pattern : StringView, special_only : Bool) -> String {
+  let buf = StringBuilder::StringBuilder()
+  for c in pattern {
+    let code = c.to_int()
+    // Invisible characters first: the grammar spells them, it never carries
+    // them raw.
+    if code == 0x09 {
+      buf.write_string("\\t")
+    } else if code == 0x0A {
+      buf.write_string("\\n")
+    } else if code == 0x0B {
+      buf.write_string("\\v")
+    } else if code == 0x0C {
+      buf.write_string("\\f")
+    } else if code == 0x0D {
+      buf.write_string("\\r")
+    } else if is_lexmatch_special(code) {
+      buf.write_char('\\')
+      buf.write_char(c)
+    } else if special_only || is_ascii_alnum(code) {
+      buf.write_char(c)
+    } else if code < 0x20 || code == 0x7F {
+      buf.write_string("\\u{" + hex_digits(code, 0) + "}")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn is_lexmatch_special(code : Int32) -> Bool {
+  match code {
+    0x5C
+    | 0x2E
+    | 0x2A
+    | 0x2B
+    | 0x3F
+    | 0x28
+    | 0x29
+    | 0x5B
+    | 0x5D
+    | 0x7B
+    | 0x7D
+    | 0x7C
+    | 0x5E
+    | 0x24
+    | 0x2D => true
+    _ => false
+  }
+}
+
+///|
+fn is_ascii_alnum(code : Int32) -> Bool {
+  (code >= 0x61 && code <= 0x7A) ||
+  (code >= 0x41 && code <= 0x5A) ||
+  (code >= 0x30 && code <= 0x39)
+}
+
+///|
+/// `\x..`, with exactly `width` digits when `width` is non-zero.
+fn hex_escape(code : Int32, width : Int32) -> String {
+  "\\x" + hex_digits(code, width)
+}
+
+///|
+/// Upper-case hex, zero-padded to `width` digits; `width` 0 means "as many as
+/// the value needs".
+fn hex_digits(value : Int32, width : Int32) -> String {
+  let digits = "0123456789ABCDEF"
+  let out : Array[Char] = []
+  let mut n = value
+  if n == 0 {
+    out.push('0')
+  }
+  while n > 0 {
+    out.push(digits[n % 16].to_int().unsafe_to_char())
+    n = n / 16
+  }
+  while out.length() < width {
+    out.push('0')
+  }
+  let buf = StringBuilder::StringBuilder()
+  let mut i = out.length() - 1
+  while i >= 0 {
+    buf.write_char(out[i])
+    i -= 1
+  }
+  buf.to_string()
+}
+
+///|
+fn is_python_special(c : Char) -> Bool {
   c == '(' ||
   c == ')' ||
   c == '[' ||
@@ -416,23 +632,18 @@ fn is_special(c : Char) -> Bool {
   c == '.' ||
   c == '&' ||
   c == '~' ||
-  c == '#'
+  c == '#' ||
+  c == ' ' ||
+  c == '\t' ||
+  c == '\n' ||
+  c == '\r' ||
+  c == '\u{0B}' ||
+  c == '\u{0C}'
 }
 
 // ---------------------------------------------------------------------------
 // Flag constants & module aliases (Python `re` / `regex` surface)
 // ---------------------------------------------------------------------------
-
-///|
-/// The error the engine raises for a bad pattern or a run that hit its step
-/// ceiling — the MoonBit spelling of Python's `regex.error` (type names are
-/// upper-case here).
-pub type RegexError = @parse.Refused
-
-///|
-/// The flag type, for callers who build flags by name (the `RegexFlag` alias of
-/// Python's `regex` module).
-pub type RegexFlag = @parse.Flags
 
 // MoonBit constrains `let` bindings to lower-case names and `const` to primitive
 // types, so the Python `re` flag constants (which are upper-case) are exposed
@@ -440,109 +651,102 @@ pub type RegexFlag = @parse.Flags
 // so on — each a `Flags` value, so a caller ports a pattern flag-for-flag.
 
 ///|
-pub let i : RegexFlag = @parse.Flags::new(ignorecase=true)
+pub let i : Flags = @parse.Flags::new(ignorecase=true)
 
 ///|
 /// `ignorecase` — Python's `re.IGNORECASE`.
-pub let ignorecase : RegexFlag = i
+pub let ignorecase : Flags = i
 
 ///|
-pub let m : RegexFlag = @parse.Flags::new(multiline=true)
+pub let m : Flags = @parse.Flags::new(multiline=true)
 
 ///|
 /// `multiline` — Python's `re.MULTILINE`.
-pub let multiline : RegexFlag = m
+pub let multiline : Flags = m
 
 ///|
-pub let s : RegexFlag = @parse.Flags::new(dotall=true)
+pub let s : Flags = @parse.Flags::new(dotall=true)
 
 ///|
 /// `dotall` — Python's `re.DOTALL`.
-pub let dotall : RegexFlag = s
+pub let dotall : Flags = s
 
 ///|
-pub let x : RegexFlag = @parse.Flags::new(verbose=true)
+pub let x : Flags = @parse.Flags::new(verbose=true)
 
 ///|
 /// `verbose` — Python's `re.VERBOSE`.
-pub let verbose : RegexFlag = x
+pub let verbose : Flags = x
 
 ///|
-pub let a : RegexFlag = @parse.Flags::new(ascii=true)
+pub let a : Flags = @parse.Flags::new(ascii=true)
 
 ///|
 /// `ascii` — Python's `re.ASCII`.
-pub let ascii : RegexFlag = a
+pub let ascii : Flags = a
 
 ///|
-pub let u : RegexFlag = @parse.Flags::new(unicode=true)
+pub let u : Flags = @parse.Flags::new(unicode=true)
 
 ///|
 /// `unicode` — Python's `re.UNICODE`.
-pub let unicode : RegexFlag = u
+pub let unicode : Flags = u
 
 ///|
-pub let f : RegexFlag = @parse.Flags::new(fullcase=true)
+pub let f : Flags = @parse.Flags::new(fullcase=true)
 
 ///|
 /// `fullcase` — Python's `re.FULLCASE`.
-pub let fullcase : RegexFlag = f
+pub let fullcase : Flags = f
 
 ///|
-pub let w : RegexFlag = @parse.Flags::new(word=true)
+pub let w : Flags = @parse.Flags::new(word=true)
 
 ///|
 /// `word` — `regex.WORD`.
-pub let word : RegexFlag = w
+pub let word : Flags = w
 
 ///|
-pub let t : RegexFlag = @parse.Flags::new()
-
-///|
-/// `template` — Python's `re.TEMPLATE` (no implicit flags).
-pub let template_flag : RegexFlag = t
-
-///|
-pub let b : RegexFlag = @parse.Flags::new(bestmatch=true)
+pub let b : Flags = @parse.Flags::new(bestmatch=true)
 
 ///|
 /// `bestmatch` — `regex.BESTMATCH`.
-pub let bestmatch : RegexFlag = b
+pub let bestmatch : Flags = b
 
 ///|
-pub let e : RegexFlag = @parse.Flags::new(enhancematch=true)
+pub let e : Flags = @parse.Flags::new(enhancematch=true)
 
 ///|
 /// `enhancematch` — `regex.ENHANCEMATCH`.
-pub let enhancematch : RegexFlag = e
+pub let enhancematch : Flags = e
 
 ///|
-pub let r : RegexFlag = @parse.Flags::new(reverse=true)
+pub let r : Flags = @parse.Flags::new(reverse=true)
 
 ///|
 /// `reverse` — `regex.REVERSE`.
-pub let reverse : RegexFlag = r
+pub let reverse : Flags = r
 
 ///|
-pub let p : RegexFlag = @parse.Flags::new(posix=true)
+pub let p : Flags = @parse.Flags::new(posix=true)
 
 ///|
 /// `posix` — `regex.POSIX`.
-pub let posix : RegexFlag = p
+pub let posix : Flags = p
 
 ///|
-pub let v0 : RegexFlag = @parse.Flags::new(version=@parse.V0)
+pub let v0 : Flags = @parse.Flags::new(version=@parse.V0)
 
 ///|
 /// `version0` — `regex.VERSION0`.
-pub let version0 : RegexFlag = v0
+pub let version0 : Flags = v0
 
 ///|
-pub let v1 : RegexFlag = @parse.Flags::new(version=@parse.V1)
+pub let v1 : Flags = @parse.Flags::new(version=@parse.V1)
 
 ///|
 /// `version1` — `regex.VERSION1`.
-pub let version1 : RegexFlag = v1
+pub let version1 : Flags = v1
 
 ///|
 /// The `V0` behaviour set, as a `Version` value — `regex.VERSION0`'s target.
@@ -564,28 +768,3 @@ pub let version : String = "0.1.0"
 /// The library version split into `(major, minor, patch)`, as
 /// `regex.__version_info__` reports it.
 pub let version_info : (Int32, Int32, Int32) = (0, 1, 0)
-
-///|
-/// Clear the compiled-pattern cache. `moonregex` compiles on demand and keeps
-/// no cache, so this is a no-op kept for drop-in API compatibility.
-pub fn purge() -> Unit {
-  ()
-}
-
-///|
-/// Compile with no grammar flags, as `re.template` does (deprecated in Python;
-/// kept for compatibility).
-pub fn template(
-  pattern : StringView,
-  dialect~ : @parse.Dialect = @parse.Python,
-  lists? : Map[String, Array[String]],
-  partial~ : Bool = false,
-) -> Pattern raise @parse.Refused {
-  compile(
-    pattern,
-    flags=@parse.flags,
-    dialect~,
-    lists=lists.unwrap_or({}),
-    partial~,
-  )
-}

@@ -35,7 +35,8 @@ priv struct Parser {
   /// What is left to read.
   rest : StringView
   dialect : Dialect
-  version : Version
+  /// The behaviour set in force; `(?V1)` changes it mid-pattern.
+  mut version : Version
   /// The flags in force here; a scoped `(?i:…)` swaps them for its body.
   mut flags : Flags
   /// How many capture groups have opened so far.
@@ -70,6 +71,15 @@ pub fn parse(
   dialect~ : Dialect = dialect,
   lists? : Map[String, Array[String]],
 ) -> Ast raise Refused {
+  if dialect is Ecma262 && flags.unicode && flags.unicode_sets {
+    // ECMA-262: the two Unicode modes are alternatives, never a pair.
+    raise Pattern(
+      msg="invalid regular expression flags",
+      at=0,
+      line=1,
+      column=1,
+    )
+  }
   let parser : Parser = {
     src: pattern,
     rest: pattern,
@@ -202,6 +212,9 @@ fn Parser::term(
 ) -> (StringView, Node) raise Refused {
   let (after_atom, atom, assertion) = self.atom(rest)
   let (rest, node) = self.quantify(atom, after_atom)
+  if node is Repeat(node=Lookaround(..), ..) && !(self.dialect is Python) {
+    raise self.refuse(after_atom, "nothing to repeat")
+  }
   if node is Repeat(..) && assertion {
     // `^*` and `\b{2}` are refusals in every grammar here: an assertion
     // matches a position, and a position cannot be repeated. Lookarounds are
@@ -341,6 +354,62 @@ fn Parser::quantifier(
 }
 
 ///|
+/// The punctuators ECMA-262 reserves as a pair inside a class expression.
+fn is_double_reserved(c : Int32) -> Bool {
+  match c {
+    0x26
+    | 0x21
+    | 0x23
+    | 0x24
+    | 0x25
+    | 0x2A
+    | 0x2B
+    | 0x2C
+    | 0x2E
+    | 0x3A
+    | 0x3B
+    | 0x3C
+    | 0x3D
+    | 0x3E
+    | 0x3F
+    | 0x40
+    | 0x5E
+    | 0x60
+    | 0x7E => true
+    _ => false
+  }
+}
+
+///|
+/// The punctuation ECMA-262's `v` mode reserves inside a class expression, so
+/// that a bare one cannot be mistaken for syntax.
+fn is_reserved_in_class(c : Int32) -> Bool {
+  match c {
+    0x28
+    | 0x29
+    | 0x7B
+    | 0x7D
+    | 0x2F
+    | 0x7C
+    | 0x21
+    | 0x23
+    | 0x25
+    | 0x2C
+    | 0x3A
+    | 0x3B
+    | 0x3C
+    | 0x3D
+    | 0x3E
+    | 0x40
+    | 0x60
+    | 0x7E
+    | 0x26
+    | 0x2D => true
+    _ => false
+  }
+}
+
+///|
 /// Whether a stray `{` is a refusal or a literal.
 fn Parser::strict_braces(self : Parser) -> Bool {
   match self.dialect {
@@ -372,6 +441,10 @@ fn Parser::counted(
   }
   if body.at(i).to_int() != ',' {
     return None
+  }
+  if i + 1 == body.length() {
+    // `{n,}`: at least `n`, with no ceiling.
+    return Some((min, None))
   }
   let (max, next) = match self.digits(body, i + 1) {
     None => return None
@@ -584,6 +657,28 @@ fn Parser::atom(
   }
   if c == '?' || c == '*' || c == '+' {
     raise self.refuse(rest, "nothing to repeat")
+  }
+  if c == '{' {
+    // A `{…}` that reads as a counted quantifier has nothing to repeat here,
+    // which is an error even where a stray brace is a literal. A brace that
+    // is not a quantifier is a literal in Annex B and a refusal under `u`.
+    match self.read_until_close(rest.view(start_offset=1), '}') {
+      Some((inner, _)) =>
+        match self.counted(inner) {
+          Some(_) => raise self.refuse(rest, "nothing to repeat")
+          None =>
+            if self.strict_braces() {
+              raise self.refuse(rest, "lone quantifier brackets")
+            }
+        }
+      None =>
+        if self.strict_braces() {
+          raise self.refuse(rest, "lone quantifier brackets")
+        }
+    }
+  }
+  if c == '}' && self.strict_braces() {
+    raise self.refuse(rest, "lone quantifier brackets")
   }
   // A literal code point.
   let (ch, view) = next_char(rest)
@@ -904,7 +999,8 @@ fn Parser::python_group(
     return self.capture(rest, Some(name))
   }
   if c == '=' {
-    let (rest, name) = self.name(rest.view(start_offset=3))
+    // `(?P=name)` closes with `)`, not `>`.
+    let (rest, name) = self.name_close(rest.view(start_offset=3))
     let slot = match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(slots) => slots[0]
@@ -936,6 +1032,10 @@ fn Parser::name(
   }
   if i == 0 || i >= rest.length() || rest.at(i).to_int() != '>' {
     raise self.refuse(rest, "missing >, unterminated name")
+  }
+  if rest.at(0).to_int() >= '0'.to_int() && rest.at(0).to_int() <= '9'.to_int() {
+    // A name is an identifier: it may not start with a digit.
+    raise self.refuse(rest, "bad character in group name")
   }
   (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
 }
@@ -1256,8 +1356,8 @@ fn Parser::scoped_flags(
   self : Parser,
   rest : StringView,
 ) -> (StringView, Node) raise Refused {
-  // rest points at `(?` followed by flag letters.
-  let mut i = 2
+  // rest points at `?` — the flag letters start right after it.
+  let mut i = 1
   let on : Array[String] = []
   let off : Array[String] = []
   let mut target = on
@@ -1310,12 +1410,23 @@ fn Parser::global_flags(
   let letters : Array[String] = []
   while i < rest.length() {
     let c = rest.at(i).to_int()
+    if c == 'V' && i + 1 < rest.length() {
+      // `(?V0)` / `(?V1)`: which behaviour set the Python grammar is read
+      // under, spelled the way the superset spells it.
+      let digit = rest.at(i + 1).to_int()
+      if digit == '0' || digit == '1' {
+        letters.push("V" + digit.unsafe_to_char().to_string())
+        i += 2
+        continue
+      }
+    }
     if c == ')' {
       // The whole group was flag letters.
       if letters.length() == 0 {
         return rest
       }
       self.flags = self.apply_inline(rest, self.flags, letters, [])
+      self.version = self.flags.version
       return rest.view(start_offset=i + 1)
     }
     if c == ':' || c == '-' || !(c >= 'a' && c <= 'z') {
@@ -1339,6 +1450,52 @@ fn Parser::apply_inline(
   off : Array[String],
 ) -> Flags raise Refused {
   let mut flags = base
+  if self.dialect is Ecma262 {
+    for letter in on {
+      if letter != "i" && letter != "m" && letter != "s" {
+        raise self.refuse(cursor, "invalid modifiers")
+      }
+    }
+    for letter in off {
+      if letter != "i" && letter != "m" && letter != "s" {
+        raise self.refuse(cursor, "invalid modifiers")
+      }
+    }
+    // ECMA-262 has no empty modifier group and refuses a flag added and
+    // removed in the same one.
+    if on.length() == 0 && off.length() == 0 {
+      raise self.refuse(cursor, "invalid modifiers")
+    }
+    for letter in on {
+      for other in off {
+        if letter == other {
+          raise self.refuse(cursor, "invalid modifiers")
+        }
+      }
+    }
+    let mut i = 0
+    while i < on.length() {
+      let mut j = i + 1
+      while j < on.length() {
+        if on[i] == on[j] {
+          raise self.refuse(cursor, "invalid modifiers")
+        }
+        j += 1
+      }
+      i += 1
+    }
+    let mut i = 0
+    while i < off.length() {
+      let mut j = i + 1
+      while j < off.length() {
+        if off[i] == off[j] {
+          raise self.refuse(cursor, "invalid modifiers")
+        }
+        j += 1
+      }
+      i += 1
+    }
+  }
   for letter in on {
     flags = self.set_inline(cursor, flags, letter, true)
   }
@@ -1358,6 +1515,18 @@ fn Parser::set_inline(
 ) -> Flags raise Refused {
   let refuse = fn(msg : String) -> Refused { self.refuse(cursor, msg) }
   match letter {
+    "V0" =>
+      if self.dialect is Python {
+        { ..flags, version: V0, }
+      } else {
+        raise refuse("bad inline flags: the behaviour set is Python only")
+      }
+    "V1" =>
+      if self.dialect is Python {
+        { ..flags, version: V1, }
+      } else {
+        raise refuse("bad inline flags: the behaviour set is Python only")
+      }
     "i" => { ..flags, ignorecase: value, }
     "m" => { ..flags, multiline: value, }
     "s" => { ..flags, dotall: value, }
@@ -1437,6 +1606,16 @@ fn Parser::escape(
     }
     _ => ()
   }
+  if self.dialect is Ecma262 && (c == 'p' || c == 'P') {
+    // `\p{…}` is ECMA-262's own property escape, but only under `u` or `v`;
+    // without them Annex B makes `\p` an identity escape — a literal `p`.
+    if self.flags.unicode || self.flags.unicode_sets {
+      let (after, set) = self.property(after, c == 'P')
+      return (after, Class(set~), false)
+    }
+    let ch = c.unsafe_to_char()
+    return (after, Char(code=ch.to_int()), false)
+  }
   if self.dialect is Python {
     // The superset's assertions and constructs, which only the Python grammar
     // carries.
@@ -1454,13 +1633,20 @@ fn Parser::escape(
           Class(set=horizontal_space(self.flags.ascii).complement()),
           false,
         )
-      'v' => return (after, Class(set=vertical_space(self.flags.ascii)), false)
+      // Under V0 `\v` is the vertical tab, as it is in every other regex
+      // dialect; the vertical-whitespace class is the V1 reading.
+      'v' =>
+        if self.version is V1 {
+          return (after, Class(set=vertical_space(self.flags.ascii)), false)
+        }
       'V' =>
-        return (
-          after,
-          Class(set=vertical_space(self.flags.ascii).complement()),
-          false,
-        )
+        if self.version is V1 {
+          return (
+            after,
+            Class(set=vertical_space(self.flags.ascii).complement()),
+            false,
+          )
+        }
       'R' => return (after, Class(set=vertical_space(self.flags.ascii)), false)
       'X' => return (after, Grapheme, false)
       'p' | 'P' => {
@@ -1610,14 +1796,16 @@ fn Parser::shorthand(self : Parser, c : Int32) -> @prop.CharSet {
   if self.dialect is Lexmatch {
     return @prop.CharSet::empty()
   }
-  let ascii = self.flags.ascii
+  // ECMA-262's `\w`, `\d` and `\s` are ASCII whatever the `u` flag says;
+  // Unicode comes in through `\p{…}` alone.
+  let ascii = self.flags.ascii || self.dialect is Ecma262
   match c {
-    'd' => if ascii { @prop.ascii_digit } else { @prop.digit }
-    'D' => (if ascii { @prop.ascii_digit } else { @prop.digit }).complement()
-    's' => if ascii { @prop.ascii_space } else { @prop.space }
-    'S' => (if ascii { @prop.ascii_space } else { @prop.space }).complement()
-    'w' => if ascii { @prop.ascii_word } else { @prop.word }
-    'W' => (if ascii { @prop.ascii_word } else { @prop.word }).complement()
+    'd' => if ascii { @prop.ascii_digit } else { @prop.digit() }
+    'D' => (if ascii { @prop.ascii_digit } else { @prop.digit() }).complement()
+    's' => if ascii { @prop.ascii_space } else { @prop.space() }
+    'S' => (if ascii { @prop.ascii_space } else { @prop.space() }).complement()
+    'w' => if ascii { @prop.ascii_word } else { @prop.word() }
+    'W' => (if ascii { @prop.ascii_word } else { @prop.word() }).complement()
     _ => @prop.CharSet::empty()
   }
 }
@@ -1757,12 +1945,18 @@ fn Parser::char_escape(
     'a' =>
       if self.dialect is Python {
         (after, 0x07)
+      } else if self.dialect is Ecma262 && self.flags.unicode {
+        // Under `u` ECMA-262 defines no `\a`, and an identity escape of a
+        // letter is not one either.
+        raise self.refuse(rest, "bad escape \\a")
       } else {
         (after, 'a'.to_int())
       }
     'e' =>
       if self.dialect is Python {
         (after, 0x1B)
+      } else if self.dialect is Ecma262 && self.flags.unicode {
+        raise self.refuse(rest, "bad escape \\e")
       } else {
         (after, 'e'.to_int())
       }
@@ -1887,7 +2081,14 @@ fn Parser::unicode_escape(
       Some((hex, view)) =>
         match hex_to_int(hex) {
           None => raise self.refuse(rest, "invalid Unicode escape")
-          Some(code) => (view, code)
+          // A code point has to be a scalar value, so anything past the last
+          // plane is refused rather than wrapped.
+          Some(code) =>
+            if code > 0x10FFFF {
+              raise self.refuse(rest, "invalid Unicode escape")
+            } else {
+              (view, code)
+            }
         }
     }
   }
@@ -1994,6 +2195,22 @@ fn Parser::klass(
       view = view.view(start_offset=1)
       break
     }
+    if self.dialect is Ecma262 && self.flags.unicode_sets {
+      // In `v` mode the punctuation a class expression uses has to be escaped
+      // to stand for itself, and a set operator needs something on its left.
+      let is_op = c == '&' || c == '|' || c == '-' || c == '~'
+      if is_op {
+        if first {
+          raise self.refuse(view, "invalid character in character class")
+        }
+      } else if view.length() > 1 &&
+        view.at(1).to_int() == c &&
+        is_double_reserved(c) {
+        raise self.refuse(view, "invalid character in character class")
+      } else if is_reserved_in_class(c) {
+        raise self.refuse(view, "invalid character in character class")
+      }
+    }
     first = false
     // A set operator between operands, where the grammar has one.
     if self.set_ops() {
@@ -2028,7 +2245,17 @@ fn Parser::klass(
     let (next, part) = self.class_item(view)
     view = next
     match part {
-      Many(set~) => cs = cs.union(set)
+      Many(set~) => {
+        if self.dialect is Ecma262 &&
+          (self.flags.unicode || self.flags.unicode_sets) &&
+          view.length() > 0 &&
+          view.at(0).to_int() == '-' &&
+          !(view.length() > 1 && view.at(1).to_int() == '-') {
+          // A class escape is not a range endpoint: `[\d-a]` is not ECMA-262.
+          raise self.refuse(view, "invalid character class")
+        }
+        cs = cs.union(set)
+      }
       One(code~) => {
         // A `-` between two single characters is a range; at the end of the
         // class it is a literal dash.
@@ -2207,7 +2434,13 @@ fn Parser::class_escape(
         (after, Many(set=self.shorthand(c)))
       }
     'p' | 'P' =>
-      if self.dialect is Python {
+      // ECMA-262 reads `\p{…}` inside a class only under `u` or `v`; without
+      // them Annex B makes it an identity escape for the letter itself.
+      if self.dialect is Python ||
+        (
+          self.dialect is Ecma262 &&
+          (self.flags.unicode || self.flags.unicode_sets)
+        ) {
         let (after, set) = self.property(after, c == 'P')
         (after, Many(set~))
       } else {

@@ -41,8 +41,8 @@ test "possessive plus and optional" {
 test "(*ACCEPT) ends the match early" {
   // The `b` is never reached: the verb accepts after `a`.
   assert_eq(sup_whole("a(*ACCEPT)b", "axyz"), "a")
-  // Even a fullmatch is forced to succeed by the verb.
-  assert_true(@moonregex.fullmatch("a(*ACCEPT)b", "axyz") is Some(_))
+  // Even a full is forced to succeed by the verb.
+  assert_true(@moonregex.full("a(*ACCEPT)b", "axyz") is Some(_))
   // And a plain match at the accepted position is exactly that prefix.
   let m = @moonregex.search("a(*ACCEPT).*", "axyz").unwrap()
   assert_eq(m.group().unwrap(), "a")

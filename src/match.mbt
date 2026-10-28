@@ -419,3 +419,28 @@ fn escape_char(d : Char) -> String {
     d.to_string()
   }
 }
+
+// ---------------------------------------------------------------------------
+// The core library's view of a match
+// ---------------------------------------------------------------------------
+
+///|
+/// The text before the match — core's `MatchResult::before`.
+pub fn Match::before(self : Match) -> StringView {
+  let (start, _) = self.result.spans[0]
+  slice_cp(self.text, 0, start).view()
+}
+
+///|
+/// The text after the match — core's `MatchResult::after`.
+pub fn Match::after(self : Match) -> StringView {
+  let (_, end) = self.result.spans[0]
+  slice_cp(self.text, end, cp_length(self.text)).view()
+}
+
+///|
+/// The matched text — core's `MatchResult::content`, and Python's `group(0)`.
+pub fn Match::content(self : Match) -> StringView {
+  let (start, end) = self.result.spans[0]
+  slice_cp(self.text, start, end).view()
+}

@@ -29,16 +29,13 @@ test "named flag constants exist and differ" {
   assert_eq(@moonregex.v0.version, @moonregex.version0_value)
   assert_eq(@moonregex.v1.version, @moonregex.version1_value)
   assert_eq(@moonregex.default_version, @moonregex.version0_value)
-  // The TEMPLATE flag is the empty flag set.
-  assert_false(@moonregex.t.ignorecase)
-  assert_false(@moonregex.t.multiline)
 }
 
 ///|
 test "ignorecase flag makes matching case-insensitive" {
   let pat = @moonregex.compile("hello", flags=@moonregex.i)
   assert_true(pat.search("HELLO world") is Some(_))
-  assert_true(pat.fullmatch("HeLLo") is Some(_))
+  assert_true(pat.full("HeLLo") is Some(_))
 }
 
 ///|
@@ -55,13 +52,6 @@ test "dotall flag lets dot cross newlines" {
   assert_true(pat.search("a\nb") is Some(_))
   let pat2 = @moonregex.compile("a.b")
   assert_true(pat2.search("a\nb") is None)
-}
-
-///|
-test "purge and template are present for drop-in compatibility" {
-  @moonregex.purge()
-  let pat = @moonregex.template("abc")
-  assert_true(pat.fullmatch("abc") is Some(_))
 }
 
 ///|
@@ -120,13 +110,13 @@ test "Scanner search walks the text left to right" {
 }
 
 ///|
-test "Scanner match_at anchors each call at the cursor" {
-  // `match_at` anchors at the cursor: after matching "foo", the cursor sits at
+test "Scanner prefix anchors each call at the cursor" {
+  // `prefix` anchors at the cursor: after matching "foo", the cursor sits at
   // the space, where `\w+` does not match, so the second call is `None`.
   let sc = @moonregex.compile("\\w+").scanner("foo bar")
-  let m1 = sc.match_at().unwrap()
+  let m1 = sc.prefix().unwrap()
   assert_eq(m1.group().unwrap(), "foo")
-  assert_true(sc.match_at() is None)
+  assert_true(sc.prefix() is None)
 }
 
 ///|
@@ -148,13 +138,6 @@ test "Scanner split and sub act on the remainder" {
   assert_eq(sc.split(), [Some("a"), Some("b"), Some("c")])
   let sc2 = @moonregex.compile("\\d").scanner("x1y2")
   assert_eq(sc2.sub("#"), "x#y#")
-}
-
-///|
-test "RegexError and RegexFlag aliases are the underlying types" {
-  // These compile-time aliases just need to exist and be usable.
-  let _flag : @moonregex.RegexFlag = @moonregex.i
-  assert_true(true)
 }
 
 ///|

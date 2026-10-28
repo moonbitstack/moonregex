@@ -66,7 +66,22 @@ pub fn Pattern::search(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> Match? raise @parse.Refused {
-  match self.program.search(text, pos~, endpos~, limit~) {
+  self.search_from(text, pos, endpos, false, limit)
+}
+
+///|
+/// A search that may be told it has to consume something, which is how the
+/// scan steps past an empty match without losing a non-empty one at the same
+/// place.
+fn Pattern::search_from(
+  self : Pattern,
+  text : String,
+  pos : Int32,
+  endpos : Int32,
+  must_advance : Bool,
+  limit : Int32,
+) -> Match? raise @parse.Refused {
+  match self.program.search(text, pos~, endpos~, limit~, must_advance~) {
     None => None
     Some(r) => {
       let e = if endpos < 0 { cp_length(text) } else { endpos }
@@ -77,13 +92,13 @@ pub fn Pattern::search(
 
 ///|
 /// Match only at `pos`.
-pub fn Pattern::match_at(
+pub fn Pattern::prefix(
   self : Pattern,
   text : String,
   pos~ : Int32 = 0,
   limit~ : Int32 = 10000000,
 ) -> Match? raise @parse.Refused {
-  match self.program.match_at(text, pos~, limit~) {
+  match self.program.prefix(text, pos~, limit~) {
     None => None
     Some(r) =>
       Some(Match::{
@@ -98,14 +113,14 @@ pub fn Pattern::match_at(
 
 ///|
 /// Match the whole region `pos..endpos`.
-pub fn Pattern::fullmatch(
+pub fn Pattern::full(
   self : Pattern,
   text : String,
   pos~ : Int32 = 0,
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> Match? raise @parse.Refused {
-  match self.program.fullmatch(text, pos~, endpos~, limit~) {
+  match self.program.full(text, pos~, endpos~, limit~) {
     None => None
     Some(r) => {
       let e = if endpos < 0 { cp_length(text) } else { endpos }
@@ -126,6 +141,11 @@ pub fn Pattern::findall(
   limit~ : Int32 = 10000000,
 ) -> Array[String?] raise @parse.Refused {
   let ng = self.groups()
+  // Python answers a tuple once there are two or more groups, which a
+  // statically typed list cannot say, so the caller has to pick one.
+  if group is Whole && ng >= 2 {
+    raise @parse.Ambiguous(groups=ng)
+  }
   let use_group = if group is Whole {
     if ng == 0 {
       Whole
@@ -135,22 +155,16 @@ pub fn Pattern::findall(
   } else {
     group
   }
-  if use_group is Whole && ng >= 2 {
-    raise @parse.Ambiguous(groups=ng)
-  }
   let out : Array[String?] = []
-  let mut p = pos
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
-  while p <= end {
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
-      Some(m) => {
-        out.push(m.group(group=use_group))
-        let e = m.end()
-        let next = if e > p { e } else { p + 1 }
-        p = if overlapped { m.start() + 1 } else { next }
-      }
-    }
+  for m in self.walk(text, pos~, endpos~, overlapped~, limit~) {
+    // A group that took no part answers the empty string, which is what
+    // Python's `findall` collects — `split` and `group` keep the difference.
+    out.push(
+      match m.group(group=use_group) {
+        None => Some("")
+        Some(g) => Some(g)
+      },
+    )
   }
   out
 }
@@ -165,17 +179,55 @@ pub fn Pattern::finditer(
   overlapped~ : Bool = false,
   limit~ : Int32 = 10000000,
 ) -> Array[Match] raise @parse.Refused {
+  self.walk(text, pos~, endpos~, overlapped~, limit~)
+}
+
+///|
+/// Every match in the region, the way the two Python engines walk it.
+///
+/// After an empty match the next attempt at the same position has to consume
+/// something — that is what makes `|a` on `a` answer an empty match at 0, then
+/// `a`, then an empty match at 1, and what keeps `x*` from looping.
+fn Pattern::walk(
+  self : Pattern,
+  text : String,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  overlapped~ : Bool = false,
+  limit~ : Int32 = 10000000,
+) -> Array[Match] raise @parse.Refused {
   let out : Array[Match] = []
-  let mut p = pos
   let end = if endpos < 0 { cp_length(text) } else { endpos }
+  let mut p = pos
+  let mut must_advance = false
   while p <= end {
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
+    match self.search_from(text, p, end, must_advance, limit) {
+      None =>
+        if must_advance {
+          must_advance = false
+          p = p + 1
+        } else {
+          break
+        }
       Some(m) => {
         out.push(m)
-        let e = m.end()
-        let next = if e > p { e } else { p + 1 }
-        p = if overlapped { m.start() + 1 } else { next }
+        if overlapped {
+          p = m.start() + 1
+          must_advance = false
+        } else if m.end() == m.start() {
+          // After an empty match Python retries the same position for a
+          // non-empty one; ECMA-262's `lastIndex` just moves on by one.
+          if self.dialect is @parse.Ecma262 {
+            p = m.end() + 1
+            must_advance = false
+          } else {
+            p = m.end()
+            must_advance = true
+          }
+        } else {
+          p = m.end()
+          must_advance = false
+        }
       }
     }
   }
@@ -193,31 +245,22 @@ pub fn Pattern::split(
   limit~ : Int32 = 10000000,
 ) -> Array[String?] raise @parse.Refused {
   let ng = self.groups()
-  let out : Array[String?] = []
-  let mut p = pos
   let end = if endpos < 0 { cp_length(text) } else { endpos }
+  let out : Array[String?] = []
   let mut last = pos
   let mut count = 0
-  while p <= end {
+  for m in self.walk(text, pos~, endpos~, overlapped=false, limit~) {
     if maxsplit != 0 && count >= maxsplit {
       break
     }
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
-      Some(m) => {
-        let s = m.start()
-        let e = m.end()
-        out.push(Some(slice_cp(text, last, s)))
-        let mut g = 1
-        while g <= ng {
-          out.push(m.group(group=Num(n=g)))
-          g += 1
-        }
-        last = e
-        count += 1
-        p = if e > s { e } else { s + 1 }
-      }
+    out.push(Some(slice_cp(text, last, m.start())))
+    let mut g = 1
+    while g <= ng {
+      out.push(m.group(group=Num(n=g)))
+      g += 1
     }
+    last = m.end()
+    count += 1
   }
   out.push(Some(slice_cp(text, last, end)))
   out
@@ -249,35 +292,12 @@ pub fn Pattern::subn(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> (String, Int32) raise @parse.Refused {
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
-  let buf = StringBuilder::StringBuilder()
-  let mut p = pos
-  let mut last = pos
-  let mut n = 0
-  while p <= end {
-    if count != 0 && n >= count {
-      break
-    }
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
-      Some(m) => {
-        let s = m.start()
-        let e = m.end()
-        buf.write_string(slice_cp(text, last, s))
-        buf.write_string(expand(repl, m))
-        last = e
-        n += 1
-        p = if e > s { e } else { s + 1 }
-      }
-    }
-  }
-  buf.write_string(slice_cp(text, last, end))
-  (buf.to_string(), n)
+  self.replace(text, m => expand(repl, m), count~, pos~, endpos~, limit~)
 }
 
 ///|
-/// Replace matches with `f(match)`, as `subn_by` at the module level.
-pub fn Pattern::subn_by(
+/// Replace matches with `f(match)`, as `subn_with` at the module level.
+pub fn Pattern::subn_with(
   self : Pattern,
   text : String,
   f : (Match) -> String raise @parse.Refused,
@@ -286,35 +306,12 @@ pub fn Pattern::subn_by(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> (String, Int32) raise @parse.Refused {
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
-  let buf = StringBuilder::StringBuilder()
-  let mut p = pos
-  let mut last = pos
-  let mut n = 0
-  while p <= end {
-    if count != 0 && n >= count {
-      break
-    }
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
-      Some(m) => {
-        let s = m.start()
-        let e = m.end()
-        buf.write_string(slice_cp(text, last, s))
-        buf.write_string(f(m))
-        last = e
-        n += 1
-        p = if e > s { e } else { s + 1 }
-      }
-    }
-  }
-  buf.write_string(slice_cp(text, last, end))
-  (buf.to_string(), n)
+  self.replace(text, f, count~, pos~, endpos~, limit~)
 }
 
 ///|
-/// Replace matches with `f(match)`, as `sub_by` at the module level.
-pub fn Pattern::sub_by(
+/// Replace matches with `f(match)`, as `sub_with` at the module level.
+pub fn Pattern::sub_with(
   self : Pattern,
   text : String,
   f : (Match) -> String raise @parse.Refused,
@@ -323,7 +320,7 @@ pub fn Pattern::sub_by(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> String raise @parse.Refused {
-  self.subn_by(text, f, count~, pos~, endpos~, limit~).0
+  self.replace(text, f, count~, pos~, endpos~, limit~).0
 }
 
 ///|
@@ -339,7 +336,7 @@ pub fn Pattern::subf(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> String raise @parse.Refused {
-  self.subfn(text, repl, count~, pos~, endpos~, limit~).0
+  self.replace(text, m => expandf(repl, m), count~, pos~, endpos~, limit~).0
 }
 
 ///|
@@ -354,27 +351,33 @@ pub fn Pattern::subfn(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> (String, Int32) raise @parse.Refused {
+  self.replace(text, m => expandf(repl, m), count~, pos~, endpos~, limit~)
+}
+
+///|
+/// The one substitution loop: walk the matches, keep the text between them,
+/// and put whatever the replacement answers in their place.
+fn Pattern::replace(
+  self : Pattern,
+  text : String,
+  f : (Match) -> String raise @parse.Refused,
+  count~ : Int32 = 0,
+  pos~ : Int32 = 0,
+  endpos~ : Int32 = -1,
+  limit~ : Int32 = 10000000,
+) -> (String, Int32) raise @parse.Refused {
   let end = if endpos < 0 { cp_length(text) } else { endpos }
   let buf = StringBuilder::StringBuilder()
-  let mut p = pos
   let mut last = pos
   let mut n = 0
-  while p <= end {
+  for m in self.walk(text, pos~, endpos~, overlapped=false, limit~) {
     if count != 0 && n >= count {
       break
     }
-    match self.search(text, pos=p, endpos=end, limit~) {
-      None => break
-      Some(m) => {
-        let s = m.start()
-        let e = m.end()
-        buf.write_string(slice_cp(text, last, s))
-        buf.write_string(expandf(repl, m))
-        last = e
-        n += 1
-        p = if e > s { e } else { s + 1 }
-      }
-    }
+    buf.write_string(slice_cp(text, last, m.start()))
+    buf.write_string(f(m))
+    last = m.end()
+    n += 1
   }
   buf.write_string(slice_cp(text, last, end))
   (buf.to_string(), n)

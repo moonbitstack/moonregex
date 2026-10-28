@@ -29,7 +29,7 @@ pub fn fnmatch(
   } else {
     @moonregex.flags
   }
-  @moonregex.fullmatch(re, name, flags~) is Some(_)
+  @moonregex.full(re, name, flags~) is Some(_)
 }
 
 ///|
@@ -57,7 +57,7 @@ pub fn filter(
   let p = @moonregex.compile(re, flags~, dialect=@moonregex.python)
   let out : Array[String] = []
   for name in names {
-    if p.fullmatch(name) is Some(_) {
+    if p.full(name) is Some(_) {
       out.push(name)
     }
   }
@@ -102,7 +102,7 @@ pub fn Glob::matches(
   path : String,
 ) -> Bool raise @moonregex.Refused {
   let p = normalise_sep(path)
-  self.regex.fullmatch(p) is Some(_)
+  self.regex.full(p) is Some(_)
 }
 
 ///|

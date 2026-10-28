@@ -35,8 +35,8 @@ fn main raise {
   // A plain search and a forced match-at-start.
   println(@moonregex.search("\\d+", "order 42").unwrap().group().unwrap())
   println(
-    "match_at at the start: " +
-    (@moonregex.match_at("\\d+", "order 42") is None).to_string(),
+    "prefix at the start: " +
+    (@moonregex.prefix("\\d+", "order 42") is None).to_string(),
   )
 
   // findall collects one capture per match.
@@ -46,7 +46,7 @@ fn main raise {
   println("split: " + show(@moonregex.split("(\\s+)", "a  b\tc")))
 
   // sub with a callable replacement.
-  let numbered = @moonregex.sub_by(
+  let numbered = @moonregex.sub_with(
     "(\\w+)",
     fn(m) -> String raise @moonregex.Refused {
       match m.group() {
@@ -56,7 +56,7 @@ fn main raise {
     },
     "hello world",
   )
-  println("sub_by: " + numbered)
+  println("sub_with: " + numbered)
 
   // case-insensitive and multiline flags.
   let rx = @moonregex.compile(
@@ -80,11 +80,10 @@ fn main raise {
   // a named Unicode character and a line break.
   println(
     "named char: " +
-    (@moonregex.fullmatch("\\N{EM DASH}", "\u{2014}") is Some(_)).to_string(),
+    (@moonregex.full("\\N{EM DASH}", "\u{2014}") is Some(_)).to_string(),
   )
   println(
-    "line break: " +
-    (@moonregex.fullmatch("\\R", "\u{2028}") is Some(_)).to_string(),
+    "line break: " + (@moonregex.full("\\R", "\u{2028}") is Some(_)).to_string(),
   )
 
   // a control verb: (*COMMIT) aborts the whole match.
@@ -95,12 +94,10 @@ fn main raise {
   // branch reset: (?|(a)|(b)) captures to group 1 either way.
   println(
     "branch reset: " +
-    (@moonregex.fullmatch("(?|(a)|(b))", "b") is Some(_)).to_string(),
+    (@moonregex.full("(?|(a)|(b))", "b") is Some(_)).to_string(),
   )
 
   // (?(DEFINE)…) declares a subroutine, then recursion calls it.
   let grammar = @moonregex.compile("(?(DEFINE)(?P<num>\\d+))(?P>num)")
-  println(
-    "define+recursion: " + (grammar.fullmatch("12345") is Some(_)).to_string(),
-  )
+  println("define+recursion: " + (grammar.full("12345") is Some(_)).to_string())
 }

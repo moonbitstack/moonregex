@@ -18,7 +18,7 @@ pub(all) enum AnchorKind {
   LineStart
   LineEnd
   SoftEnd
-  WordBoundary(negate~ : Bool)
+  WordBoundary(negate~ : Bool, ascii~ : Bool)
   WordStart
   WordEnd
   SearchStart
@@ -80,9 +80,9 @@ pub struct Program {
   extra : Map[Int32, Array[Inst]]
   groupindex : Map[String, Array[Int32]]
 }
-pub fn Program::fullmatch(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
-pub fn Program::match_at(Self, String, pos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
-pub fn Program::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+pub fn Program::full(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+pub fn Program::prefix(Self, String, pos? : Int32, limit? : Int32) -> MatchResult? raise @parse.Refused
+pub fn Program::search(Self, String, pos? : Int32, endpos? : Int32, limit? : Int32, must_advance? : Bool) -> MatchResult? raise @parse.Refused
 
 pub(all) enum RecurseCondKind {
   AnyRecursion

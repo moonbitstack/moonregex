@@ -13,7 +13,7 @@ fn whole(pattern : String, text : String) -> String raise @moonregex.Refused {
 ///|
 /// Helper: the whole full match text, or the empty string when it does not fit.
 fn full(pattern : String, text : String) -> String raise @moonregex.Refused {
-  match @moonregex.fullmatch(pattern, text) {
+  match @moonregex.full(pattern, text) {
     None => ""
     Some(m) => m.group().unwrap()
   }
@@ -26,16 +26,16 @@ test "search returns the leftmost match" {
 }
 
 ///|
-test "match_at anchors to the start only" {
-  assert_true(@moonregex.match_at("\\d+", "42") is Some(_))
-  assert_true(@moonregex.match_at("\\d+", "x42") is None)
+test "prefix anchors to the start only" {
+  assert_true(@moonregex.prefix("\\d+", "42") is Some(_))
+  assert_true(@moonregex.prefix("\\d+", "x42") is None)
 }
 
 ///|
-test "fullmatch requires the whole region" {
-  assert_true(@moonregex.fullmatch("\\d+", "42") is Some(_))
-  assert_true(@moonregex.fullmatch("\\d+", "42x") is None)
-  assert_true(@moonregex.fullmatch("\\d+", "x42") is None)
+test "full requires the whole region" {
+  assert_true(@moonregex.full("\\d+", "42") is Some(_))
+  assert_true(@moonregex.full("\\d+", "42x") is None)
+  assert_true(@moonregex.full("\\d+", "x42") is None)
 }
 
 ///|
@@ -125,9 +125,9 @@ test "sub swaps and counts" {
 }
 
 ///|
-test "sub_by rewrites with a callable" {
+test "sub_with rewrites with a callable" {
   assert_eq(
-    @moonregex.sub_by(
+    @moonregex.sub_with(
       "\\w+",
       fn(m) -> String raise @moonregex.Refused {
         match m.group() {
@@ -254,13 +254,13 @@ test "fuzzy budgets are scoped per operation" {
   // deletions only: an insertion is not allowed, so the whole string cannot be
   // spanned by an inserted character
   assert_eq(full("(?:abc){d<=1}", "ab"), "ab")
-  assert_true(@moonregex.fullmatch("(?:abc){d<=1}", "abcd") is None)
+  assert_true(@moonregex.full("(?:abc){d<=1}", "abcd") is None)
   // insertions only: a deletion is not allowed
   assert_eq(full("(?:abc){i<=1}", "abcd"), "abcd")
-  assert_true(@moonregex.fullmatch("(?:abc){i<=1}", "ab") is None)
+  assert_true(@moonregex.full("(?:abc){i<=1}", "ab") is None)
   // substitutions only
   assert_eq(full("(?:abc){s<=1}", "abd"), "abd")
-  assert_true(@moonregex.fullmatch("(?:abc){s<=1}", "ab") is None)
+  assert_true(@moonregex.full("(?:abc){s<=1}", "ab") is None)
 }
 
 ///|
@@ -271,13 +271,9 @@ test "fuzzy matches a class run" {
 }
 
 ///|
-test "fuzzy fullmatch measures the whole region" {
+test "fuzzy full measures the whole region" {
   let flags = @moonregex.flags
-  assert_true(
-    @moonregex.fullmatch("(?:hello){e<=1}", "hellp", flags~) is Some(_),
-  )
+  assert_true(@moonregex.full("(?:hello){e<=1}", "hellp", flags~) is Some(_))
   // two errors exceed the budget, so the whole string cannot be matched
-  assert_true(
-    @moonregex.fullmatch("(?:hello){e<=1}", "helloxx", flags~) is None,
-  )
+  assert_true(@moonregex.full("(?:hello){e<=1}", "helloxx", flags~) is None)
 }

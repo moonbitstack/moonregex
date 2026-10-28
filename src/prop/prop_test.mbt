@@ -63,13 +63,13 @@ test "case folding is an equivalence, both ways" {
 
 ///|
 test "the word, digit and space sets" {
-  assert_true(@prop.word.contains('a'.to_int()))
-  assert_true(@prop.word.contains('_'.to_int()))
-  assert_true(@prop.word.contains('7'.to_int()))
-  assert_false(@prop.word.contains('-'.to_int()))
-  assert_true(@prop.digit.contains('9'.to_int()))
-  assert_false(@prop.digit.contains('a'.to_int()))
-  assert_true(@prop.space.contains('\n'.to_int()))
+  assert_true(@prop.word().contains('a'.to_int()))
+  assert_true(@prop.word().contains('_'.to_int()))
+  assert_true(@prop.word().contains('7'.to_int()))
+  assert_false(@prop.word().contains('-'.to_int()))
+  assert_true(@prop.digit().contains('9'.to_int()))
+  assert_false(@prop.digit().contains('a'.to_int()))
+  assert_true(@prop.space().contains('\n'.to_int()))
   assert_true(@prop.ascii_word.contains('_'.to_int()))
   assert_false(@prop.ascii_word.contains('π'.to_int()))
 }

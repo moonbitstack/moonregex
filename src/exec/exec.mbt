@@ -11,7 +11,7 @@ pub(all) enum AnchorKind {
   /// End of the text, or just before a single trailing newline — Python's `$`
   /// and `\Z`.
   SoftEnd
-  WordBoundary(negate~ : Bool)
+  WordBoundary(negate~ : Bool, ascii~ : Bool)
   WordStart
   WordEnd
   /// `\G`: where the search started.
@@ -58,7 +58,7 @@ pub(all) enum Inst {
   Backref(slot~ : Int32, icase~ : Bool)
   /// `\K`: the match starts here, not where the search did.
   Keep
-  /// `\X`: one grapheme cluster (approximated by one code point here).
+  /// `\X`: one grapheme cluster.
   Grapheme
   /// An atomic group: match the sub-program, commit, no backing into it.
   Atomic(id~ : Int32)
@@ -89,7 +89,7 @@ pub(all) enum Inst {
     err~ : Int32
   )
   /// `(*ACCEPT)`: end the whole match here, successfully. The engine raises an
-  /// `Accept` refusal that the top-level search/match/fullmatch catch and turn
+  /// `Accept` refusal that the top-level search/match/full catch and turn
   /// into the winning match.
   Accept
   /// `(*FAIL)` / `(*F)`: make this match attempt fail at this position.
@@ -443,10 +443,19 @@ fn anchor_to_kind(anchor : @parse.Anchor) -> AnchorKind {
       } else {
         TextStart
       }
-    @parse.EndLine(multiline~, ..) => if multiline { LineEnd } else { SoftEnd }
+    @parse.EndLine(multiline~, before_final_newline~) =>
+      if multiline {
+        LineEnd
+      } else if before_final_newline {
+        // Python's `$` also sits before a final newline; ECMA-262's is the
+        // end of the text and nothing else.
+        SoftEnd
+      } else {
+        TextEnd
+      }
     @parse.TextStart => TextStart
     @parse.TextEnd => TextEnd
-    @parse.WordBoundary(negate~, ..) => WordBoundary(negate~)
+    @parse.WordBoundary(negate~, ascii~) => WordBoundary(negate~, ascii~)
     @parse.WordStart => WordStart
     @parse.WordEnd => WordEnd
     @parse.SearchAnchor => SearchStart
@@ -762,8 +771,13 @@ pub fn compile(ast : @parse.Ast) -> Program {
 /// survives the recursion that implements backtracking.
 priv struct Matcher {
   program : Program
+  /// The subject, kept for the grapheme boundaries `\X` asks the UCD for.
+  text : String
   chars : Array[Int32]
-  len : Int32
+  /// Where the subject ends for the instruction being run. A lookbehind lowers
+  /// it to its own position, so the body cannot read past the place the
+  /// assertion is about.
+  mut len : Int32
   pos : Int32
   /// The match step ceiling, mutable so `(*LIMIT_MATCH:n)` can lower it.
   limit : Array[Int32]
@@ -776,6 +790,11 @@ priv struct Matcher {
   recurse : Array[Int32]
   /// The marks `(*MARK:name)` set, as `(name, position)`, in order.
   marks : Array[(String, Int32)]
+  /// Where the current attempt started, and whether it has to consume
+  /// something — the rule that lets a non-empty match follow an empty one at
+  /// the same position.
+  mut attempt : Int32
+  mut must_advance : Bool
 }
 
 ///|
@@ -799,44 +818,48 @@ fn to_code_points(s : String) -> Array[Int32] {
 }
 
 ///|
-fn Matcher::is_word(_self : Matcher, code : Int32) -> Bool {
-  (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
-  (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
-  (code >= '0'.to_int() && code <= '9'.to_int()) ||
-  code == '_'.to_int()
+fn Matcher::is_word(_self : Matcher, code : Int32, ascii : Bool) -> Bool {
+  if ascii {
+    (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
+    (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
+    (code >= '0'.to_int() && code <= '9'.to_int()) ||
+    code == '_'.to_int()
+  } else {
+    @prop.word().contains(code)
+  }
 }
 
 ///|
-fn Matcher::word_at(self : Matcher, sp : Int32) -> Bool {
+fn Matcher::word_at(self : Matcher, sp : Int32, ascii : Bool) -> Bool {
   if sp < self.len {
-    self.is_word(self.chars[sp])
+    self.is_word(self.chars[sp], ascii)
   } else {
     false
   }
 }
 
 ///|
-fn Matcher::word_before(self : Matcher, sp : Int32) -> Bool {
+fn Matcher::word_before(self : Matcher, sp : Int32, ascii : Bool) -> Bool {
   if sp > 0 {
-    self.is_word(self.chars[sp - 1])
+    self.is_word(self.chars[sp - 1], ascii)
   } else {
     false
   }
 }
 
 ///|
-fn Matcher::is_word_boundary(self : Matcher, sp : Int32) -> Bool {
-  self.word_before(sp) != self.word_at(sp)
+fn Matcher::is_word_boundary(self : Matcher, sp : Int32, ascii : Bool) -> Bool {
+  self.word_before(sp, ascii) != self.word_at(sp, ascii)
 }
 
 ///|
-fn Matcher::at_word_start(self : Matcher, sp : Int32) -> Bool {
-  self.is_word_boundary(sp) && self.word_at(sp)
+fn Matcher::at_word_start(self : Matcher, sp : Int32, ascii : Bool) -> Bool {
+  self.is_word_boundary(sp, ascii) && self.word_at(sp, ascii)
 }
 
 ///|
-fn Matcher::at_word_end(self : Matcher, sp : Int32) -> Bool {
-  self.is_word_boundary(sp) && self.word_before(sp)
+fn Matcher::at_word_end(self : Matcher, sp : Int32, ascii : Bool) -> Bool {
+  self.is_word_boundary(sp, ascii) && self.word_before(sp, ascii)
 }
 
 ///|
@@ -849,9 +872,9 @@ fn Matcher::test_anchor(self : Matcher, kind : AnchorKind, sp : Int32) -> Bool {
     SoftEnd =>
       sp == self.len ||
       (sp < self.len && self.chars[sp] == '\n'.to_int() && sp + 1 == self.len)
-    WordBoundary(negate~) => self.is_word_boundary(sp) != negate
-    WordStart => self.at_word_start(sp)
-    WordEnd => self.at_word_end(sp)
+    WordBoundary(negate~, ascii~) => self.is_word_boundary(sp, ascii) != negate
+    WordStart => self.at_word_start(sp, false)
+    WordEnd => self.at_word_end(sp, false)
     SearchStart => sp == self.pos
   }
 }
@@ -934,7 +957,14 @@ fn Matcher::run(
         saves[slot] = sp
         pc = pc + 1
       }
-      Match => return (true, sp, saves)
+      Match =>
+        if self.must_advance && sp == self.attempt {
+          // This attempt has to make progress; the empty path is not an
+          // answer, so keep looking.
+          return (false, sp, saves)
+        } else {
+          return (true, sp, saves)
+        }
       Backref(slot~, icase~) => {
         let s = saves[2 * slot]
         let e = saves[2 * slot + 1]
@@ -969,7 +999,8 @@ fn Matcher::run(
       }
       Grapheme =>
         if sp < len {
-          sp = sp + 1
+          let (_, end) = @segment.grapheme_at(self.text, sp)
+          sp = end
           pc = pc + 1
         } else {
           return (false, sp, saves)
@@ -999,6 +1030,11 @@ fn Matcher::run(
         let sub = program.extra.get(id).unwrap()
         let mut found = false
         let mut found_saves = saves
+        let outer_len = len
+        // The body has to end where the assertion sits, so it is run with the
+        // subject cut there: a greedy body then backtracks against that end
+        // instead of running past it.
+        self.len = sp
         let mut j = 0
         while j <= sp {
           let (ok, esp, ns) = self.run(sub, 0, j, clone_saves(saves), fz)
@@ -1009,6 +1045,7 @@ fn Matcher::run(
           }
           j = j + 1
         }
+        self.len = outer_len
         if found == positive {
           saves = found_saves
           pc = pc + 1
@@ -1045,41 +1082,43 @@ fn Matcher::run(
       Star(body_id~, greedy~) => {
         let sub = program.extra.get(body_id).unwrap()
         let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
-        if greedy {
-          if ok && esp > sp {
-            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns), fz)
-            if ok2 {
-              return (true, esp2, ns2)
-            }
-            sp = esp
-            saves = ns
-            pc = pc + 1
-          } else {
-            pc = pc + 1
-          }
-        } else {
+        let progressed = ok && esp > sp
+        // Leaving the loop keeps whatever captures the last turn set; a turn
+        // that consumed nothing still counts for them, which is why `(a*)*`
+        // on "aaa" ends with group 1 empty.
+        let stop_saves = if ok && !progressed { ns } else { saves }
+        if !greedy {
+          // Reluctant: leaving the loop is the first thing to try.
           let (okstop, esp_s, ns_s) = self.run(
             code,
             pc + 1,
             sp,
-            clone_saves(saves),
+            clone_saves(stop_saves),
             fz,
           )
           if okstop {
             return (true, esp_s, ns_s)
           }
-          if ok && esp > sp {
-            let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns), fz)
-            if ok2 {
-              return (true, esp2, ns2)
-            }
-            sp = esp
-            saves = ns
-            pc = pc + 1
-          } else {
-            return (false, sp, saves)
+        }
+        if progressed {
+          let (ok2, esp2, ns2) = self.run(code, pc, esp, clone_saves(ns), fz)
+          if ok2 {
+            return (true, esp2, ns2)
           }
         }
+        if greedy {
+          let (okstop, esp_s, ns_s) = self.run(
+            code,
+            pc + 1,
+            sp,
+            clone_saves(stop_saves),
+            fz,
+          )
+          if okstop {
+            return (true, esp_s, ns_s)
+          }
+        }
+        return (false, sp, saves)
       }
       RecurseGroup(slot~) => {
         let sub = match program.group_codes.get(slot) {
@@ -1090,9 +1129,16 @@ fn Matcher::run(
           return (false, sp, saves)
         }
         self.recurse.push(slot)
+        let outer_start = saves[2 * slot]
+        let outer_end = saves[2 * slot + 1]
         let (ok, esp, ns) = self.run(sub, 0, sp, clone_saves(saves), fz)
         ignore(self.recurse.pop())
         if ok {
+          // The group keeps the span its outermost occurrence gives it: the
+          // inner calls are the same group matching again, not a new value
+          // for it.
+          ns[2 * slot] = outer_start
+          ns[2 * slot + 1] = outer_end
           sp = esp
           saves = ns
           pc = pc + 1
@@ -1267,6 +1313,7 @@ pub fn Program::search(
   pos~ : Int32 = 0,
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
+  must_advance~ : Bool = false,
 ) -> MatchResult? raise @parse.Refused {
   let chars = to_code_points(text)
   let len = chars.length()
@@ -1274,6 +1321,7 @@ pub fn Program::search(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
+    text,
     chars,
     len,
     pos,
@@ -1282,6 +1330,8 @@ pub fn Program::search(
     steps: [0],
     recurse: [],
     marks: [],
+    attempt: pos,
+    must_advance: false,
   }
   let mut p = pos
   while p <= end {
@@ -1291,6 +1341,8 @@ pub fn Program::search(
     fz[0] = None
     let mut stop = false
     let mut skip_to = -1
+    mat.attempt = p
+    mat.must_advance = must_advance
     let result = try {
       let (ok, _esp, saves) = mat.run(self.code, 0, p, init, fz)
       if ok {
@@ -1346,7 +1398,7 @@ fn clear_marks(a : Array[(String, Int32)]) -> Unit {
 
 ///|
 /// Match only at `pos` (Python's `match`).
-pub fn Program::match_at(
+pub fn Program::prefix(
   self : Program,
   text : String,
   pos~ : Int32 = 0,
@@ -1356,6 +1408,7 @@ pub fn Program::match_at(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
+    text,
     chars,
     len: chars.length(),
     pos,
@@ -1364,6 +1417,8 @@ pub fn Program::match_at(
     steps: [0],
     recurse: [],
     marks: [],
+    attempt: pos,
+    must_advance: false,
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
@@ -1384,8 +1439,8 @@ pub fn Program::match_at(
 }
 
 ///|
-/// Match the whole region `pos..endpos` (Python's `fullmatch`).
-pub fn Program::fullmatch(
+/// Match the whole region `pos..endpos` (Python's `full`).
+pub fn Program::full(
   self : Program,
   text : String,
   pos~ : Int32 = 0,
@@ -1398,6 +1453,7 @@ pub fn Program::fullmatch(
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
+    text,
     chars,
     len,
     pos,
@@ -1406,6 +1462,8 @@ pub fn Program::fullmatch(
     steps: [0],
     recurse: [],
     marks: [],
+    attempt: pos,
+    must_advance: false,
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {

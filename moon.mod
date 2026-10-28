@@ -13,3 +13,7 @@ keywords = [ "regex", "re", "ecma262", "unicode", "moonbit" ]
 description = "Regular expressions for MoonBit."
 
 source = "src"
+
+import {
+  "moonbitstack/moonucd@0.1.1",
+}

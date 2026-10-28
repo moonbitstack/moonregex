@@ -7,11 +7,17 @@ import {
 }
 
 // Values
+pub fn captured(Ast, name~ : String) -> Ast raise Refused
+
+pub fn concat(Ast, Ast) -> Ast
+
 pub let dialect : Dialect
 
 pub fn ecma_parse(StringView) -> Ast raise Refused
 
 pub fn ecma_parse_with(StringView, Flags) -> Ast raise Refused
+
+pub fn either(Ast, Ast) -> Ast
 
 pub let flags : Flags
 
@@ -19,7 +25,11 @@ pub fn lexmatch_parse(StringView) -> Ast raise Refused
 
 pub fn lexmatch_parse_with(StringView, Flags) -> Ast raise Refused
 
+pub fn literal(StringView) -> Ast
+
 pub fn parse(StringView, flags? : Flags, dialect? : Dialect, lists? : Map[String, Array[String]]) -> Ast raise Refused
+
+pub fn repeated(Ast, min~ : Int32, max? : Int32, greedy~ : Bool) -> Ast raise Refused
 
 // Errors
 pub(all) suberror Refused {
@@ -60,12 +70,14 @@ pub struct Ast {
   named_lists : Map[String, Array[String]]
   flags : Flags
 }
+pub fn Ast::built(Node, groups~ : Int32, groupindex~ : Map[String, Array[Int32]], flags~ : Flags) -> Self
 pub fn Ast::dump(Self) -> String
 pub fn Ast::flags(Self) -> Flags
 pub fn Ast::groupindex(Self) -> Map[String, Array[Int32]]
 pub fn Ast::groups(Self) -> Int32
 pub fn Ast::named_lists(Self) -> Map[String, Array[String]]
 pub fn Ast::root(Self) -> Node
+pub fn Ast::to_lexmatch(Self) -> String?
 
 pub enum Cond {
   ByGroup(slot~ : Int32)
@@ -151,6 +163,7 @@ pub enum Node {
 } derive(Eq, @debug.Debug)
 pub fn Node::equal(Self, Self) -> Bool
 pub fn Node::not_equal(Self, Self) -> Bool
+pub fn Node::shift_slots(Self, Int32) -> Self
 pub fn Node::to_repr(Self) -> @debug.Repr
 
 pub enum Recurse {

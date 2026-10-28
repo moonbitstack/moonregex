@@ -1,0 +1,7 @@
+// The same pattern written three ways, and lowered onto the core engine:
+// `moon run examples/bridge`.
+pkgtype(kind: "executable")
+
+import {
+  "moonbitstack/moonregex",
+}

@@ -20,19 +20,21 @@ pub fn category(StringView) -> CharSet?
 
 pub fn char_of_name(StringView) -> Int32?
 
-pub let digit : CharSet
+pub fn digit() -> CharSet
 
 pub fn fold(Char) -> Char
+
+pub fn fold_pairs() -> Array[(Int32, Int32)]
 
 pub fn property(StringView) -> CharSet?
 
 pub fn script(StringView) -> CharSet?
 
-pub let space : CharSet
+pub fn space() -> CharSet
 
 pub fn version() -> String
 
-pub let word : CharSet
+pub fn word() -> CharSet
 
 // Errors
 

@@ -4,4 +4,5 @@
 import {
   "moonbitstack/moonregex/parse",
   "moonbitstack/moonregex/prop",
+  "moonbitstack/moonucd/segment",
 }

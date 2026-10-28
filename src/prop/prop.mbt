@@ -196,7 +196,7 @@ pub fn CharSet::complement(self : CharSet) -> CharSet {
 /// `SS` is out of scope, exactly as it is in Python's `re`.
 pub fn CharSet::fold(self : CharSet) -> CharSet {
   let extra : Array[(Int32, Int32)] = []
-  for (src, dst) in casefold_pairs {
+  for (src, dst) in fold_pairs() {
     if src == dst {
       continue
     }

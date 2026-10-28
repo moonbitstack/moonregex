@@ -537,3 +537,77 @@ fn dump_class(set : @prop.CharSet, buf : StringBuilder) -> Unit {
   }
   buf.write_string("]")
 }
+
+// ---------------------------------------------------------------------------
+// Building a tree by hand
+// ---------------------------------------------------------------------------
+
+///|
+/// An `Ast` assembled from parts rather than parsed, so patterns can be
+/// composed in code and still be the same kind of value as a parsed one.
+pub fn Ast::built(
+  root : Node,
+  groups~ : Int32,
+  groupindex~ : Map[String, Array[Int32]],
+  flags~ : Flags,
+) -> Ast {
+  { root, groups, groupindex, named_lists: {}, flags, }
+}
+
+///|
+/// The tree with every capture slot moved up by `by`.
+///
+/// Composing two patterns renumbers the right-hand one's groups so the result
+/// is numbered as one written pattern would be — the left operand keeps
+/// `1..n`, the right one continues at `n+1`.
+pub fn Node::shift_slots(self : Node, by : Int32) -> Node {
+  if by == 0 {
+    return self
+  }
+  shift(self, by)
+}
+
+///|
+fn shift(node : Node, by : Int32) -> Node {
+  match node {
+    Empty
+    | Char(_)
+    | Any(_)
+    | Class(_)
+    | Anchor(_)
+    | Keep
+    | Grapheme
+    | Verb(_) => node
+    Seq(items~) => Seq(items=items.map(item => shift(item, by)))
+    Alt(items~) => Alt(items=items.map(item => shift(item, by)))
+    Repeat(node~, min~, max~, greedy~) =>
+      Repeat(node=shift(node, by), min~, max~, greedy~)
+    Group(slot~, node~) => Group(slot=slot + by, node=shift(node, by))
+    Atomic(node~) => Atomic(node=shift(node, by))
+    Lookaround(node~, look~) => Lookaround(node=shift(node, by), look~)
+    Backref(slot~, icase~) => Backref(slot=slot + by, icase~)
+    Cond(probe~, yes~, no~) =>
+      Cond(
+        probe=match probe {
+          ByGroup(slot~) => ByGroup(slot=slot + by)
+          ByLook(node~, look~) => ByLook(node=shift(node, by), look~)
+          ByRecurse(target~) => ByRecurse(target~)
+        },
+        yes=shift(yes, by),
+        no=match no {
+          None => None
+          Some(n) => Some(shift(n, by))
+        },
+      )
+    Fuzzy(spec~, node~) => Fuzzy(spec~, node=shift(node, by))
+    Define(node~) => Define(node=shift(node, by))
+    Recurse(target~) =>
+      Recurse(
+        target=match target {
+          Whole => Whole
+          Group(slot~) => Group(slot=slot + by)
+          Named(name~) => Named(name~)
+        },
+      )
+  }
+}
