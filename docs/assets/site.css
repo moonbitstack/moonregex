@@ -779,3 +779,12 @@ footer .foot-note { color: var(--faint); font-size: 13px; margin-top: 8px; }
   .nav-tools .cta { padding: 7px 9px; }
   .nav-tools { gap: 4px; }
 }
+
+/* The page scroll bar shows while the page moves or under the pointer and
+   hides a moment after; it keeps its place, so nothing shifts. */
+@supports selector(::-webkit-scrollbar) {
+  html:not(.scrolling)::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; box-shadow: none; }
+}
+@supports not selector(::-webkit-scrollbar) {
+  html:not(.scrolling) { scrollbar-color: transparent transparent; }
+}
