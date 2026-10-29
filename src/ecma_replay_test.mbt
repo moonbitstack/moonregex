@@ -66,7 +66,9 @@ test "an ECMA-262 engine, replayed" {
     let pattern = unescape(fields[1])
     let flags = ecma_flags(fields[2])
     let text = unescape(fields[3])
-    let p = @moonregex.compile(pattern, flags~, dialect=@moonregex.ecma262)
+    let p = @moonregex.compile(pattern, flags~, dialect=@moonregex.ecma262) catch {
+      e => fail("/\{pattern}/ (\{fields[2]}) was refused: \{e}")
+    }
     let spans = walk_spans(p, text)
     if spans != fields[5] {
       fail(

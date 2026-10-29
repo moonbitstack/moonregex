@@ -2249,10 +2249,15 @@ fn Parser::klass(
         if self.dialect is Ecma262 &&
           (self.flags.unicode || self.flags.unicode_sets) &&
           view.length() > 0 &&
-          view.at(0).to_int() == '-' &&
-          !(view.length() > 1 && view.at(1).to_int() == '-') {
-          // A class escape is not a range endpoint: `[\d-a]` is not ECMA-262.
-          raise self.refuse(view, "invalid character class")
+          view.at(0).to_int() == '-' {
+          // With `u` a class escape is not a range endpoint, so `[\d-a]` is
+          // refused; a dash that closes the class is a dash, `[\d-]`. In `v`
+          // mode a lone dash has to be escaped and only `--` may follow.
+          let after = if view.length() > 1 { view.at(1).to_int() } else { 0 }
+          let dash = if self.flags.unicode_sets { '-' } else { ']' }
+          if after != dash.to_int() {
+            raise self.refuse(view, "invalid character class")
+          }
         }
         cs = cs.union(set)
       }
@@ -2275,7 +2280,17 @@ fn Parser::klass(
               }
               cs = cs.union(@prop.CharSet::of([(lo, code)]))
             }
-            Many(..) => raise self.refuse(view, "bad character range")
+            Many(set~) =>
+              // Without `u`, Annex B reads `[a-\d]` as `a`, `-` and the class.
+              if self.dialect is Ecma262 &&
+                !(self.flags.unicode || self.flags.unicode_sets) {
+                cs = cs
+                  .union(@prop.CharSet::single(lo))
+                  .union(@prop.CharSet::single('-'.to_int()))
+                  .union(set)
+              } else {
+                raise self.refuse(view, "bad character range")
+              }
           }
         } else {
           cs = cs.union(@prop.CharSet::single(lo))

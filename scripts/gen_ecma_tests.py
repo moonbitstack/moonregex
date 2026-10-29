@@ -247,6 +247,30 @@ CORPUS = [
     ("\\0", "", ["\0"]),
     ("[\\d]", "", ["5"]),
     ("[^]", "", ["a"]),
+    # A dash beside a class escape is a dash when it closes the class, in
+    # both modes; between two atoms it is one only without `u` (Annex B).
+    ("^[\\d-]+$", "", ["1-2", "a"]),
+    ("^[\\d-]+$", "u", ["1-2", "a"]),
+    ("^[\\w-]+$", "u", ["a-b_1", "a b"]),
+    ("^[\\p{Nd}-]+$", "u", ["1-٣", "a"]),
+    ("^[-\\d]+$", "u", ["-1", "a"]),
+    ("^[\\s-]+$", "", [" -\t", "a"]),
+    ("[\\d-a]+", "", ["x1-a", "b"]),
+    ("[\\d-\\w]+", "", ["-a1!"]),
+    ("[a-\\d]+", "", ["a-1", "b"]),
+    ("[%-\\d]+", "", ["%-5"]),
+]
+
+
+# Refusals test262 does not spell out, around a dash beside a class escape;
+# `keep_refused` still asks the engine about each.
+REFUSED = [
+    "[\\d-]\tv",
+    "[\\d--]\tu",
+    "[\\d-\\w]\tu",
+    "[a-\\d]\tu",
+    "[\\w-a]\tu",
+    "[\\p{Nd}-a]\tu",
 ]
 
 
@@ -334,6 +358,7 @@ def main() -> int:
 
     syntax = collect_syntax(args.test262) if args.test262 else []
     if syntax:
+        syntax += [row for row in REFUSED if row not in syntax]
         syntax = keep_refused(syntax, "node")
     matching = collect_matching("node")
 
