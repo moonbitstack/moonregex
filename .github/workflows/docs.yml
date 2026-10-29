@@ -1,4 +1,4 @@
-name: GitHub Pages
+name: Docs
 
 # Publish the site: the homepage, the guide and the generated API reference,
 # all from `docs/`. The API page is regenerated here and the build fails if the

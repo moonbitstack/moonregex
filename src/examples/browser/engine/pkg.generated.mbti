@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonbitstack/moonregex/web/engine"
+package "moonbitstack/moonregex/examples/browser/engine"
 
 // Values
 pub fn run(String, String, String, String) -> String

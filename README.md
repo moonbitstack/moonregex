@@ -14,7 +14,7 @@ behind it, and the ECMA-262 grammar that JSON Schema and OpenAPI mean.
 </div>
 
 The [showcase](https://moonbitstack.github.io/moonregex/showcase.html) runs this
-library in the browser: `src/web` compiles to `docs/assets/moonregex_web.js`
+library in the browser: `src/examples/browser` compiles to `docs/assets/moonregex_web.js`
 with `python scripts/build_web.py`, and the page feeds your pattern, flags and
 text through it. Nothing there is re-implemented in JavaScript.
 
