@@ -737,7 +737,13 @@ footer .foot-note { color: var(--faint); font-size: 13px; margin-top: 8px; }
   .side h4 { display: none; }
   .side ol, .side ul {
     display: flex; gap: 6px; margin: 0; padding: 2px 0;
-    overflow-x: auto; scrollbar-width: none;
+    overflow-x: auto;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    .side ol, .side ul {
+      scrollbar-width: none;
+    }
   }
   .side ol::-webkit-scrollbar, .side ul::-webkit-scrollbar { display: none; }
   .side ul { margin-top: 8px; }
