@@ -29,10 +29,6 @@
   --c-com: #85839f;
   --c-num: #ffc857;
 
-  /* Scrollbars are painted from `--sb-*`; `--sb-*-base` is what the theme
-     actually wants. The split exists so the page's own bar can be emptied at
-     scroll 0 without emptying every content scroller with it — see the reveal
-     rule further down. */
   --sb-track-base: #05070f;
   --sb-thumb-base: #555fa0;
   --sb-thumb-hover-base: #6a75b9;
@@ -141,30 +137,6 @@ html {
 /* No arrow buttons: Chrome draws them on Windows, and a 3px stub above the
    thumb reads as a second, broken scrollbar. */
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-
-/* At the very top of a page the page's own bar empties out, so the opening
-   frame is one unbroken surface; it fills back in on the first pixel of scroll
-   (`html.is-scrolled`, set by site.js) and empties again at 0. Only paint
-   changes — the bar keeps its 12px, so nothing moves.
-
-   The emptying is done through the tokens, not by qualifying the
-   `::-webkit-scrollbar-*` selectors with `html:not(.is-scrolled)`: Chrome
-   resolves those per scroller and drops the entire bar as soon as a scoped
-   rule meets the unscoped width rule, which leaves the page with no visible
-   scrollbar at all once you scroll. */
-html:not(.is-scrolled) {
-  --sb-track: transparent;
-  --sb-thumb: transparent;
-  --sb-thumb-hover: transparent;
-}
-
-/* Content scrollers keep their bar at every scroll position: they are content,
-   not the page. Each sheet that owns scrollers opts them back in. */
-pre, .sig {
-  --sb-track: var(--sb-track-base);
-  --sb-thumb: var(--sb-thumb-base);
-  --sb-thumb-hover: var(--sb-thumb-hover-base);
-}
 
 body {
   margin: 0;
@@ -784,13 +756,4 @@ footer .foot-note { color: var(--faint); font-size: 13px; margin-top: 8px; }
   .nav-tools .cta .lbl { display: none; }
   .nav-tools .cta { padding: 7px 9px; }
   .nav-tools { gap: 4px; }
-}
-
-/* The page scroll bar shows while the page moves or under the pointer and
-   hides a moment after; it keeps its place, so nothing shifts. */
-@supports selector(::-webkit-scrollbar) {
-  html:not(.scrolling)::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; box-shadow: none; }
-}
-@supports not selector(::-webkit-scrollbar) {
-  html:not(.scrolling) { scrollbar-color: transparent transparent; }
 }

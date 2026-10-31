@@ -10,7 +10,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="./assets/site.css" />
-<script type="module" src="assets/scrollbar.js"></script>
 <style>
   /* page-local: the four demos */
   .demo-block {
@@ -248,14 +247,6 @@
     border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
   }
   .pg-empty code { color: var(--c-str); }
-
-  /* Content scrollers keep their bar even while the page sits at the top,
-     where the page's own bar is empty (site.css). */
-  .walk-text, .spell-out, .pg-echo, .pg-hit, .pg-results {
-    --sb-track: var(--sb-track-base);
-    --sb-thumb: var(--sb-thumb-base);
-    --sb-thumb-hover: var(--sb-thumb-hover-base);
-  }
 
   /* Firefox only: Chrome gets the same look from the shared `::-webkit-…`
      rules, and setting both paths there paints two bars. */
