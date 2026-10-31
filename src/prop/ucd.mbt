@@ -4,11 +4,10 @@
 ///|
 /// The Unicode answers `\p{…}` is made of.
 ///
-/// Every set here is derived from the Unicode Character Database through the
-/// `moonucd` packages — nothing in this repository restates a table. A
-/// derivation walks the code space once with the UCD's own predicate, so each
-/// set is derived at most once and then kept: the walk is the price of having
-/// one source of truth for Unicode, and it is paid on first use, not at load.
+/// Every set here is a table `moonucd` already generated from the Unicode
+/// Character Database, read as ranges: a category, a binary property, a script
+/// and a block are one lookup each, so nothing below walks the code space, and
+/// a set is built at most once and then kept.
 
 ///|
 /// Which Unicode the answers follow.
@@ -17,21 +16,25 @@ pub fn version() -> String {
 }
 
 ///|
-/// The derived sets, keyed by normalised property name. Deriving one means a
-/// walk of the whole code space, so the result is kept rather than recomputed.
-let derived : Map[String, CharSet] = Map([])
+/// The sets already built, by normalised name: a pattern asks for the same
+/// family more than once, and building one sorts a few thousand ranges.
+let sets : Map[String, CharSet] = Map([])
 
 ///|
-/// Which families have been derived: categories, scripts, blocks, case folding.
-let derived_state : Array[Bool] = [false, false, false, false]
-
-///|
-/// Simple case folding, one code point in and one out, sorted by source.
-let fold_source : Array[Int32] = []
-
-///|
-/// The fold of `fold_source[i]`.
-let fold_target : Array[Int32] = []
+/// The set `build` makes, kept under `key` once it is made.
+fn memo(key : String, build : () -> CharSet?) -> CharSet? {
+  match sets.get(key) {
+    Some(set) => Some(set)
+    None =>
+      match build() {
+        Some(set) => {
+          sets[key] = set
+          Some(set)
+        }
+        None => None
+      }
+  }
+}
 
 ///|
 /// Normalise a property name the way Unicode's loose matching does: case,
@@ -53,8 +56,8 @@ fn normalise_name(name : StringView) -> String {
 // ---------------------------------------------------------------------------
 
 ///|
-/// The general categories in UCD order; the index is the bucket each code
-/// point lands in.
+/// The general categories in UCD order, under the two-letter name and under
+/// the long one the standard also gives them.
 let category_short : Array[String] = [
   "Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Mc", "Me", "Nd", "Nl", "No", "Pc", "Pd", "Ps",
   "Pe", "Pi", "Pf", "Po", "Sm", "Sc", "Sk", "So", "Zs", "Zl", "Zp", "Cc", "Cf", "Cs",
@@ -62,7 +65,6 @@ let category_short : Array[String] = [
 ]
 
 ///|
-/// The same categories under the names the standard also gives them.
 let category_long : Array[String] = [
   "Uppercase_Letter", "Lowercase_Letter", "Titlecase_Letter", "Modifier_Letter",
   "Other_Letter", "Nonspacing_Mark", "Spacing_Mark", "Enclosing_Mark", "Decimal_Number",
@@ -74,44 +76,41 @@ let category_long : Array[String] = [
 ]
 
 ///|
-/// The bucket a category belongs to.
-fn category_code(c : @moonucd.Category) -> Int32 {
-  match c {
-    Lu => 0
-    Ll => 1
-    Lt => 2
-    Lm => 3
-    Lo => 4
-    Mn => 5
-    Mc => 6
-    Me => 7
-    Nd => 8
-    Nl => 9
-    No => 10
-    Pc => 11
-    Pd => 12
-    Ps => 13
-    Pe => 14
-    Pi => 15
-    Pf => 16
-    Po => 17
-    Sm => 18
-    Sc => 19
-    Sk => 20
-    So => 21
-    Zs => 22
-    Zl => 23
-    Zp => 24
-    Cc => 25
-    Cf => 26
-    Cs => 27
-    Co => 28
-    Cn => 29
-  }
-}
+let categories : Array[@moonucd.Category] = [
+  @moonucd.Lu,
+  @moonucd.Ll,
+  @moonucd.Lt,
+  @moonucd.Lm,
+  @moonucd.Lo,
+  @moonucd.Mn,
+  @moonucd.Mc,
+  @moonucd.Me,
+  @moonucd.Nd,
+  @moonucd.Nl,
+  @moonucd.No,
+  @moonucd.Pc,
+  @moonucd.Pd,
+  @moonucd.Ps,
+  @moonucd.Pe,
+  @moonucd.Pi,
+  @moonucd.Pf,
+  @moonucd.Po,
+  @moonucd.Sm,
+  @moonucd.Sc,
+  @moonucd.Sk,
+  @moonucd.So,
+  @moonucd.Zs,
+  @moonucd.Zl,
+  @moonucd.Zp,
+  @moonucd.Cc,
+  @moonucd.Cf,
+  @moonucd.Cs,
+  @moonucd.Co,
+  @moonucd.Cn,
+]
 
 ///|
-/// The one-letter families, as the buckets they are the union of.
+/// The one-letter families, as the categories they are the union of.
 let category_families : Array[(String, Array[Int32])] = [
   ("L", [0, 1, 2, 3, 4]),
   ("Letter", [0, 1, 2, 3, 4]),
@@ -130,159 +129,56 @@ let category_families : Array[(String, Array[Int32])] = [
 ]
 
 ///|
-/// Derive every general category in one walk of the code space.
-fn ensure_categories() -> Unit {
-  if derived_state[0] {
-    return
-  }
-  derived_state[0] = true
-  let buckets : Array[Array[(Int32, Int32)]] = []
-  let open : Array[(Int32, Int32)?] = []
-  let mut i = 0
-  while i < 30 {
-    buckets.push([])
-    open.push(None)
-    i += 1
-  }
-  let mut cp = 0
-  while cp <= 0x10FFFF {
-    let code = category_code(@moonucd.category(cp.unsafe_to_char()))
-    match open[code] {
-      None => open[code] = Some((cp, cp))
-      Some((lo, hi)) =>
-        if cp == hi + 1 {
-          open[code] = Some((lo, cp))
-        } else {
-          buckets[code].push((lo, hi))
-          open[code] = Some((cp, cp))
+/// A general category: `L`, `Lu`, `Uppercase_Letter`, `casedletter`.
+pub fn category(name : StringView) -> CharSet? {
+  let key = normalise_name(name)
+  memo(key, fn() {
+    for i, short in category_short {
+      if normalise_name(short) == key || normalise_name(category_long[i]) == key {
+        return Some(CharSet::of(categories[i].ranges()))
+      }
+    }
+    for (family, parts) in category_families {
+      if normalise_name(family) == key {
+        let ranges : Array[(Int32, Int32)] = []
+        for part in parts {
+          for range in categories[part].ranges() {
+            ranges.push(range)
+          }
         }
-    }
-    cp += 1
-  }
-  let mut i = 0
-  while i < 30 {
-    match open[i] {
-      None => ()
-      Some((lo, hi)) => buckets[i].push((lo, hi))
-    }
-    i += 1
-  }
-  let mut i = 0
-  while i < 30 {
-    let set = CharSet::of(buckets[i])
-    derived[normalise_name(category_short[i])] = set
-    derived[normalise_name(category_long[i])] = set
-    i += 1
-  }
-  for (name, parts) in category_families {
-    let mut set = CharSet::empty()
-    for part in parts {
-      set = set.union(CharSet::of(buckets[part]))
-    }
-    derived[normalise_name(name)] = set
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Scripts
-// ---------------------------------------------------------------------------
-
-///|
-/// Derive every script in one walk: the script changes rarely, so the name is
-/// only asked for when it does.
-fn ensure_scripts() -> Unit {
-  if derived_state[1] {
-    return
-  }
-  derived_state[1] = true
-  let buckets : Map[String, Array[(Int32, Int32)]] = Map([])
-  let mut open : (Int32, Int32)? = None
-  let mut open_name = ""
-  let mut last : @script.Script? = None
-  let mut cp = 0
-  while cp <= 0x10FFFF {
-    let s = @script.script(cp.unsafe_to_char())
-    let changed = match last {
-      None => true
-      Some(prev) => s != prev
-    }
-    if changed {
-      match open {
-        Some((lo, hi)) => push_range(buckets, open_name, (lo, hi))
-        None => ()
+        return Some(CharSet::of(ranges))
       }
-      open_name = normalise_name(@script.Script::to_string(s))
-      open = Some((cp, cp))
-      last = Some(s)
-    } else {
-      open = Some((open.unwrap().0, cp))
     }
-    cp += 1
-  }
-  match open {
-    Some((lo, hi)) => push_range(buckets, open_name, (lo, hi))
-    None => ()
-  }
-  for name, ranges in buckets {
-    derived[name] = CharSet::of(ranges)
-  }
-}
-
-///|
-/// Add a range to the bucket for `name`, opening it if this is the first.
-fn push_range(
-  buckets : Map[String, Array[(Int32, Int32)]],
-  name : String,
-  range : (Int32, Int32),
-) -> Unit {
-  match buckets.get(name) {
-    None => buckets[name] = [range]
-    Some(ranges) => ranges.push(range)
-  }
+    None
+  })
 }
 
 // ---------------------------------------------------------------------------
-// Blocks
+// Scripts and blocks
 // ---------------------------------------------------------------------------
 
 ///|
-/// Derive every block in one walk, the same way as the scripts.
-fn ensure_blocks() -> Unit {
-  if derived_state[2] {
-    return
-  }
-  derived_state[2] = true
-  let buckets : Map[String, Array[(Int32, Int32)]] = Map([])
-  let mut open : (Int32, Int32)? = None
-  let mut open_name = ""
-  let mut last : String? = None
-  let mut cp = 0
-  while cp <= 0x10FFFF {
-    let b = @block.block(cp.unsafe_to_char())
-    let changed = match (last, b) {
-      (None, None) => false
-      (Some(a), Some(c)) => a != c
-      _ => true
+/// A script: `Latin`, `Latn`, `Han`.
+///
+/// The short code and the long name are one name to the UCD, so its own reader
+/// resolves the name and the table answers with that script's ranges.
+pub fn script(name : StringView) -> CharSet? {
+  memo(normalise_name(name), fn() {
+    match @script.Script::of(name) {
+      Some(s) => Some(CharSet::of(s.ranges()))
+      None => None
     }
-    if changed {
-      match open {
-        Some((lo, hi)) => push_range(buckets, open_name, (lo, hi))
-        None => ()
-      }
-      open_name = normalise_name(b.unwrap_or(""))
-      open = Some((cp, cp))
-      last = b
-    } else {
-      open = Some((open.unwrap().0, cp))
-    }
-    cp += 1
-  }
-  match open {
-    Some((lo, hi)) => push_range(buckets, open_name, (lo, hi))
-    None => ()
-  }
-  for name, ranges in buckets {
-    derived[name] = CharSet::of(ranges)
+  })
+}
+
+///|
+/// A block: `Basic Latin`, `BasicLatin`, `CJK Unified Ideographs`.
+///
+/// A block is one range, so the usual answer needs no table of its own.
+pub fn block(name : StringView) -> CharSet? {
+  match @block.range(name) {
+    Some((lo, hi)) => Some(CharSet::of([(lo.to_int(), hi.to_int())]))
+    None => None
   }
 }
 
@@ -392,49 +288,16 @@ let binary_names : Array[(String, @moonucd.Property)] = [
 ]
 
 ///|
-/// Derive one binary property over the whole code space.
-fn ensure_binary(name : String, property : @moonucd.Property) -> CharSet {
-  match derived.get(name) {
-    Some(set) => set
-    None => {
-      let ranges : Array[(Int32, Int32)] = []
-      let mut open : (Int32, Int32)? = None
-      let mut cp = 0
-      while cp <= 0x10FFFF {
-        if @moonucd.has(cp.unsafe_to_char(), property) {
-          match open {
-            None => open = Some((cp, cp))
-            Some((lo, hi)) =>
-              if cp == hi + 1 {
-                open = Some((lo, cp))
-              } else {
-                ranges.push((lo, hi))
-                open = Some((cp, cp))
-              }
-          }
-        }
-        cp += 1
-      }
-      match open {
-        Some((lo, hi)) => ranges.push((lo, hi))
-        None => ()
-      }
-      let set = CharSet::of(ranges)
-      derived[name] = set
-      set
-    }
-  }
-}
-
-///|
 /// A binary property by name.
 fn binary_of(name : String) -> CharSet? {
-  for (key, property) in binary_names {
-    if normalise_name(key) == name {
-      return Some(ensure_binary(name, property))
+  memo(name, fn() {
+    for (key, property) in binary_names {
+      if normalise_name(key) == name {
+        return Some(CharSet::of(property.ranges()))
+      }
     }
-  }
-  None
+    None
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -442,64 +305,45 @@ fn binary_of(name : String) -> CharSet? {
 // ---------------------------------------------------------------------------
 
 ///|
-/// Derive the simple case folds: the code points the UCD says change under
-/// casefolding, and what each one folds to. Multi-code-point folds (`ß` to
-/// `ss`) are left out — a class holds code points, not strings.
-fn ensure_fold() -> Unit {
-  if derived_state[3] {
-    return
-  }
-  derived_state[3] = true
-  let mut cp = 0
-  while cp <= 0x10FFFF {
-    let c = cp.unsafe_to_char()
-    if @moonucd.has(c, @moonucd.ChangesWhenCasefolded) {
-      let folded = @moonucd.fold(c.to_string())
-      let chars : Array[Char] = []
-      for ch in folded {
-        chars.push(ch)
-      }
-      if chars.length() == 1 && chars[0].to_int() != cp {
-        fold_source.push(cp)
-        fold_target.push(chars[0].to_int())
-      }
-    }
-    cp += 1
-  }
-}
-
-///|
-/// The simple fold of a code point; a code point with no fold is its own.
+/// The simple fold of a code point: the one character it becomes when case
+/// stops counting. A code point whose fold is longer than one character, `ß`
+/// to `ss`, is its own, since a class holds code points, not strings.
 pub fn fold(c : Char) -> Char {
-  ensure_fold()
-  let cp = c.to_int()
-  let mut lo = 0
-  let mut hi = fold_source.length() - 1
-  while lo <= hi {
-    let mid = (lo + hi) / 2
-    let src = fold_source[mid]
-    if cp < src {
-      hi = mid - 1
-    } else if cp > src {
-      lo = mid + 1
-    } else {
-      return fold_target[mid].unsafe_to_char()
-    }
-  }
-  c
+  @moonucd.simple_fold(c)
 }
 
 ///|
-/// The fold pairs, sorted by source — what a class is closed under.
+/// The pair list, kept once it is built: a pattern closes many classes under
+/// case, and every one of them reads the same pairs.
+let fold_pair_cache : Array[(Int32, Int32)] = []
+
+///|
+/// Whether it has been built yet.
+let fold_pair_ready : Array[Bool] = [false]
+
+///|
+/// The fold pairs both ways, sorted by source — what a class is closed under.
+///
+/// The code points that change under casefolding are the ones a class grows
+/// from, and each of them brings its whole fold class with it, so the pairs
+/// come out of the orbit table instead of a walk of the code space.
 pub fn fold_pairs() -> Array[(Int32, Int32)] {
-  ensure_fold()
-  let out : Array[(Int32, Int32)] = []
-  let mut i = 0
-  while i < fold_source.length() {
-    out.push((fold_source[i], fold_target[i]))
-    i += 1
+  if !fold_pair_ready[0] {
+    fold_pair_ready[0] = true
+    for (lo, hi) in @moonucd.ChangesWhenCasefolded.ranges() {
+      for cp in lo..<(hi + 1) {
+        let orbit = @moonucd.fold_orbit(cp.unsafe_to_char())
+        for x in orbit {
+          for y in orbit {
+            if x != y {
+              fold_pair_cache.push((x.to_int(), y.to_int()))
+            }
+          }
+        }
+      }
+    }
   }
-  out
+  fold_pair_cache.copy()
 }
 
 // ---------------------------------------------------------------------------
@@ -507,55 +351,9 @@ pub fn fold_pairs() -> Array[(Int32, Int32)] {
 // ---------------------------------------------------------------------------
 
 ///|
-/// A general category: `L`, `Lu`, `Uppercase_Letter`, `casedletter`.
-pub fn category(name : StringView) -> CharSet? {
-  let key = normalise_name(name)
-  ensure_categories()
-  derived.get(key)
-}
-
-///|
 /// A binary property: `Alphabetic`, `White_Space`, `Emoji`.
 pub fn binary(name : StringView) -> CharSet? {
   binary_of(normalise_name(name))
-}
-
-///|
-/// A script: `Latin`, `Latn`, `Han`.
-///
-/// The short code and the long name are one name to the UCD, so the name is
-/// resolved through the UCD's own reader first and only then looked up.
-pub fn script(name : StringView) -> CharSet? {
-  match @script.Script::of(name) {
-    Some(s) => {
-      ensure_scripts()
-      match derived.get(normalise_name(@script.Script::to_string(s))) {
-        Some(set) => Some(set)
-        None => None
-      }
-    }
-    None => {
-      let key = normalise_name(name)
-      ensure_scripts()
-      derived.get(key)
-    }
-  }
-}
-
-///|
-/// A block: `Basic Latin`, `BasicLatin`, `CJK Unified Ideographs`.
-///
-/// A block is one range, so the usual answer needs no walk at all; the walk is
-/// only for spellings the UCD's reader does not take.
-pub fn block(name : StringView) -> CharSet? {
-  match @block.range(name) {
-    Some((lo, hi)) => Some(CharSet::of([(lo.to_int(), hi.to_int())]))
-    None => {
-      let key = normalise_name(name)
-      ensure_blocks()
-      derived.get(key)
-    }
-  }
 }
 
 ///|

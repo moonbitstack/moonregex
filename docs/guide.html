@@ -203,8 +203,9 @@ p.full(<span class="c-str">"HeLLo"</span>)   <span class="c-com">// Some(_)</spa
 @moonregex.compile(<span class="c-str">"\\p{Block=Basic Latin}+"</span>).findall(<span class="c-str">"abcé"</span>)  <span class="c-com">// ["abc"]</span></code></pre>
     <p>The sets come from the Unicode Character Database through the
       <code>moonucd</code> packages, so the version a pattern is read against is
-      the version the rest of the ecosystem uses. The tables behind them are built
-      the first time a property is asked for, not at load.</p>
+      the version the rest of the ecosystem uses. A property is one lookup in a
+      table of ranges, so the first pattern that asks for one does not walk the
+      code space to answer.</p>
     <p><code>\X</code> matches one grapheme cluster, by the UCD's own segmentation:
       a letter with its accents, a flag, an emoji with its modifiers.</p>
     <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"\\X"</span>)

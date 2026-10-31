@@ -220,16 +220,17 @@
 <ul class="members">
 <li><code class="sig">binary(StringView) -&gt; CharSet?</code><div class="desc"><p>A binary property: <code>Alphabetic</code>, <code>White_Space</code>, <code>Emoji</code>.</p></div></li>
 <li><code class="sig">block(StringView) -&gt; CharSet?</code><div class="desc"><p>A block: <code>Basic Latin</code>, <code>BasicLatin</code>, <code>CJK Unified Ideographs</code>.</p>
-<p>A block is one range, so the usual answer needs no walk at all; the walk is only for spellings the UCD&#x27;s reader does not take.</p></div></li>
+<p>A block is one range, so the usual answer needs no table of its own.</p></div></li>
 <li><code class="sig">category(StringView) -&gt; CharSet?</code><div class="desc"><p>A general category: <code>L</code>, <code>Lu</code>, <code>Uppercase_Letter</code>, <code>casedletter</code>.</p></div></li>
 <li><code class="sig">char_of_name(StringView) -&gt; Int32?</code><div class="desc"><p>The code point a Unicode character name denotes — what <code>\N{name}</code> answers from. Names are read loosely, the way <code>unicodedata.lookup</code> reads them.</p></div></li>
 <li><code class="sig">digit() -&gt; CharSet</code><div class="desc"><p><code>\d</code>: decimal digits, and only those.</p></div></li>
-<li><code class="sig">fold(Char) -&gt; Char</code><div class="desc"><p>The simple fold of a code point; a code point with no fold is its own.</p></div></li>
-<li><code class="sig">fold_pairs() -&gt; Array[(Int32, Int32)]</code><div class="desc"><p>The fold pairs, sorted by source — what a class is closed under.</p></div></li>
+<li><code class="sig">fold(Char) -&gt; Char</code><div class="desc"><p>The simple fold of a code point: the one character it becomes when case stops counting. A code point whose fold is longer than one character, <code>ß</code> to <code>ss</code>, is its own, since a class holds code points, not strings.</p></div></li>
+<li><code class="sig">fold_pairs() -&gt; Array[(Int32, Int32)]</code><div class="desc"><p>The fold pairs both ways, sorted by source — what a class is closed under.</p>
+<p>The code points that change under casefolding are the ones a class grows from, and each of them brings its whole fold class with it, so the pairs come out of the orbit table instead of a walk of the code space.</p></div></li>
 <li><code class="sig">property(StringView) -&gt; CharSet?</code><div class="desc"><p>Any property, however it is spelled — the shape <code>\p{...}</code> takes.</p>
 <p><code>name=value</code> is accepted too: <code>Script=Latin</code>, <code>General_Category=Lu</code>, <code>Block=CJK Unified Ideographs</code>. The left side picks the table, the right side the entry; without it, every table is searched in the order a Unicode name would be looked up: category, script, block, binary property.</p></div></li>
 <li><code class="sig">script(StringView) -&gt; CharSet?</code><div class="desc"><p>A script: <code>Latin</code>, <code>Latn</code>, <code>Han</code>.</p>
-<p>The short code and the long name are one name to the UCD, so the name is resolved through the UCD&#x27;s own reader first and only then looked up.</p></div></li>
+<p>The short code and the long name are one name to the UCD, so its own reader resolves the name and the table answers with that script&#x27;s ranges.</p></div></li>
 <li><code class="sig">space() -&gt; CharSet</code><div class="desc"><p><code>\s</code>: the White_Space property.</p></div></li>
 <li><code class="sig">struct CharSet {</code></li>
 <li><code class="sig">version() -&gt; String</code><div class="desc"><p>Which Unicode the answers follow.</p></div></li>
