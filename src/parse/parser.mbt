@@ -141,7 +141,7 @@ fn Parser::alternation(
   view = next
   branches.push(first)
   while view.length() > 0 && view.at(0).to_int() == '|' {
-    let (nxt, branch) = self.sequence(view.view(start_offset=1))
+    let (nxt, branch) = self.sequence(view.exact_view(start=1))
     branches.push(branch)
     view = nxt
   }
@@ -189,14 +189,14 @@ fn Parser::skip_space(self : Parser, rest : StringView) -> StringView {
   while going && view.length() > 0 {
     match view.at(0).to_int() {
       ' ' | '\t' | '\n' | '\r' | '\u{0c}' | '\u{0b}' =>
-        view = view.view(start_offset=1)
+        view = view.exact_view(start=1)
       '#' => {
         // A comment runs to the end of the line, newline included.
         let mut i = 0
         while i < view.length() && view.at(i).to_int() != '\n' {
           i += 1
         }
-        view = view.view(start_offset=i)
+        view = view.exact_view(start=i)
       }
       _ => going = false
     }
@@ -241,9 +241,9 @@ fn Parser::quantify(
       // either way a quantifier may not follow it.
       let (rest, reluctant, possessive_mod) = if rest.length() > 0 &&
         rest.at(0).to_int() == '?' {
-        (rest.view(start_offset=1), true, false)
+        (rest.exact_view(start=1), true, false)
       } else if rest.length() > 0 && rest.at(0).to_int() == '+' {
-        (rest.view(start_offset=1), false, true)
+        (rest.exact_view(start=1), false, true)
       } else {
         (rest, false, false)
       }
@@ -292,19 +292,19 @@ fn Parser::quantifier(
   let c = rest.at(0).to_int()
   if c == '*' {
     return (
-      rest.view(start_offset=1),
+      rest.exact_view(start=1),
       Some({ min: 0, max: None, possessive: false, fuzzy: None, }),
     )
   }
   if c == '+' {
     return (
-      rest.view(start_offset=1),
+      rest.exact_view(start=1),
       Some({ min: 1, max: None, possessive: false, fuzzy: None, }),
     )
   }
   if c == '?' {
     return (
-      rest.view(start_offset=1),
+      rest.exact_view(start=1),
       Some({ min: 0, max: Some(1), possessive: false, fuzzy: None, }),
     )
   }
@@ -312,7 +312,7 @@ fn Parser::quantifier(
     return (rest, None)
   }
   // `{` opens a counted quantifier, a fuzzy budget, or nothing at all.
-  match self.read_until_close(rest.view(start_offset=1), '}') {
+  match self.read_until_close(rest.exact_view(start=1), '}') {
     None => {
       if self.strict_braces() {
         raise self.refuse(rest, "unterminated quantifier")
@@ -324,7 +324,7 @@ fn Parser::quantifier(
         Some((min, max)) => {
           let (after, possessive) = if after.length() > 0 &&
             after.at(0).to_int() == '+' {
-            (after.view(start_offset=1), true)
+            (after.exact_view(start=1), true)
           } else {
             (after, false)
           }
@@ -517,11 +517,11 @@ fn Parser::fuzzy_spec(_self : Parser, body : StringView) -> FuzzySpec? {
         if t.length() == 0 {
           return None
         }
-        let letter = t.view(start_offset=t.length() - 1)
+        let letter = t.exact_view(start=t.length() - 1)
         let count = if t.length() == 1 {
           1
         } else {
-          match parse_int(t.view(end_offset=t.length() - 1)) {
+          match parse_int(t.exact_view(end=t.length() - 1)) {
             None => return None
             Some(n) => n
           }
@@ -588,7 +588,7 @@ fn Parser::read_until_close(
   let mut i = 0
   while i < rest.length() {
     if rest.at(i).to_int() == close {
-      return Some((rest.view(end_offset=i), rest.view(start_offset=i + 1)))
+      return Some((rest.exact_view(end=i), rest.exact_view(start=i + 1)))
     }
     i += 1
   }
@@ -632,18 +632,18 @@ fn Parser::atom(
     } else {
       Any(dotall=self.flags.dotall)
     }
-    return (rest.view(start_offset=1), node, false)
+    return (rest.exact_view(start=1), node, false)
   }
   if c == '^' {
     return (
-      rest.view(start_offset=1),
+      rest.exact_view(start=1),
       Anchor(anchor=StartLine(multiline=self.flags.multiline)),
       true,
     )
   }
   if c == '$' {
     return (
-      rest.view(start_offset=1),
+      rest.exact_view(start=1),
       Anchor(
         anchor=EndLine(
           multiline=self.flags.multiline,
@@ -662,7 +662,7 @@ fn Parser::atom(
     // A `{…}` that reads as a counted quantifier has nothing to repeat here,
     // which is an error even where a stray brace is a literal. A brace that
     // is not a quantifier is a literal in Annex B and a refusal under `u`.
-    match self.read_until_close(rest.view(start_offset=1), '}') {
+    match self.read_until_close(rest.exact_view(start=1), '}') {
       Some((inner, _)) =>
         match self.counted(inner) {
           Some(_) => raise self.refuse(rest, "nothing to repeat")
@@ -711,7 +711,7 @@ fn next_char(rest : StringView) -> (Char, StringView) {
   } else {
     rest.at(0).to_int()
   }
-  (code.unsafe_to_char(), rest.view(start_offset=width))
+  (code.unsafe_to_char(), rest.exact_view(start=width))
 }
 
 ///|
@@ -727,7 +727,7 @@ fn Parser::quote(self : Parser, rest : StringView) -> (StringView, Array[Node]) 
     if view.at(0).to_int() == '\\' &&
       view.length() > 1 &&
       view.at(1).to_int() == 'E'.to_int() {
-      view = view.view(start_offset=2)
+      view = view.exact_view(start=2)
       break
     }
     let (ch, next) = next_char(view)
@@ -751,7 +751,7 @@ fn Parser::group(
   rest : StringView,
 ) -> (StringView, Node) raise Refused {
   // The opening parenthesis is consumed by the caller's atom.
-  let after = rest.view(start_offset=1)
+  let after = rest.exact_view(start=1)
   if self.depth >= MAX_DEPTH {
     raise self.refuse(rest, "pattern nests too deeply")
   }
@@ -778,24 +778,24 @@ fn Parser::group(
     return self.branch_reset(after)
   }
   if ext == ':' {
-    let (view, body) = self.scoped(after.view(start_offset=2))
+    let (view, body) = self.scoped(after.exact_view(start=2))
     return (view, body)
   }
   if ext == '>' {
     // An atomic group: no backtracking into it once through.
-    let (view, body) = self.scoped(after.view(start_offset=2))
+    let (view, body) = self.scoped(after.exact_view(start=2))
     return (view, Atomic(node=body))
   }
   if ext == '=' || ext == '!' {
     let positive = ext == '='
-    let (view, body) = self.scoped(after.view(start_offset=2))
+    let (view, body) = self.scoped(after.exact_view(start=2))
     return (view, Lookaround(node=body, look=Ahead(positive~)))
   }
   if ext == '<' &&
     after.length() > 2 &&
     (after.at(2).to_int() == '=' || after.at(2).to_int() == '!') {
     let positive = after.at(2).to_int() == '='
-    let (view, body) = self.scoped(after.view(start_offset=3))
+    let (view, body) = self.scoped(after.exact_view(start=3))
     return (view, Lookaround(node=body, look=Behind(positive~)))
   }
   if ext == 'P' {
@@ -806,7 +806,7 @@ fn Parser::group(
   }
   if ext == '#' {
     // A comment: read to the closing parenthesis and drop it.
-    return match self.read_until_close(after.view(start_offset=2), ')') {
+    return match self.read_until_close(after.exact_view(start=2), ')') {
       None => raise self.refuse(rest, "missing ), unterminated comment")
       Some((_, view)) =>
         // The comment stood where an atom was expected, so an empty node
@@ -847,13 +847,13 @@ fn Parser::group(
     // `(?<name>…)`: ECMA-262's spelling of a named group and the regex
     // superset's; Python's own `re` refuses it, so it is read here rather than
     // under `?P`.
-    let (view, body) = self.named(after.view(start_offset=2))
+    let (view, body) = self.named(after.exact_view(start=2))
     return (view, body)
   }
   if ext == '\'' {
     // ECMA-262's `(?'name'…)`: the single-quoted spelling of a named group.
     if self.dialect is Ecma262 {
-      let (view, body) = self.named_sq(after.view(start_offset=2))
+      let (view, body) = self.named_sq(after.exact_view(start=2))
       return (view, body)
     }
     raise self.refuse(rest, "unknown extension ?'")
@@ -875,13 +875,13 @@ fn Parser::branch_reset(
   let branches : Array[Node] = []
   self.depth += 1
   self.groups = base
-  let (next, first) = self.sequence(rest.view(start_offset=2))
+  let (next, first) = self.sequence(rest.exact_view(start=2))
   let mut view = next
   branches.push(first)
   let mut max_slot = self.groups
   while view.length() > 0 && view.at(0).to_int() == '|' {
     self.groups = base
-    let (nxt, branch) = self.sequence(view.view(start_offset=1))
+    let (nxt, branch) = self.sequence(view.exact_view(start=1))
     branches.push(branch)
     if self.groups > max_slot {
       max_slot = self.groups
@@ -916,7 +916,7 @@ fn Parser::close(self : Parser, rest : StringView) -> StringView raise Refused {
   if rest.at(0).to_int() != ')' {
     raise self.refuse(rest, "unexpected character in group")
   }
-  rest.view(start_offset=1)
+  rest.exact_view(start=1)
 }
 
 ///|
@@ -978,8 +978,8 @@ fn Parser::named_sq(
   if i == 0 || i >= rest.length() || rest.at(i).to_int() != '\'' {
     raise self.refuse(rest, "missing ', unterminated name")
   }
-  let name = rest.view(end_offset=i).to_owned()
-  let rest2 = rest.view(start_offset=i + 1)
+  let name = rest.exact_view(end=i).to_owned()
+  let rest2 = rest.exact_view(start=i + 1)
   self.capture(rest2, Some(name))
 }
 
@@ -995,12 +995,12 @@ fn Parser::python_group(
   }
   let c = rest.at(2).to_int()
   if c == '<' {
-    let (rest, name) = self.name(rest.view(start_offset=3))
+    let (rest, name) = self.name(rest.exact_view(start=3))
     return self.capture(rest, Some(name))
   }
   if c == '=' {
     // `(?P=name)` closes with `)`, not `>`.
-    let (rest, name) = self.name_close(rest.view(start_offset=3))
+    let (rest, name) = self.name_close(rest.exact_view(start=3))
     let slot = match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(slots) => slots[0]
@@ -1010,7 +1010,7 @@ fn Parser::python_group(
   if c == '>' {
     // `(?P>name)`: the `regex` superset's spelling of a named-group recursion.
     // The name is closed by `)`, not `>`, so a `)`-delimited reader is used.
-    let (view, name) = self.name_close(rest.view(start_offset=3))
+    let (view, name) = self.name_close(rest.exact_view(start=3))
     match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(_) => ()
@@ -1037,7 +1037,7 @@ fn Parser::name(
     // A name is an identifier: it may not start with a digit.
     raise self.refuse(rest, "bad character in group name")
   }
-  (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
+  (rest.exact_view(start=i + 1), rest.exact_view(end=i).to_owned())
 }
 
 ///|
@@ -1054,7 +1054,7 @@ fn Parser::name_close(
   if i == 0 || i >= rest.length() || rest.at(i).to_int() != ')' {
     raise self.refuse(rest, "missing ), unterminated name")
   }
-  (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
+  (rest.exact_view(start=i + 1), rest.exact_view(end=i).to_owned())
 }
 
 ///|
@@ -1079,7 +1079,7 @@ fn Parser::gref(
   if i == 0 || i >= rest.length() || rest.at(i).to_int() != close {
     raise self.refuse(rest, "unterminated group reference")
   }
-  (rest.view(start_offset=i + 1), rest.view(end_offset=i).to_owned())
+  (rest.exact_view(start=i + 1), rest.exact_view(end=i).to_owned())
 }
 
 ///|
@@ -1098,17 +1098,17 @@ fn Parser::conditional(
 ) -> (StringView, Node) raise Refused {
   // rest points at `?(`. The condition is read up to the `)` that closes it,
   // then the two branches, then the group's own `)`.
-  let head = rest.view(start_offset=2)
+  let head = rest.exact_view(start=2)
   let (cond, view) = if head.length() > 0 && head.at(0).to_int() == '?' {
     let ((body, look), view) = self.look_cond(head)
     (Cond::ByLook(node=body, look~), view)
   } else if head.length() > 0 && head.at(0).to_int() == 'R' {
     // `(?(R)…)`, `(?(R1)…)`, `(?(R&name)…)`: a recursion condition.
     self.recurse_cond(rest, head)
-  } else if head.length() > 6 && head.view(end_offset=6).to_owned() == "DEFINE" {
+  } else if head.length() > 6 && head.exact_view(end=6).to_owned() == "DEFINE" {
     // `(?(DEFINE)…)`: declare subroutines, match empty. The inner groups are
     // registered, but the group itself produces nothing.
-    let view = self.close(head.view(start_offset=6))
+    let view = self.close(head.exact_view(start=6))
     self.depth += 1
     let (view, body) = self.alternation(view)
     self.depth -= 1
@@ -1122,8 +1122,8 @@ fn Parser::conditional(
     if i == 0 || i >= head.length() || head.at(i).to_int() != ')' {
       raise self.refuse(rest, "bad character in group name")
     }
-    let text = head.view(end_offset=i).to_owned()
-    let view = head.view(start_offset=i + 1)
+    let text = head.exact_view(end=i).to_owned()
+    let view = head.exact_view(start=i + 1)
     if text.at(0).to_int() >= '0' && text.at(0).to_int() <= '9' {
       let slot = match parse_int(text[:]) {
         None => raise self.refuse(rest, "invalid group reference")
@@ -1144,7 +1144,7 @@ fn Parser::conditional(
   }
   let (view, yes) = self.sequence(view)
   let (no, view) = if view.length() > 0 && view.at(0).to_int() == '|' {
-    let (view, no) = self.sequence(view.view(start_offset=1))
+    let (view, no) = self.sequence(view.exact_view(start=1))
     if view.length() > 0 && view.at(0).to_int() == '|' {
       raise self.refuse(view, "conditional backref with more than two branches")
     }
@@ -1164,16 +1164,16 @@ fn Parser::recurse_cond(
   head : StringView,
 ) -> (Cond, StringView) raise Refused {
   // head points at `R…`.
-  let after = head.view(start_offset=1)
+  let after = head.exact_view(start=1)
   if after.length() == 0 {
     raise self.refuse(rest, "bad condition (?(R)")
   }
   let c = after.at(0).to_int()
   if c == ')' {
-    return (Cond::ByRecurse(target=AnyRecursion), after.view(start_offset=1))
+    return (Cond::ByRecurse(target=AnyRecursion), after.exact_view(start=1))
   }
   if c == '&' {
-    let (view, name) = self.name_close(after.view(start_offset=1))
+    let (view, name) = self.name_close(after.exact_view(start=1))
     match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(_) => ()
@@ -1188,7 +1188,7 @@ fn Parser::recurse_cond(
   if slot > self.groups {
     raise self.refuse(rest, "invalid group reference \{slot}")
   }
-  let view = self.close(after.view(start_offset=after2))
+  let view = self.close(after.exact_view(start=after2))
   (Cond::ByRecurse(target=GroupRecursion(slot~)), view)
 }
 
@@ -1213,7 +1213,7 @@ fn Parser::look_cond(
   let positive = rest.at(width - 1).to_int() == '='
   let behind = width >= 2 && rest.at(1).to_int() == '<'
   self.depth += 1
-  let (view, body) = self.alternation(rest.view(start_offset=width))
+  let (view, body) = self.alternation(rest.exact_view(start=width))
   self.depth -= 1
   let view = self.close(view)
   let look = if behind { Behind(positive~) } else { Ahead(positive~) }
@@ -1232,11 +1232,11 @@ fn Parser::recursion(
   }
   let c = rest.at(1).to_int()
   if c == 'R' {
-    let view = self.close(rest.view(start_offset=2))
+    let view = self.close(rest.exact_view(start=2))
     return (view, Recurse(target=Whole))
   }
   if c == '&' {
-    let (view, name) = self.name_close(rest.view(start_offset=2))
+    let (view, name) = self.name_close(rest.exact_view(start=2))
     match self.groupindex.get(name) {
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(_) => ()
@@ -1251,7 +1251,7 @@ fn Parser::recursion(
   if slot > self.groups {
     raise self.refuse(rest, "invalid group reference \{slot}")
   }
-  let view = self.close(rest.view(start_offset=after))
+  let view = self.close(rest.exact_view(start=after))
   (view, Recurse(target=Group(slot~)))
 }
 
@@ -1268,7 +1268,7 @@ fn Parser::verb(
 ) -> (StringView, Node) raise Refused {
   // rest points at `*VERB)…` (the `(` was consumed by the caller's atom).
   // Read to the closing parenthesis of the group.
-  match self.read_until_close(rest.view(start_offset=1), ')') {
+  match self.read_until_close(rest.exact_view(start=1), ')') {
     None => raise self.refuse(rest, "unterminated verb")
     Some((inner, view)) => {
       // Split the verb at its first `:`, into the name and an optional argument.
@@ -1284,7 +1284,7 @@ fn Parser::verb(
       let (name, arg) = if colon < 0 {
         (inner, None)
       } else {
-        (inner.view(end_offset=colon), Some(inner.view(start_offset=colon + 1)))
+        (inner.exact_view(end=colon), Some(inner.exact_view(start=colon + 1)))
       }
       let kind = match name.to_owned() {
         "ACCEPT" => VerbKind::Accept
@@ -1383,7 +1383,7 @@ fn Parser::scoped_flags(
   if !colon {
     raise self.refuse(rest, "missing :")
   }
-  let body = rest.view(start_offset=i)
+  let body = rest.exact_view(start=i)
   let before = self.flags
   self.flags = self.apply_inline(body, before, on, off)
   self.depth += 1
@@ -1427,7 +1427,7 @@ fn Parser::global_flags(
       }
       self.flags = self.apply_inline(rest, self.flags, letters, [])
       self.version = self.flags.version
-      return rest.view(start_offset=i + 1)
+      return rest.exact_view(start=i + 1)
     }
     if c == ':' || c == '-' || !(c >= 'a' && c <= 'z') {
       // Not a global flag group after all — a scoped one, or something else.
@@ -1581,7 +1581,7 @@ fn Parser::escape(
     raise self.refuse(rest, "bad escape (end of pattern)")
   }
   let c = rest.at(1).to_int()
-  let after = rest.view(start_offset=2)
+  let after = rest.exact_view(start=2)
   // Assertions first: they are not quantifiable, and some share their letter
   // with a class shorthand that only exists inside a class.
   match c {
@@ -1673,10 +1673,10 @@ fn Parser::escape(
         } else {
           raise self.refuse(rest, "missing < or { in \\g")
         }
-        let (after, name) = self.gref(after.view(start_offset=1), close)
+        let (after, name) = self.gref(after.exact_view(start=1), close)
         let slot = if name.length() > 0 && name.at(0).to_int() == '-' {
           // A relative reference: `\g{-1}` is the last group opened so far.
-          match parse_int(name[:].view(start_offset=1)) {
+          match parse_int(name[:].exact_view(start=1)) {
             None =>
               raise self.refuse(after, "invalid group reference '\{name}'")
             Some(mag) => {
@@ -1708,7 +1708,7 @@ fn Parser::escape(
         if after.length() > 0 && after.at(0).to_int() == '{' {
           // `\N{name}`: a character named in the Unicode Character Database.
           let (name, view) = match
-            self.read_until_close(after.view(start_offset=1), '}') {
+            self.read_until_close(after.exact_view(start=1), '}') {
             None => raise self.refuse(rest, "missing }, unterminated name")
             Some(pair) => pair
           }
@@ -1745,7 +1745,7 @@ fn Parser::escape(
     if after.length() == 0 || after.at(0).to_int() != '<' {
       raise self.refuse(rest, "invalid backreference")
     }
-    let (after, name) = self.name(after.view(start_offset=1))
+    let (after, name) = self.name(after.exact_view(start=1))
     match self.groupindex.get(name) {
       None => raise self.refuse(after, "invalid named capture group reference")
       Some(slots) =>
@@ -1766,7 +1766,7 @@ fn Parser::escape(
           view.at(0).to_int() >= '0' &&
           view.at(0).to_int() <= '9' {
       digits = digits + view.at(0).to_int().unsafe_to_char().to_string()
-      view = view.view(start_offset=1)
+      view = view.exact_view(start=1)
     }
     match parse_int(digits) {
       Some(n) =>
@@ -1866,7 +1866,7 @@ fn Parser::property(
     raise self.refuse(rest, "missing { after \\p")
   }
   let (name, after) = match
-    self.read_until_close(rest.view(start_offset=1), '}') {
+    self.read_until_close(rest.exact_view(start=1), '}') {
     None => raise self.refuse(rest, "missing }, unterminated property name")
     Some(pair) => pair
   }
@@ -1874,7 +1874,7 @@ fn Parser::property(
   let mut negate = negate
   if view.length() > 0 && view.at(0).to_int() == '^' {
     negate = !negate
-    view = view.view(start_offset=1)
+    view = view.exact_view(start=1)
   }
   match @prop.property(view) {
     None => raise self.refuse(rest, "unknown property '\{view.to_owned()}'")
@@ -1989,7 +1989,7 @@ fn Parser::char_escape(
         } else {
           raise self.refuse(rest, "invalid control escape")
         }
-        (after.view(start_offset=1), code)
+        (after.exact_view(start=1), code)
       } else {
         (after, 'c'.to_int())
       }
@@ -2002,7 +2002,7 @@ fn Parser::char_escape(
         let mut i = 0
         while i < 2 && view.length() > 0 && is_octal_digit(view.at(0).to_int()) {
           digits = digits + view.at(0).to_int().unsafe_to_char().to_string()
-          view = view.view(start_offset=1)
+          view = view.exact_view(start=1)
           i += 1
         }
         // The digits are octal, so parse them in base eight.
@@ -2013,13 +2013,13 @@ fn Parser::char_escape(
       let mut view = after
       if view.length() > 0 && is_octal_digit(view.at(0).to_int()) {
         digits = digits + view.at(0).to_int().unsafe_to_char().to_string()
-        view = view.view(start_offset=1)
+        view = view.exact_view(start=1)
         if is_octal_digit(c) &&
           is_octal_digit(digits.at(1).to_int()) &&
           view.length() > 0 &&
           is_octal_digit(view.at(0).to_int()) {
           digits = digits + view.at(0).to_int().unsafe_to_char().to_string()
-          view = view.view(start_offset=1)
+          view = view.exact_view(start=1)
           let code = octal(digits)
           if code > 0o377 {
             raise self.refuse(
@@ -2076,7 +2076,7 @@ fn Parser::unicode_escape(
     after.length() > 0 &&
     after.at(0).to_int() == '{'
   if braced {
-    return match self.read_until_close(after.view(start_offset=1), '}') {
+    return match self.read_until_close(after.exact_view(start=1), '}') {
       None => raise self.refuse(rest, "invalid Unicode escape")
       Some((hex, view)) =>
         match hex_to_int(hex) {
@@ -2136,7 +2136,7 @@ fn Parser::hex(
     code = code * 16 + digit
     i += 1
   }
-  Some((code, rest.view(start_offset=n)))
+  Some((code, rest.exact_view(start=n)))
 }
 
 ///|
@@ -2173,10 +2173,10 @@ fn Parser::klass(
   rest : StringView,
 ) -> (StringView, Node) raise Refused {
   // rest points at `[`.
-  let mut view = rest.view(start_offset=1)
+  let mut view = rest.exact_view(start=1)
   let negate = view.length() > 0 && view.at(0).to_int() == '^'
   if negate {
-    view = view.view(start_offset=1)
+    view = view.exact_view(start=1)
   }
   // A `]` first is a literal in Python; ECMA-262 reads `[]` as the empty
   // class, and lexmatch refuses it.
@@ -2192,7 +2192,7 @@ fn Parser::klass(
     }
     let c = view.at(0).to_int()
     if c == ']' && !(first && first_is_literal) {
-      view = view.view(start_offset=1)
+      view = view.exact_view(start=1)
       break
     }
     if self.dialect is Ecma262 && self.flags.unicode_sets {
@@ -2236,7 +2236,7 @@ fn Parser::klass(
           operands.push(cs)
           ops.push(op)
           cs = @prop.CharSet::empty()
-          view = view.view(start_offset=2)
+          view = view.exact_view(start=2)
           continue
         }
         None => ()
@@ -2268,7 +2268,7 @@ fn Parser::klass(
         if view.length() > 1 &&
           view.at(0).to_int() == '-' &&
           view.at(1).to_int() != ']' {
-          let (next, hi) = self.class_item(view.view(start_offset=1))
+          let (next, hi) = self.class_item(view.exact_view(start=1))
           view = next
           match hi {
             One(code~) => {
@@ -2373,10 +2373,10 @@ fn Parser::posix(
   if i + 1 >= rest.length() {
     return None
   }
-  let name = rest.view(start_offset=2, end_offset=i).to_owned()
+  let name = rest.exact_view(start=2, end=i).to_owned()
   match posix_set(name[:]) {
     None => None
-    Some(set) => Some((set, rest.view(start_offset=i + 2)))
+    Some(set) => Some((set, rest.exact_view(start=i + 2)))
   }
 }
 
@@ -2440,7 +2440,7 @@ fn Parser::class_escape(
     raise self.refuse(rest, "bad escape (end of pattern)")
   }
   let c = rest.at(1).to_int()
-  let after = rest.view(start_offset=2)
+  let after = rest.exact_view(start=2)
   match c {
     'd' | 'D' | 's' | 'S' | 'w' | 'W' =>
       if self.dialect is Lexmatch {
@@ -2485,7 +2485,7 @@ fn Parser::class_escape(
         self.flags.unicode &&
         after.length() > 0 &&
         after.at(0).to_int() == '{' {
-        match self.read_until_close(after.view(start_offset=1), '}') {
+        match self.read_until_close(after.exact_view(start=1), '}') {
           None => raise self.refuse(rest, "invalid Unicode escape")
           Some((hex, view)) =>
             match hex_to_int(hex) {
@@ -2521,7 +2521,7 @@ fn Parser::class_escape(
       let mut i = 0
       while i < 2 && view.length() > 0 && is_octal_digit(view.at(0).to_int()) {
         digits = digits + view.at(0).to_int().unsafe_to_char().to_string()
-        view = view.view(start_offset=1)
+        view = view.exact_view(start=1)
         i += 1
       }
       let code = octal(digits[:])

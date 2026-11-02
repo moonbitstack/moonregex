@@ -408,7 +408,7 @@ fn translate_brace(
     buf.write_char('{')
     (buf.to_string(), 1)
   } else {
-    let content = pat.view(start_offset=i + 1, end_offset=j)
+    let content = pat.exact_view(start=i + 1, end=j)
     let items = split_top_level(content)
     let buf = StringBuilder::StringBuilder()
     buf.write_string("(?:")
@@ -450,12 +450,12 @@ fn split_top_level(s : StringView) -> Array[StringView] {
     } else if class_depth == 0 && code == '}'.to_int() && depth > 0 {
       depth = depth - 1
     } else if class_depth == 0 && depth == 0 && code == ','.to_int() {
-      out.push(s.view(start_offset=start, end_offset=k))
+      out.push(s.exact_view(start~, end=k))
       start = k + 1
     }
     k = k + 1
   }
-  out.push(s.view(start_offset=start, end_offset=n))
+  out.push(s.exact_view(start~, end=n))
   out
 }
 
