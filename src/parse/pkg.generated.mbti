@@ -32,6 +32,7 @@ pub fn parse(StringView, flags? : Flags, dialect? : Dialect, lists? : Map[String
 pub fn repeated(Ast, min~ : Int32, max? : Int32, greedy~ : Bool) -> Ast raise Refused
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror Refused {
   Pattern(msg~ : String, at~ : Int32, line~ : Int32, column~ : Int32)
   Exceeded(limit~ : Int32, got~ : Int32)
@@ -40,7 +41,7 @@ pub(all) suberror Refused {
   Commit
   Prune
   Skip(target~ : Int32)
-} derive(Eq, @debug.Debug)
+}
 pub fn Refused::equal(Self, Self) -> Bool
 pub fn Refused::not_equal(Self, Self) -> Bool
 pub fn Refused::output(Self, &Logger) -> Unit
@@ -49,6 +50,7 @@ pub fn Refused::to_string(Self) -> String
 pub impl Show for Refused
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub enum Anchor {
   StartLine(multiline~ : Bool)
   EndLine(multiline~ : Bool, before_final_newline~ : Bool)
@@ -58,7 +60,7 @@ pub enum Anchor {
   WordStart
   WordEnd
   SearchAnchor
-} derive(Eq, @debug.Debug)
+}
 pub fn Anchor::equal(Self, Self) -> Bool
 pub fn Anchor::not_equal(Self, Self) -> Bool
 pub fn Anchor::to_repr(Self) -> @debug.Repr
@@ -79,20 +81,22 @@ pub fn Ast::named_lists(Self) -> Map[String, Array[String]]
 pub fn Ast::root(Self) -> Node
 pub fn Ast::to_lexmatch(Self) -> String?
 
+#derive(Eq, @debug.Debug)
 pub enum Cond {
   ByGroup(slot~ : Int32)
   ByLook(node~ : Node, look~ : Look)
   ByRecurse(target~ : RecurseCond)
-} derive(Eq, @debug.Debug)
+}
 pub fn Cond::equal(Self, Self) -> Bool
 pub fn Cond::not_equal(Self, Self) -> Bool
 pub fn Cond::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Dialect {
   Python
   Ecma262
   Lexmatch
-} derive(Eq, @debug.Debug)
+}
 pub fn Dialect::equal(Self, Self) -> Bool
 pub fn Dialect::not_equal(Self, Self) -> Bool
 pub fn Dialect::output(Self, &Logger) -> Unit
@@ -100,6 +104,7 @@ pub fn Dialect::to_repr(Self) -> @debug.Repr
 pub fn Dialect::to_string(Self) -> String
 pub impl Show for Dialect
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Flags {
   ignorecase : Bool
   multiline : Bool
@@ -115,31 +120,34 @@ pub(all) struct Flags {
   reverse : Bool
   word : Bool
   version : Version
-} derive(Eq, @debug.Debug)
+}
 pub fn Flags::equal(Self, Self) -> Bool
 pub fn Flags::new(ignorecase? : Bool, multiline? : Bool, dotall? : Bool, verbose? : Bool, ascii? : Bool, unicode? : Bool, unicode_sets? : Bool, fullcase? : Bool, bestmatch? : Bool, enhancematch? : Bool, posix? : Bool, reverse? : Bool, word? : Bool, version? : Version) -> Self
 pub fn Flags::not_equal(Self, Self) -> Bool
 pub fn Flags::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct FuzzySpec {
   insertions : Int32?
   deletions : Int32?
   substitutions : Int32?
   errors : Int32?
   cost : (Int32, Int32, Int32)?
-} derive(Eq, @debug.Debug)
+}
 pub fn FuzzySpec::equal(Self, Self) -> Bool
 pub fn FuzzySpec::not_equal(Self, Self) -> Bool
 pub fn FuzzySpec::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Look {
   Ahead(positive~ : Bool)
   Behind(positive~ : Bool)
-} derive(Eq, @debug.Debug)
+}
 pub fn Look::equal(Self, Self) -> Bool
 pub fn Look::not_equal(Self, Self) -> Bool
 pub fn Look::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Node {
   Empty
   Char(code~ : Int32)
@@ -160,30 +168,33 @@ pub enum Node {
   Define(node~ : Node)
   Recurse(target~ : Recurse)
   Verb(kind~ : VerbKind)
-} derive(Eq, @debug.Debug)
+}
 pub fn Node::equal(Self, Self) -> Bool
 pub fn Node::not_equal(Self, Self) -> Bool
 pub fn Node::shift_slots(Self, Int32) -> Self
 pub fn Node::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Recurse {
   Whole
   Group(slot~ : Int32)
   Named(name~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn Recurse::equal(Self, Self) -> Bool
 pub fn Recurse::not_equal(Self, Self) -> Bool
 pub fn Recurse::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum RecurseCond {
   AnyRecursion
   GroupRecursion(slot~ : Int32)
   NamedRecursion(name~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn RecurseCond::equal(Self, Self) -> Bool
 pub fn RecurseCond::not_equal(Self, Self) -> Bool
 pub fn RecurseCond::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum VerbKind {
   Accept
   Fail
@@ -196,15 +207,16 @@ pub enum VerbKind {
   LimitRecursion(n~ : Int32)
   Version
   Fence
-} derive(Eq, @debug.Debug)
+}
 pub fn VerbKind::equal(Self, Self) -> Bool
 pub fn VerbKind::not_equal(Self, Self) -> Bool
 pub fn VerbKind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Version {
   V0
   V1
-} derive(Eq, @debug.Debug)
+}
 pub fn Version::equal(Self, Self) -> Bool
 pub fn Version::not_equal(Self, Self) -> Bool
 pub fn Version::to_repr(Self) -> @debug.Repr

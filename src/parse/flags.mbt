@@ -8,6 +8,7 @@
 /// because the callers need different ones. JSON Schema's `pattern` and
 /// OpenAPI's `pattern` are defined as ECMA-262 §22.2 and are unforgiving
 /// about it, while everyone else writes Python's.
+#derive(Eq, Debug)
 pub(all) enum Dialect {
   /// Python's `re` and the `regex` superset behind it.
   Python
@@ -15,7 +16,7 @@ pub(all) enum Dialect {
   Ecma262
   /// The `lexmatch` literal MoonBit's own `@string.Regex` speaks.
   Lexmatch
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Dialect with Eq::{equal, not_equal}
@@ -43,10 +44,11 @@ pub impl Show for Dialect with fn output(self, logger) {
 /// `V0` is `re` as everyone writes it; `V1` opens the set algebra (`--`, `&&`,
 /// `~~`, nested sets) and the rest of what `(?V1)` unlocks. Only the Python
 /// dialect has versions — ECMA-262 gates the same algebra behind its `v` flag.
+#derive(Eq, Debug)
 pub(all) enum Version {
   V0
   V1
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Version with Eq::{equal, not_equal}
@@ -64,6 +66,7 @@ pub extend Version with Debug::{to_repr}
 ///
 /// Flags are resolved into the syntax tree at parse time: `(?s:.)` puts the
 /// dotall behaviour inside the node, so the executor never consults them.
+#derive(Eq, Debug)
 pub(all) struct Flags {
   /// `i` — case-insensitive matching.
   ignorecase : Bool
@@ -95,7 +98,7 @@ pub(all) struct Flags {
   word : Bool
   /// Which `regex` behaviour set the Python grammar is read under.
   version : Version
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Flags with Eq::{equal, not_equal}
@@ -175,6 +178,7 @@ pub fn Flags::new(
 /// The word is deliberate: a pattern is input, and this library is fed
 /// patterns it did not write. Refusals say what was wrong and where; the
 /// step ceiling says how far the run got before giving up.
+#derive(Eq, Debug)
 pub(all) suberror Refused {
   /// The pattern is not the grammar it claims: `at` is the code point offset
   /// reading stopped at, `line` and `column` are where that is in the text.
@@ -194,7 +198,7 @@ pub(all) suberror Refused {
   /// `(*SKIP)`: fail and resume the search at `target` (the last mark, or the
   /// search start when no mark was set).
   Skip(target~ : Int32)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Refused with Eq::{equal, not_equal}

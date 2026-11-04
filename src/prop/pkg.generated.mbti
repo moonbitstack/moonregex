@@ -39,9 +39,10 @@ pub fn word() -> CharSet
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub struct CharSet {
   ranges : Array[(Int32, Int32)]
-} derive(Eq)
+}
 pub fn CharSet::any() -> Self
 pub fn CharSet::complement(Self) -> Self
 pub fn CharSet::contains(Self, Int32) -> Bool

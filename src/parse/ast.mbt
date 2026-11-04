@@ -3,12 +3,13 @@
 
 ///|
 /// Which way a lookaround looks, and whether it wants to find something.
+#derive(Eq, Debug)
 pub enum Look {
   /// `(?=…)` / `(?!…)`
   Ahead(positive~ : Bool)
   /// `(?<=…)` / `(?<!…)`
   Behind(positive~ : Bool)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Look with Eq::{equal, not_equal}
@@ -23,6 +24,7 @@ pub extend Look with Debug::{to_repr}
 /// `^` under `m` is a different node from `^` without it, and Python's `$`
 /// (which also matches before a trailing newline) from ECMA-262's (which does
 /// not) — so the executor reads one meaning per node.
+#derive(Eq, Debug)
 pub enum Anchor {
   /// `^`: start of line when `multiline`, of the text otherwise.
   StartLine(multiline~ : Bool)
@@ -41,7 +43,7 @@ pub enum Anchor {
   WordEnd
   /// `\G`: where the search started, so a scan cannot drift.
   SearchAnchor
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Anchor with Eq::{equal, not_equal}
@@ -51,6 +53,7 @@ pub extend Anchor with Debug::{to_repr}
 
 ///|
 /// What a conditional tests.
+#derive(Eq, Debug)
 pub enum Cond {
   /// `(?(1)yes|no)`: whether a group took part in the match.
   ByGroup(slot~ : Int32)
@@ -58,7 +61,7 @@ pub enum Cond {
   ByLook(node~ : Node, look~ : Look)
   /// `(?(R)…)`, `(?(R1)…)`, `(?(R&name)…)`: whether we are inside a recursion.
   ByRecurse(target~ : RecurseCond)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Cond with Eq::{equal, not_equal}
@@ -74,6 +77,7 @@ pub extend Cond with Debug::{to_repr}
 /// weighed. The representation is settled here before any of it executes, so
 /// the executor grows one interpreter for fuzzy nodes rather than a fuzzy
 /// branch in every path.
+#derive(Eq, Debug)
 pub struct FuzzySpec {
   /// `i<=n`: how many insertions.
   insertions : Int32?
@@ -85,7 +89,7 @@ pub struct FuzzySpec {
   errors : Int32?
   /// A weighted budget, with the weights it is weighed by.
   cost : (Int32, Int32, Int32)?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FuzzySpec with Eq::{equal, not_equal}
@@ -95,6 +99,7 @@ pub extend FuzzySpec with Debug::{to_repr}
 
 ///|
 /// What a recursion calls back into.
+#derive(Eq, Debug)
 pub enum Recurse {
   /// `(?R)`: the whole pattern.
   Whole
@@ -102,13 +107,14 @@ pub enum Recurse {
   Group(slot~ : Int32)
   /// `(?&name)`: a capture group by name.
   Named(name~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A control verb from the `regex` superset: `(*ACCEPT)`, `(*FAIL)`, and the
 /// rest. `Accept` ends the whole match at the current position; `Fail` forces
 /// the current match attempt to fail; `Mark` records a name; `Prune` and `Skip`
 /// carry the position past a failure so the scan does not retry it.
+#derive(Eq, Debug)
 pub enum VerbKind {
   /// `(*ACCEPT)`: end the match successfully here.
   Accept
@@ -132,7 +138,7 @@ pub enum VerbKind {
   Version
   /// `(*FENCE)`: prevent any backtracking past this point.
   Fence
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VerbKind with Eq::{equal, not_equal}
@@ -148,6 +154,7 @@ pub extend Recurse with Debug::{to_repr}
 
 ///|
 /// The target of a recursion condition `(?(R)…)`.
+#derive(Eq, Debug)
 pub enum RecurseCond {
   /// `(?(R))`: inside any recursion.
   AnyRecursion
@@ -155,7 +162,7 @@ pub enum RecurseCond {
   GroupRecursion(slot~ : Int32)
   /// `(?(R&name))`: inside a recursion of named group `name`.
   NamedRecursion(name~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend RecurseCond with Eq::{equal, not_equal}
@@ -169,6 +176,7 @@ pub extend RecurseCond with Debug::{to_repr}
 /// The tree is resolved: flags have been folded into the nodes that care
 /// (`(?s:.)` is an `Any` that eats newlines, `(?i)k` is a class holding both
 /// cases), so the executor never asks which grammar a node came from.
+#derive(Eq, Debug)
 pub enum Node {
   /// Matches the empty string.
   Empty
@@ -212,7 +220,7 @@ pub enum Node {
   /// A control verb: `(*ACCEPT)`, `(*FAIL)`, `(*MARK:name)`, `(*PRUNE)`,
   /// `(*SKIP)`.
   Verb(kind~ : VerbKind)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Node with Eq::{equal, not_equal}

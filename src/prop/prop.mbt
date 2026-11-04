@@ -7,9 +7,10 @@
 /// Character classes, `\p{...}`, `\w` and the rest are all this one shape, so
 /// the set algebra a pattern needs — union for `[a-z]`, difference for `--`,
 /// intersection for `&&`, complement for `[^…]` — lives here once.
+#derive(Eq)
 pub struct CharSet {
   ranges : Array[(Int32, Int32)]
-} derive(Eq)
+}
 
 ///|
 pub extend CharSet with Eq::{equal, not_equal}
