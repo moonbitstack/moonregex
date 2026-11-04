@@ -72,7 +72,7 @@ def doc_map(files: list[Path]) -> dict[str, str]:
             if collecting and match:
                 buffer.append(match.group(1))
                 continue
-            if collecting and line.strip() == "":
+            if collecting and (line.strip() == "" or line.startswith("#")):
                 continue
             if collecting:
                 collecting = False
