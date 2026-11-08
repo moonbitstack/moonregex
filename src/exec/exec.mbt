@@ -148,6 +148,9 @@ pub struct MatchResult {
   )?
   /// The marks `(*MARK:name)` set during the match, in the order they were set.
   marks : Array[String]
+  /// Whether the match is partial: the pattern ran out of text and would have
+  /// gone on had the subject continued.
+  partial : Bool
 }
 
 ///|
@@ -796,6 +799,12 @@ priv struct Matcher {
   /// Grapheme boundaries for `\X`, worked out once per search: entry `i` is
   /// true when a cluster ends between code point `i` and `i + 1`.
   mut graphemes : Array[Bool]?
+  /// Whether a read past the end of the subject may be treated as satisfied by
+  /// text still to come, and how many such reads the current attempt has made.
+  /// A match that needed one is a partial match: the pattern is a prefix of
+  /// something the caller has not typed yet.
+  mut partial : Bool
+  past_end : Array[Int32]
 }
 
 ///|
@@ -881,6 +890,23 @@ fn Matcher::test_anchor(self : Matcher, kind : AnchorKind, sp : Int32) -> Bool {
 }
 
 ///|
+/// Whether a character the pattern wants is still to come, which is how a
+/// partial match reads past the end of what the caller has so far.
+///
+/// The position is not advanced: the span of a partial match is the text that
+/// did arrive, so the engine stands still and lets the pattern finish on text
+/// that is not here yet. Nothing loops on that, because a repetition whose
+/// body consumed nothing ends — the same rule that stops `(a*)*`.
+fn Matcher::reads_past_end(self : Matcher, sp : Int32) -> Bool {
+  if self.partial && sp >= self.len {
+    self.past_end[0] = self.past_end[0] + 1
+    true
+  } else {
+    false
+  }
+}
+
+///|
 /// Run the program from `entry` at position `sp0`, returning whether it reached
 /// `Match`, where it ended, and the captures then held.
 fn Matcher::run(
@@ -916,6 +942,8 @@ fn Matcher::run(
         if sp < len && self.chars[sp] == c {
           sp = sp + 1
           pc = pc + 1
+        } else if self.reads_past_end(sp) {
+          pc = pc + 1
         } else {
           return (false, sp, saves)
         }
@@ -923,12 +951,16 @@ fn Matcher::run(
         if sp < len && (!except_newline || self.chars[sp] != '\n'.to_int()) {
           sp = sp + 1
           pc = pc + 1
+        } else if self.reads_past_end(sp) {
+          pc = pc + 1
         } else {
           return (false, sp, saves)
         }
       Class(set~) =>
         if sp < len && set.contains(self.chars[sp]) {
           sp = sp + 1
+          pc = pc + 1
+        } else if self.reads_past_end(sp) {
           pc = pc + 1
         } else {
           return (false, sp, saves)
@@ -973,12 +1005,12 @@ fn Matcher::run(
           return (false, sp, saves)
         }
         let n = e - s
-        if sp + n > len {
-          return (false, sp, saves)
-        }
+        // Only the part of the captured text that has arrived can be compared;
+        // the rest is still to come, which is what makes this a partial match.
+        let here = if sp + n > len { len - sp } else { n }
         let mut i = 0
         let mut ok = true
-        while i < n {
+        while i < here {
           let a = self.chars[sp + i]
           let b = self.chars[s + i]
           if a != b && !(icase && (a - b == 32 || b - a == 32)) {
@@ -987,12 +1019,17 @@ fn Matcher::run(
           }
           i = i + 1
         }
-        if ok {
-          sp = sp + n
-          pc = pc + 1
-        } else {
+        if !ok {
           return (false, sp, saves)
         }
+        if sp + n > len {
+          if !self.partial {
+            return (false, sp, saves)
+          }
+          self.past_end[0] = self.past_end[0] + 1
+        }
+        sp = sp + here
+        pc = pc + 1
       }
       Keep => {
         saves[0] = sp
@@ -1014,6 +1051,8 @@ fn Matcher::run(
             end = end + 1
           }
           sp = end
+          pc = pc + 1
+        } else if self.reads_past_end(sp) {
           pc = pc + 1
         } else {
           return (false, sp, saves)
@@ -1044,10 +1083,13 @@ fn Matcher::run(
         let mut found = false
         let mut found_saves = saves
         let outer_len = len
+        let outer_partial = self.partial
         // The body has to end where the assertion sits, so it is run with the
         // subject cut there: a greedy body then backtracks against that end
-        // instead of running past it.
+        // instead of running past it. Reads past the cut are refusals, not
+        // text still to come, because no continuation reaches back here.
         self.len = sp
+        self.partial = false
         let mut j = 0
         while j <= sp {
           let (ok, esp, ns) = self.run(sub, 0, j, clone_saves(saves), fz)
@@ -1059,6 +1101,7 @@ fn Matcher::run(
           j = j + 1
         }
         self.len = outer_len
+        self.partial = outer_partial
         if found == positive {
           saves = found_saves
           pc = pc + 1
@@ -1264,6 +1307,7 @@ fn make_match(
   ngroups : Int32,
   fz : FuzzyOutcome?,
   marks : Array[(String, Int32)],
+  partial~ : Bool,
 ) -> MatchResult {
   let spans : Array[(Int32, Int32)] = Array::make(ngroups + 1, (-1, -1))
   for g in 0..<(ngroups + 1) {
@@ -1284,6 +1328,7 @@ fn make_match(
     fuzzy,
     fuzzy_changes,
     marks: mark_names(marks),
+    partial,
   }
 }
 
@@ -1305,6 +1350,7 @@ fn accept_match(
     fuzzy: None,
     fuzzy_changes: None,
     marks: mark_names(marks),
+    partial: false,
   }
 }
 
@@ -1320,6 +1366,9 @@ fn mark_names(marks : Array[(String, Int32)]) -> Array[String] {
 
 ///|
 /// Search left to right from `pos` to `endpos`, returning the leftmost match.
+///
+/// `endpos` is the end of the subject as far as matching is concerned, which is
+/// what Python means by it: `$` sits there and a greedy repetition stops there.
 pub fn Program::search(
   self : Program,
   text : String,
@@ -1327,15 +1376,15 @@ pub fn Program::search(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
   must_advance~ : Bool = false,
+  partial~ : Bool = false,
 ) -> MatchResult? raise @parse.Refused {
   let chars = to_code_points(text)
-  let len = chars.length()
-  let end = if endpos < 0 { len } else { endpos }
+  let end = if endpos < 0 { chars.length() } else { endpos }
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
     chars,
-    len,
+    len: end,
     pos,
     limit: [limit],
     recurse_limit: [10000],
@@ -1345,6 +1394,8 @@ pub fn Program::search(
     attempt: pos,
     must_advance: false,
     graphemes: None,
+    partial,
+    past_end: [0],
   }
   let mut p = pos
   while p <= end {
@@ -1352,6 +1403,7 @@ pub fn Program::search(
     clear_ints(mat.recurse)
     clear_marks(mat.marks)
     fz[0] = None
+    mat.past_end[0] = 0
     let mut stop = false
     let mut skip_to = -1
     mat.attempt = p
@@ -1359,7 +1411,15 @@ pub fn Program::search(
     let result = try {
       let (ok, _esp, saves) = mat.run(self.code, 0, p, init, fz)
       if ok {
-        Some(make_match(saves, self.ngroups, fz[0], mat.marks))
+        Some(
+          make_match(
+            saves,
+            self.ngroups,
+            fz[0],
+            mat.marks,
+            partial=mat.past_end[0] > 0,
+          ),
+        )
       } else {
         None
       }
@@ -1416,6 +1476,7 @@ pub fn Program::prefix(
   text : String,
   pos~ : Int32 = 0,
   limit~ : Int32 = 10000000,
+  partial~ : Bool = false,
 ) -> MatchResult? raise @parse.Refused {
   let chars = to_code_points(text)
   let fz : Array[FuzzyOutcome?] = [None]
@@ -1432,12 +1493,22 @@ pub fn Program::prefix(
     attempt: pos,
     must_advance: false,
     graphemes: None,
+    partial,
+    past_end: [0],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
     let (ok, _esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok {
-      Some(make_match(saves, self.ngroups, fz[0], mat.marks))
+      Some(
+        make_match(
+          saves,
+          self.ngroups,
+          fz[0],
+          mat.marks,
+          partial=mat.past_end[0] > 0,
+        ),
+      )
     } else {
       None
     }
@@ -1459,15 +1530,15 @@ pub fn Program::full(
   pos~ : Int32 = 0,
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
+  partial~ : Bool = false,
 ) -> MatchResult? raise @parse.Refused {
   let chars = to_code_points(text)
-  let len = chars.length()
-  let end = if endpos < 0 { len } else { endpos }
+  let end = if endpos < 0 { chars.length() } else { endpos }
   let fz : Array[FuzzyOutcome?] = [None]
   let mat = Matcher::{
     program: self,
     chars,
-    len,
+    len: end,
     pos,
     limit: [limit],
     recurse_limit: [10000],
@@ -1477,12 +1548,22 @@ pub fn Program::full(
     attempt: pos,
     must_advance: false,
     graphemes: None,
+    partial,
+    past_end: [0],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
     let (ok, esp, saves) = mat.run(self.code, 0, pos, init, fz)
     if ok && esp == end {
-      Some(make_match(saves, self.ngroups, fz[0], mat.marks))
+      Some(
+        make_match(
+          saves,
+          self.ngroups,
+          fz[0],
+          mat.marks,
+          partial=mat.past_end[0] > 0,
+        ),
+      )
     } else {
       None
     }

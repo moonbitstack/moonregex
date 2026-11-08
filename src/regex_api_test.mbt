@@ -147,12 +147,14 @@ test "version constants mirror regex.__version__" {
 }
 
 ///|
-test "Match partial reflects the compile-time partial flag" {
+test "Match partial marks the match the text cut short" {
   let m = @moonregex.search("a", "a").unwrap()
   assert_false(m.partial())
   let p = @moonregex.compile("a", partial=true)
-  let m2 = p.search("a").unwrap()
-  assert_true(m2.partial())
+  // A match the text completed is not partial, even on a partial pattern.
+  assert_false(p.search("a").unwrap().partial())
+  // The empty text is the beginning of `a`, and nothing more.
+  assert_true(p.full("").unwrap().partial())
 }
 
 ///|
@@ -190,4 +192,11 @@ test "subfn returns the replacement count" {
   let (s2, n2) = @moonregex.subfn("\\d", "#", "1a2b3", count=2)
   assert_eq(s2, "#a#b3")
   assert_eq(n2, 2)
+}
+
+///|
+test "a backreference compares the way its scope does" {
+  assert_true(@moonregex.full("(?i)(a)\\1", "aA") is Some(_))
+  assert_true(@moonregex.full("(?i)(ab)\\1", "abAB") is Some(_))
+  assert_true(@moonregex.full("(a)\\1", "aA") is None)
 }

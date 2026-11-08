@@ -132,10 +132,11 @@ pub fn Match::re(self : Match) -> Pattern {
 }
 
 ///|
-/// Whether this match is a partial match — `regex.Match.partial`. True when the
-/// pattern was compiled with `partial=true`.
+/// Whether this match is partial — `regex.Match.partial`: the pattern ran out
+/// of text and would have gone on had the subject continued. Only a pattern
+/// compiled with `partial=true` can answer one.
 pub fn Match::partial(self : Match) -> Bool {
-  self.pattern.partial()
+  self.result.partial
 }
 
 ///|

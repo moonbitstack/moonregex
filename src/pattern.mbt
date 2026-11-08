@@ -58,6 +58,17 @@ pub fn Pattern::partial(self : Pattern) -> Bool {
 }
 
 ///|
+/// Python's `pos` and `endpos` as the region they name: both are brought inside
+/// the text rather than refused, and `-1` means "to the end". A region whose
+/// end falls before its start stays empty, which the engine reads as no match.
+fn region(text : String, pos : Int32, endpos : Int32) -> (Int32, Int32) {
+  let n = cp_length(text)
+  let start = if pos < 0 { 0 } else if pos > n { n } else { pos }
+  let end = if endpos < 0 { n } else if endpos > n { n } else { endpos }
+  (start, end)
+}
+
+///|
 /// Scan `text` for the leftmost match.
 pub fn Pattern::search(
   self : Pattern,
@@ -81,12 +92,19 @@ fn Pattern::search_from(
   must_advance : Bool,
   limit : Int32,
 ) -> Match? raise @parse.Refused {
-  match self.program.search(text, pos~, endpos~, limit~, must_advance~) {
+  let (start, end) = region(text, pos, endpos)
+  match
+    self.program.search(
+      text,
+      pos=start,
+      endpos=end,
+      limit~,
+      must_advance~,
+      partial=self.partial,
+    ) {
     None => None
-    Some(r) => {
-      let e = if endpos < 0 { cp_length(text) } else { endpos }
-      Some(Match::{ pattern: self, text, result: r, pos, endpos: e, })
-    }
+    Some(r) =>
+      Some(Match::{ pattern: self, text, result: r, pos: start, endpos: end, })
   }
 }
 
@@ -98,16 +116,11 @@ pub fn Pattern::prefix(
   pos~ : Int32 = 0,
   limit~ : Int32 = 10000000,
 ) -> Match? raise @parse.Refused {
-  match self.program.prefix(text, pos~, limit~) {
+  let (start, end) = region(text, pos, -1)
+  match self.program.prefix(text, pos=start, limit~, partial=self.partial) {
     None => None
     Some(r) =>
-      Some(Match::{
-        pattern: self,
-        text,
-        result: r,
-        pos,
-        endpos: cp_length(text),
-      })
+      Some(Match::{ pattern: self, text, result: r, pos: start, endpos: end, })
   }
 }
 
@@ -120,12 +133,12 @@ pub fn Pattern::full(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> Match? raise @parse.Refused {
-  match self.program.full(text, pos~, endpos~, limit~) {
+  let (start, end) = region(text, pos, endpos)
+  match
+    self.program.full(text, pos=start, endpos=end, limit~, partial=self.partial) {
     None => None
-    Some(r) => {
-      let e = if endpos < 0 { cp_length(text) } else { endpos }
-      Some(Match::{ pattern: self, text, result: r, pos, endpos: e, })
-    }
+    Some(r) =>
+      Some(Match::{ pattern: self, text, result: r, pos: start, endpos: end, })
   }
 }
 
@@ -197,8 +210,8 @@ fn Pattern::walk(
   limit~ : Int32 = 10000000,
 ) -> Array[Match] raise @parse.Refused {
   let out : Array[Match] = []
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
-  let mut p = pos
+  let (start, end) = region(text, pos, endpos)
+  let mut p = start
   let mut must_advance = false
   while p <= end {
     match self.search_from(text, p, end, must_advance, limit) {
@@ -211,6 +224,11 @@ fn Pattern::walk(
         }
       Some(m) => {
         out.push(m)
+        // A partial match is what the text has of a match that would go on, so
+        // nothing can follow it.
+        if m.partial() {
+          break
+        }
         if overlapped {
           p = m.start(0) + 1
           must_advance = false
@@ -245,9 +263,9 @@ pub fn Pattern::split(
   limit~ : Int32 = 10000000,
 ) -> Array[String?] raise @parse.Refused {
   let ng = self.groups()
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
+  let (start, end) = region(text, pos, endpos)
   let out : Array[String?] = []
-  let mut last = pos
+  let mut last = start
   let mut count = 0
   for m in self.walk(text, pos~, endpos~, overlapped=false, limit~) {
     if maxsplit != 0 && count >= maxsplit {
@@ -366,9 +384,9 @@ fn Pattern::replace(
   endpos~ : Int32 = -1,
   limit~ : Int32 = 10000000,
 ) -> (String, Int32) raise @parse.Refused {
-  let end = if endpos < 0 { cp_length(text) } else { endpos }
+  let (start, end) = region(text, pos, endpos)
   let buf = StringBuilder::StringBuilder()
-  let mut last = pos
+  let mut last = start
   let mut n = 0
   for m in self.walk(text, pos~, endpos~, overlapped=false, limit~) {
     if count != 0 && n >= count {
