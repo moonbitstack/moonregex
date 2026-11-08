@@ -89,13 +89,13 @@
       leftmost match as a <code>Match?</code>. When a pattern is used more than once,
       compile it first — the module functions compile on every call.</p>
     <pre><code><span class="c-kw">let</span> year = @moonregex.compile(<span class="c-str">"\\d{4}"</span>)
-year.findall(<span class="c-str">"1999 and 2026"</span>)   <span class="c-com">// ["1999", "2026"]</span></code></pre>
+year.findall(<span class="c-str">"1999 and 2026"</span>)   <span class="c-com">// [Some("1999"), Some("2026")]</span></code></pre>
     <p>A pattern that does not compile raises <code>Refused</code>, which carries a
       message and where reading stopped:</p>
     <pre><code><span class="c-kw">try</span> {
   @moonregex.compile(<span class="c-str">"(a"</span>)
 } <span class="c-kw">catch</span> {
-  @moonregex.Pattern(msg~, at~, ..) =&gt; println(msg)   <span class="c-com">// missing ), unterminated group</span>
+  @moonregex.Refused::Pattern(msg~, at~, ..) =&gt; println(msg)   <span class="c-com">// missing ), unterminated group</span>
 }</code></pre>
 
     <h2 id="anchors"><span class="num">02</span>Where a match may fall</h2>
@@ -120,11 +120,11 @@ p.full(<span class="c-str">"hello"</span>)        <span class="c-com">// Some(_)
     <p>Parentheses capture, and a name reaches the same slot as its number:</p>
     <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?&lt;year&gt;\\d{4})-(?&lt;month&gt;\\d{2})"</span>)
 <span class="c-kw">let</span> m = p.search(<span class="c-str">"on 2026-10-28"</span>).unwrap()
-m.group(<span class="c-num">1</span>)              <span class="c-com">// Some("2026")</span>
-m.group(<span class="c-str">"month"</span>)        <span class="c-com">// Some("10")</span>
-m.span(<span class="c-str">"month"</span>)         <span class="c-com">// Some((13, 15))</span>
-m.groups()            <span class="c-com">// [Some("2026"), Some("10")]</span>
-m.groupdict()         <span class="c-com">// {"year": Some("2026"), "month": Some("10")}</span></code></pre>
+m.group(<span class="c-num">1</span>)                 <span class="c-com">// Some("2026")</span>
+m.group(<span class="c-str">"month"</span>)           <span class="c-com">// Some("10")</span>
+m.span(<span class="c-str">"month"</span>)            <span class="c-com">// (8, 10)</span>
+m.groups()                 <span class="c-com">// [Some("2026"), Some("10")]</span>
+m.groupdict()              <span class="c-com">// {"year": "2026", "month": "10"}</span></code></pre>
     <p>A group that took no part answers <code>None</code>, not an empty string —
       the difference matters in patterns with alternation:</p>
     <pre><code><span class="c-kw">let</span> m = @moonregex.compile(<span class="c-str">"(a)|(b)"</span>).search(<span class="c-str">"b"</span>).unwrap()
@@ -134,19 +134,19 @@ m.group(<span class="c-num">2</span>)   <span class="c-com">// Some("b")</span><
       groups Python answers a tuple, and since a list of strings cannot say that,
       the call is refused until you name one:</p>
     <pre><code><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(\\w+)=(\\d+)"</span>)
-p.findall(<span class="c-str">"a=1"</span>)                <span class="c-com">// raises Ambiguous(groups=2)</span>
-p.findall(<span class="c-str">"a=1"</span>, group=Num(n=<span class="c-num">1</span>))   <span class="c-com">// ["a"]</span>
-p.finditer(<span class="c-str">"a=1"</span>).length()       <span class="c-com">// 1 — and the Match has both</span></code></pre>
+p.findall(<span class="c-str">"a=1"</span>)                 <span class="c-com">// raises Ambiguous(groups=2)</span>
+p.findall(<span class="c-str">"a=1"</span>, group=Num(n=<span class="c-num">1</span>))  <span class="c-com">// [Some("a")]</span>
+p.finditer(<span class="c-str">"a=1"</span>).length()        <span class="c-com">// 1 — and the Match has both</span></code></pre>
 
     <h2 id="replace"><span class="num">04</span>Replacing and splitting</h2>
     <pre><code>@moonregex.sub(<span class="c-str">"\\s+"</span>, <span class="c-str">" "</span>, <span class="c-str">"a   b  c"</span>)        <span class="c-com">// "a b c"</span>
 @moonregex.subn(<span class="c-str">"\\d"</span>, <span class="c-str">"#"</span>, <span class="c-str">"a1b2"</span>)            <span class="c-com">// ("a#b#", 2)</span>
-@moonregex.split(<span class="c-str">"\\s*,\\s*"</span>, <span class="c-str">"a , b,c"</span>)      <span class="c-com">// ["a", "b", "c"]</span></code></pre>
+@moonregex.split(<span class="c-str">"\\s*,\\s*"</span>, <span class="c-str">"a , b,c"</span>)      <span class="c-com">// [Some("a"), Some("b"), Some("c")]</span></code></pre>
     <p>A replacement is a template: <code>\1</code>, <code>\g&lt;name&gt;</code>, and
       <code>\g&lt;0&gt;</code> for the whole match. When the replacement is computed,
       <code>sub_with</code> takes the <code>Match</code> and answers the text:</p>
-    <pre><code>@moonregex.sub(<span class="c-str">"(\\w+)@(\\w+)"</span>, <span class="c-str">"\g&lt;2&gt;:\g&lt;1&gt;"</span>, <span class="c-str">"u@h"</span>)   <span class="c-com">// "h:u"</span>
-@moonregex.sub_with(<span class="c-str">"\\d+"</span>, m =&gt; <span class="c-str">"&lt;"</span> + m.content() + <span class="c-str">"&gt;"</span>, <span class="c-str">"a1b"</span>)</code></pre>
+    <pre><code>@moonregex.sub(<span class="c-str">"(\\w+)@(\\w+)"</span>, <span class="c-str">"\\g&lt;2&gt;:\\g&lt;1&gt;"</span>, <span class="c-str">"u@h"</span>)              <span class="c-com">// "h:u"</span>
+@moonregex.sub_with(<span class="c-str">"\\d+"</span>, m =&gt; <span class="c-str">"&lt;"</span> + m.content().to_owned() + <span class="c-str">"&gt;"</span>, <span class="c-str">"a1b"</span>)</code></pre>
     <div class="out"><code>"a&lt;1&gt;b"</code></div>
     <p><code>split</code> keeps the captured groups in the result, the way Python
       does; a group that took no part is <code>None</code>, which is why the answer is
@@ -226,9 +226,9 @@ p.search(<span class="c-str">"e\u{301}x"</span>).unwrap().content()   <span clas
         <code>after</code> as core spells them, next to <code>group</code> and
         <code>span</code>.</li>
     </ul>
-    <pre><code><span class="c-kw">let</span> date = @moonregex.Pattern::string(<span class="c-str">"\\d{4}"</span>).capture(<span class="c-str">"year"</span>) +
-  @moonregex.Pattern::string(<span class="c-str">"-"</span>) +
-  @moonregex.Pattern::string(<span class="c-str">"\\d{2}"</span>).capture(<span class="c-str">"month"</span>)
+    <pre><code><span class="c-kw">let</span> date = @moonregex.compile(<span class="c-str">"\\d{4}"</span>).capture(<span class="c-str">"year"</span>) +
+  @moonregex.compile(<span class="c-str">"-"</span>) +
+  @moonregex.compile(<span class="c-str">"\\d{2}"</span>).capture(<span class="c-str">"month"</span>)
 
 <span class="c-kw">let</span> m = date.prefix(<span class="c-str">"2026-10"</span>).unwrap()
 m.group(<span class="c-str">"month"</span>)    <span class="c-com">// Some("10")</span>
@@ -249,10 +249,10 @@ m.after()         <span class="c-com">// ""</span></code></pre>
     <p>Backtracking can be made expensive. Every call carries a step ceiling —
       ten million by default — and raises rather than hanging:</p>
     <pre><code><span class="c-kw">try</span> {
-  @moonregex.full(<span class="c-str">"(a+)+b"</span>, <span class="c-str">"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"</span>)
+  @moonregex.full(<span class="c-str">"(a+)+b"</span>, <span class="c-str">"aaaaaaaaaaaaaaaaaaaa"</span>, limit=<span class="c-num">100</span>)
 } <span class="c-kw">catch</span> {
-  @moonregex.Exceeded(limit~, got~) =&gt; println(<span class="c-str">"\hit \{got} steps"</span>)
-  _ =&gt; ()
+  @moonregex.Refused::Exceeded(limit~, got~) =&gt; println(<span class="c-str">"hit \{got} steps"</span>)   <span class="c-com">// hit 101 steps</span>
+  e =&gt; <span class="c-kw">raise</span> e
 }</code></pre>
     <p><code>limit=</code> sets it per call when a pattern is known to be cheap.
       <code>partial=true</code> answers a match when the text ends in the middle of
