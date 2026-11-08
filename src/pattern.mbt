@@ -46,6 +46,12 @@ pub fn Pattern::groupindex(self : Pattern) -> Map[String, Array[Int32]] {
 }
 
 ///|
+/// The `\L<name>` lists the pattern used, name to items — `regex.Pattern.named_lists`.
+pub fn Pattern::named_lists(self : Pattern) -> Map[String, Array[String]] {
+  self.ast.named_lists()
+}
+
+///|
 /// The syntax tree re-printed, as Python's `Pattern.dump` would.
 pub fn Pattern::dump(self : Pattern) -> String {
   self.ast.dump()

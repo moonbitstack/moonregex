@@ -127,12 +127,15 @@ pub(all) struct Match {
   // private fields
 }
 pub fn Match::after(Self) -> StringView
+pub fn Match::allcaptures(Self) -> Array[Array[String]]
+pub fn Match::allspans(Self) -> Array[Array[(Int32, Int32)]]
 pub fn Match::before(Self) -> StringView
 pub fn[K : GroupKey] Match::captures(Self, K) -> Array[(Int32, Int32)] raise @parse.Refused
 pub fn Match::capturesdict(Self) -> Map[String, Array[(Int32, Int32)]]
 pub fn Match::content(Self) -> StringView
 pub fn[K : GroupKey] Match::end(Self, K) -> Int32 raise @parse.Refused
 pub fn Match::endpos(Self) -> Int32
+pub fn[K : GroupKey] Match::ends(Self, K) -> Array[Int32] raise @parse.Refused
 pub fn Match::expand(Self, String) -> String raise @parse.Refused
 pub fn Match::fuzzy_changes(Self) -> (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])
 pub fn Match::fuzzy_counts(Self) -> (Int32, Int32, Int32)
@@ -150,7 +153,9 @@ pub fn Match::pos(Self) -> Int32
 pub fn Match::re(Self) -> Pattern
 pub fn[K : GroupKey] Match::slices(Self, K) -> Array[String] raise @parse.Refused
 pub fn[K : GroupKey] Match::span(Self, K) -> (Int32, Int32) raise @parse.Refused
+pub fn[K : GroupKey] Match::spans(Self, K) -> Array[(Int32, Int32)] raise @parse.Refused
 pub fn[K : GroupKey] Match::start(Self, K) -> Int32 raise @parse.Refused
+pub fn[K : GroupKey] Match::starts(Self, K) -> Array[Int32] raise @parse.Refused
 pub fn Match::string(Self) -> String
 
 pub(all) struct Pattern {
@@ -170,6 +175,7 @@ pub fn Pattern::groups(Self) -> Int32
 #deprecated
 pub fn Pattern::lor(Self, Self) -> Self
 pub fn Pattern::lower(Self) -> @string.Regex?
+pub fn Pattern::named_lists(Self) -> Map[String, Array[String]]
 pub fn Pattern::partial(Self) -> Bool
 pub fn Pattern::pattern(Self) -> String
 pub fn Pattern::prefix(Self, String, pos? : Int32, limit? : Int32) -> Match? raise @parse.Refused

@@ -167,6 +167,76 @@ pub fn[K : GroupKey] Match::captures(
 }
 
 ///|
+/// The start offsets of every capture of `group`, in the order they happened —
+/// the plural of `start`. Our engine records the last span a group held, so a
+/// group that ran more than once answers the offset of its last turn.
+pub fn[K : GroupKey] Match::starts(
+  self : Match,
+  group : K,
+) -> Array[Int32] raise @parse.Refused {
+  let out : Array[Int32] = []
+  for (s, _e) in self.captures(group) {
+    out.push(s)
+  }
+  out
+}
+
+///|
+/// The end offsets of every capture of `group`, in the order they happened —
+/// the plural of `end`.
+pub fn[K : GroupKey] Match::ends(
+  self : Match,
+  group : K,
+) -> Array[Int32] raise @parse.Refused {
+  let out : Array[Int32] = []
+  for (_s, e) in self.captures(group) {
+    out.push(e)
+  }
+  out
+}
+
+///|
+/// Every capture of `group` as a span — the same list `captures` answers, under
+/// the name the reference gives it.
+pub fn[K : GroupKey] Match::spans(
+  self : Match,
+  group : K,
+) -> Array[(Int32, Int32)] raise @parse.Refused {
+  self.captures(group)
+}
+
+///|
+/// Every capture of every group as text, group 0 first — `regex.Match.allcaptures`.
+/// A group that took no part answers an empty list.
+pub fn Match::allcaptures(self : Match) -> Array[Array[String]] {
+  let out : Array[Array[String]] = []
+  for g in 0..<(self.pattern.groups() + 1) {
+    let span = self.result.spans[g]
+    if span.0 >= 0 {
+      out.push([slice_cp(self.text, span.0, span.1)])
+    } else {
+      out.push([])
+    }
+  }
+  out
+}
+
+///|
+/// Every capture of every group as a span, group 0 first — `regex.Match.allspans`.
+pub fn Match::allspans(self : Match) -> Array[Array[(Int32, Int32)]] {
+  let out : Array[Array[(Int32, Int32)]] = []
+  for g in 0..<(self.pattern.groups() + 1) {
+    let span = self.result.spans[g]
+    if span.0 >= 0 {
+      out.push([span])
+    } else {
+      out.push([])
+    }
+  }
+  out
+}
+
+///|
 /// Named groups to their captured spans — Python's `Match.capturesdict`.
 pub fn Match::capturesdict(self : Match) -> Map[String, Array[(Int32, Int32)]] {
   let index = self.pattern.groupindex()
