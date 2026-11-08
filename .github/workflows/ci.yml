@@ -62,6 +62,12 @@ jobs:
             pipx run --spec skills-ref agentskills validate "$dir"
           done
 
+      # The code the pages print lives in `src/examples/docs`, which `moon test` runs; this
+      # checks that what the pages print is still exactly that code.
+      - name: the pages show the code that runs
+        if: runner.os == 'Linux'
+        run: python3 scripts/gen_docs_snippets.py --check
+
       # A reader pastes the blocks of the README and the skills into a project, so they have
       # to compile as written, against this commit's source.
       - name: the code in the docs compiles

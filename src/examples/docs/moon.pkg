@@ -1,0 +1,8 @@
+// The code the site shows, written once. Each block here is the snippet a page
+// prints between its `docs:begin` and `docs:end` markers, with the setup and the
+// checks the page leaves out around it; `scripts/gen_docs_snippets.py` copies the
+// marked lines into `docs/`, so the page cannot drift from what runs.
+import {
+  "moonbitstack/moonregex",
+  "moonbitstack/moonregex/glob",
+}

@@ -547,23 +547,32 @@
     var SPELL = {
       py: {
         code:
-'<span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?P&lt;year&gt;\\d{4})-(?P&lt;month&gt;\\d{2})"</span>)\n' +
-'p.search(<span class="c-str">"on 2026-10-28"</span>)',
+        // docs:snippet showcase/py
+'<span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"(?P&lt;year&gt;\\\\d{4})-(?P&lt;month&gt;\\\\d{2})"</span>)\n' +
+'<span class="c-kw">let</span> m = p.search(<span class="c-str">"on 2026-10-28"</span>).unwrap()\n',
+        // docs:end
         out: 'match (3, 10) · year = "2026" (3, 7) · month = "10" (8, 10)'
       },
       core: {
         code:
-'<span class="c-com">// the lexmatch grammar has no \\d and no named groups: classes are written out</span>\n' +
-'<span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"([0-9]{4})-([0-9]{2})"</span>,\n' +
-'  dialect=@moonregex.lexmatch_dialect)',
+        // docs:snippet showcase/core
+'<span class="c-kw">let</span> p = @moonregex.compile(\n' +
+'  <span class="c-str">"([0-9]{4})-([0-9]{2})"</span>,\n' +
+'  dialect=@moonregex.lexmatch_dialect,\n' +
+')\n' +
+'<span class="c-kw">let</span> m = p.search(<span class="c-str">"on 2026-10-28"</span>).unwrap()\n',
+        // docs:end
         out: 'match (3, 10) · group 1 = "2026" (3, 7) · group 2 = "10" (8, 10)'
       },
       built: {
         code:
-'<span class="c-kw">let</span> year = @moonregex.compile(<span class="c-str">"\\d{4}"</span>).capture(<span class="c-str">"year"</span>)\n' +
-'<span class="c-kw">let</span> dash = @moonregex.Pattern::string(<span class="c-str">"-"</span>)   <span class="c-com">// literal, nothing to read</span>\n' +
-'<span class="c-kw">let</span> month = @moonregex.compile(<span class="c-str">"\\d{2}"</span>).capture(<span class="c-str">"month"</span>)\n' +
-'<span class="c-kw">let</span> p = year + dash + month',
+        // docs:snippet showcase/built
+'<span class="c-kw">let</span> year = @moonregex.compile(<span class="c-str">"\\\\d{4}"</span>).capture(<span class="c-str">"year"</span>)\n' +
+'<span class="c-kw">let</span> dash = @moonregex.Pattern::string(<span class="c-str">"-"</span>)\n' +
+'<span class="c-kw">let</span> month = @moonregex.compile(<span class="c-str">"\\\\d{2}"</span>).capture(<span class="c-str">"month"</span>)\n' +
+'<span class="c-kw">let</span> p = year + dash + month\n' +
+'<span class="c-kw">let</span> m = p.search(<span class="c-str">"on 2026-10-28"</span>).unwrap()\n',
+        // docs:end
         out: 'match (3, 10) · year = "2026" (3, 7) · month = "10" (8, 10)'
       }
     };

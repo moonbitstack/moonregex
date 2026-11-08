@@ -41,6 +41,13 @@ jobs:
           python3 scripts/gen_api.py
           git diff --exit-code docs/api.html
 
+      # The code on the pages is a copy of `src/examples/docs`, which the tests run:
+      # regenerate it here and fail if the committed pages had drifted.
+      - name: the pages show the code that runs
+        run: |
+          python3 scripts/gen_docs_snippets.py
+          git diff --exit-code docs/
+
       # The showcase's playground calls the library itself, so the bundle is
       # rebuilt here rather than trusted from the commit: what ships must match
       # the code that just built.
