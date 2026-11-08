@@ -18,12 +18,11 @@ library in the browser: `src/examples/browser` compiles to `docs/assets/moonrege
 with `python scripts/build_web.py`, and the page feeds your pattern, flags and
 text through it. Nothing there is re-implemented in JavaScript.
 
-<!-- nocheck -->
 ```moonbit
 let year = @moonregex.search("\\d{4}", "copyright 2026").unwrap()
-year.content()            // "2026"
-year.start()              // 10
-@moonregex.sub("\\s+", " ", "a   b  c")   // "a b c"
+assert_eq(year.content(), "2026")
+assert_eq(year.start(0), 10)
+assert_eq(@moonregex.sub("\\s+", " ", "a   b  c"), "a b c")
 ```
 
 A pattern is read by one of three grammars, lowered into a single syntax tree,
@@ -61,12 +60,12 @@ Reading an ECMA-262 pattern next to a Python one, a name that means two things
 is worse than a name nobody has seen before. `Pattern::search`, `Pattern::prefix`
 and `Pattern::full` are the same three.
 
-<!-- nocheck -->
 ```moonbit
-let p = @moonregex.compile("[a-z]+")
-p.search("  hello ")   // Some(_) — at 2
-p.prefix("  hello ")   // None    — the scan starts at 0
-p.full("hello")        // Some(_)
+let word = @moonregex.compile("[a-z]+")
+assert_true(word.search("  hello ") is Some(_))
+assert_true(word.prefix("  hello ") is None)
+assert_true(word.full("hello") is Some(_))
+assert_eq(word.search("  hello ").unwrap().start(0), 2)
 ```
 
 ## The interface
@@ -88,13 +87,14 @@ methods, when a pattern is used more than once.
 `Pattern` answers `pattern`, `flags`, `dialect`, `groups`, `groupindex`,
 `named_lists`, `partial`, `dump`, and the same matching methods without the
 compile options. `Match` answers `group`, `groups`, `groupdict`, `start`, `end`,
-`span`, `captures`, `starts`, `ends`, `spans`, `capturesdict`, `allcaptures`,
-`allspans`, `expand`, `expandf`, `pos`, `endpos`, `lastindex`, `lastgroup`, `re`,
-`string`, `content`, `before`, `after`, `fuzzy_counts`, `fuzzy_changes`, `marks`
-and `partial`.
+`span`, `captures`, `slices`, `starts`, `ends`, `spans`, `capturesdict`,
+`allcaptures`, `allspans`, `expand`, `expandf`, `pos`, `endpos`, `lastindex`,
+`lastgroup`, `re`, `string`, `content`, `before`, `after`, `fuzzy_counts`,
+`fuzzy_changes`, `marks` and `partial`.
 
 A group is addressed by number or by name — `trait GroupKey` is implemented by
-`Int` and by `String`, so `m.group(1)` and `m.group("year")` both work.
+`Int` and by `String`, so `m.group(1)` and `m.group("year")` both work. There is
+no default: `m.start(0)` says "the whole match" the way `m.group(0)` does.
 
 ### Groups, and the one place a list cannot answer
 
@@ -103,10 +103,16 @@ group when it has one — and refuses when it has two or more, because Python
 answers a tuple there and a statically typed list cannot. Pass `group` to say
 which one, or walk `finditer` for matches that carry them all.
 
-<!-- nocheck -->
 ```moonbit
-@moonregex.findall("(\\w+)=(\\d+)", "a=1")            // raises Ambiguous
-@moonregex.findall("(\\w+)=(\\d+)", "a=1", group=Num(n=1))   // ["a"]
+let ambiguous = try {
+  let _ = @moonregex.findall("(\\w+)=(\\d+)", "a=1")
+  0
+} catch {
+  @moonregex.Refused::Ambiguous(groups~) => groups
+  e => raise e
+}
+assert_eq(ambiguous, 2)
+assert_eq(@moonregex.findall("(\\w+)=(\\d+)", "a=1", group=Num(n=1)), [Some("a")])
 ```
 
 ### Flags
@@ -132,18 +138,26 @@ agree on what is special:
 | `Ecma262` | `\x61\.b` | `RegExp.escape`: punctuation is spelled in hex, and a leading alphanumeric too |
 | `Lexmatch` | `a\.b` | the `@string.Regex` metacharacters, with `\u{…}` for the invisible ones |
 
+```moonbit
+assert_eq(@moonregex.escape("a.b"), "a\\.b")
+assert_eq(@moonregex.escape("a.b", dialect=@moonregex.ecma262), "\\x61\\.b")
+assert_eq(@moonregex.escape("a.b", dialect=@moonregex.lexmatch_dialect), "a\\.b")
+```
+
 ## The three grammars
 
-<!-- nocheck -->
 ```moonbit
 // Python: named group, `\A`, backreference — the default.
-@moonregex.findall("(?P<w>\\w+)\\s+\\1", "go go no")
+assert_eq(@moonregex.findall("(?P<w>\\w+)\\s+\\1", "go go no"), [Some("go")])
 
 // ECMA-262: what a JSON Schema `pattern` means.
-@moonregex.compile("^[a-z]+$", dialect=@moonregex.ecma262)
+let schema = @moonregex.compile("^[a-z]+$", dialect=@moonregex.ecma262)
+assert_true(schema.full("abc") is Some(_))
+assert_true(schema.full("ABC") is None)
 
 // lexmatch: a pattern already written for the core library.
-@moonregex.compile("[[:digit:]]+", dialect=@moonregex.lexmatch_dialect)
+let posix = @moonregex.compile("[[:digit:]]+", dialect=@moonregex.lexmatch_dialect)
+assert_eq(posix.findall("a12b3"), [Some("12"), Some("3")])
 ```
 
 Choose by where the pattern comes from. A pattern a person wrote for text
@@ -171,21 +185,16 @@ and runs the rest itself.
 - **A match carries both views**: `content`, `before` and `after` as core spells
   them, next to `group`, `span` and the rest.
 
-<!-- nocheck -->
 ```moonbit
-let year = @moonregex.Pattern::string("\\d{4}").capture("year")
-let dash = @moonregex.Pattern::string("-")
-let month = @moonregex.Pattern::string("\\d{2}").capture("month")
-let date = year + dash + month
-
-let m = date.prefix("2026-10").unwrap()
-m.group("month")   // Some("10")
+let date = @moonregex.compile("\\d{4}").capture("year") +
+  @moonregex.compile("-") +
+  @moonregex.compile("\\d{2}").capture("month")
+let stamp = date.prefix("2026-10").unwrap()
+assert_eq(stamp.group("month"), Some("10"))
+assert_true(date.lower() is Some(_))
 
 // `lower` hands the pattern to the core engine when it fits.
-match date.lower() {
-  Some(core) => core.execute("2026-10") is Some(_)   // true
-  None => false
-}
+assert_true(@moonregex.compile("(a)\\1").lower() is None)
 ```
 
 ## Step limits
@@ -195,11 +204,32 @@ carries a step ceiling — ten million by default, the number PCRE2 uses — and
 raises `Exceeded(limit~, got~)` rather than hanging. `limit~` raises or lowers it
 per call.
 
+```moonbit
+let runaway = try {
+  let _ = @moonregex.full("(a+)+b", "aaaaaaaaaaaaaaaaaaaa", limit=100)
+  "no error"
+} catch {
+  @moonregex.Refused::Exceeded(limit~, got~) => "stopped at \{limit} of \{got} steps"
+  e => raise e
+}
+assert_eq(runaway, "stopped at 100 of 101 steps")
+```
+
 ## Partial matching
 
 With `partial=true`, a pattern that has matched everything it can but could go
 on matching if the text continued answers a match with `Match::partial` set —
-what a streaming parser needs to know that it should wait for more input.
+what a streaming parser needs to know that it should wait for more input. The
+span is the text that arrived, so nothing is invented: `\d{4}-\d{2}` against
+`2026-` answers `2026-`, flagged.
+
+```moonbit
+let stream = @moonregex.compile("\\d{4}-\\d{2}", partial=true)
+let cut = stream.prefix("2026-").unwrap()
+assert_eq(cut.content(), "2026-")
+assert_true(cut.partial())
+assert_true(stream.prefix("2026-10").unwrap().partial() is false)
+```
 
 ## What it does not do
 
@@ -232,6 +262,7 @@ instead:
 | Property names | Unicode loose matching in every dialect | ECMA-262 is case- and space-sensitive |
 | A name used twice | allowed in the ECMA dialect anywhere | `re` refuses it; ECMA-262 only across alternatives |
 | `v`-mode nested classes | `[[a-z]--[aeiou]]` is not read as a class expression | ECMA-262 reads them |
+| Repeated captures | one span per group: `captures` and `spans` answer the last turn | `regex` lists every turn |
 
 ## Licence
 
