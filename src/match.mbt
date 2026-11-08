@@ -150,10 +150,25 @@ pub fn Match::expand(
 }
 
 ///|
-/// Every capture of `group`, as code-point spans; an empty list when the group
-/// took no part — Python's `Match.captures`. Our engine records the last span a
-/// group held, so this returns the one span a non-repeated group captured.
+/// Every capture of `group` as text, in the order they happened; an empty list
+/// when the group took no part — `regex.Match.captures`. Our engine records the
+/// last span a group held, so a group that ran more than once answers its last
+/// turn rather than every one of them.
 pub fn[K : GroupKey] Match::captures(
+  self : Match,
+  group : K,
+) -> Array[String] raise @parse.Refused {
+  let out : Array[String] = []
+  for (s, e) in self.spans(group) {
+    out.push(slice_cp(self.text, s, e))
+  }
+  out
+}
+
+///|
+/// Every capture of `group` as a code-point span, in the order they happened;
+/// an empty list when the group took no part — `regex.Match.spans`.
+pub fn[K : GroupKey] Match::spans(
   self : Match,
   group : K,
 ) -> Array[(Int32, Int32)] raise @parse.Refused {
@@ -168,14 +183,13 @@ pub fn[K : GroupKey] Match::captures(
 
 ///|
 /// The start offsets of every capture of `group`, in the order they happened —
-/// the plural of `start`. Our engine records the last span a group held, so a
-/// group that ran more than once answers the offset of its last turn.
+/// the plural of `start`.
 pub fn[K : GroupKey] Match::starts(
   self : Match,
   group : K,
 ) -> Array[Int32] raise @parse.Refused {
   let out : Array[Int32] = []
-  for (s, _e) in self.captures(group) {
+  for (s, _e) in self.spans(group) {
     out.push(s)
   }
   out
@@ -189,20 +203,10 @@ pub fn[K : GroupKey] Match::ends(
   group : K,
 ) -> Array[Int32] raise @parse.Refused {
   let out : Array[Int32] = []
-  for (_s, e) in self.captures(group) {
+  for (_s, e) in self.spans(group) {
     out.push(e)
   }
   out
-}
-
-///|
-/// Every capture of `group` as a span — the same list `captures` answers, under
-/// the name the reference gives it.
-pub fn[K : GroupKey] Match::spans(
-  self : Match,
-  group : K,
-) -> Array[(Int32, Int32)] raise @parse.Refused {
-  self.captures(group)
 }
 
 ///|
@@ -237,35 +241,19 @@ pub fn Match::allspans(self : Match) -> Array[Array[(Int32, Int32)]] {
 }
 
 ///|
-/// Named groups to their captured spans — Python's `Match.capturesdict`.
-pub fn Match::capturesdict(self : Match) -> Map[String, Array[(Int32, Int32)]] {
+/// Named groups to the text they captured — `regex.Match.capturesdict`.
+pub fn Match::capturesdict(self : Match) -> Map[String, Array[String]] {
   let index = self.pattern.groupindex()
-  let out : Map[String, Array[(Int32, Int32)]] = Map([])
+  let out : Map[String, Array[String]] = Map([])
   for k in index.keys() {
     let slots = index.get(k).unwrap()
     let slot : Int32 = slots[0]
     let span = self.result.spans[slot]
     if span.0 >= 0 {
-      out[k] = [span]
+      out[k] = [slice_cp(self.text, span.0, span.1)]
     }
   }
   out
-}
-
-///|
-/// The substrings the group captured, or an empty list when it took no part —
-/// Python's `Match.slices`.
-pub fn[K : GroupKey] Match::slices(
-  self : Match,
-  group : K,
-) -> Array[String] raise @parse.Refused {
-  let slot = self.slot_of(group.to_group())
-  let span = self.result.spans[slot]
-  if span.0 >= 0 {
-    [slice_cp(self.text, span.0, span.1)]
-  } else {
-    []
-  }
 }
 
 ///|

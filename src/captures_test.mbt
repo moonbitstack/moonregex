@@ -10,7 +10,7 @@ test "starts, ends and spans agree with captures" {
   let m = @moonregex.compile("(?<year>\\d{4})-(?<month>\\d{2})")
     .search("on 2026-10-28")
     .unwrap()
-  assert_eq(m.captures(1), [(3, 7)])
+  assert_eq(m.captures(1), ["2026"])
   assert_eq(m.spans(1), [(3, 7)])
   assert_eq(m.starts(1), [3])
   assert_eq(m.ends(1), [7])

@@ -87,7 +87,7 @@ methods, when a pattern is used more than once.
 `Pattern` answers `pattern`, `flags`, `dialect`, `groups`, `groupindex`,
 `named_lists`, `partial`, `dump`, and the same matching methods without the
 compile options. `Match` answers `group`, `groups`, `groupdict`, `start`, `end`,
-`span`, `captures`, `slices`, `starts`, `ends`, `spans`, `capturesdict`,
+`span`, `captures`, `starts`, `ends`, `spans`, `capturesdict`,
 `allcaptures`, `allspans`, `expand`, `expandf`, `pos`, `endpos`, `lastindex`,
 `lastgroup`, `re`, `string`, `content`, `before`, `after`, `fuzzy_counts`,
 `fuzzy_changes`, `marks` and `partial`.
@@ -95,6 +95,11 @@ compile options. `Match` answers `group`, `groups`, `groupdict`, `start`, `end`,
 A group is addressed by number or by name — `trait GroupKey` is implemented by
 `Int` and by `String`, so `m.group(1)` and `m.group("year")` both work. There is
 no default: `m.start(0)` says "the whole match" the way `m.group(0)` does.
+
+The singular forms answer the last capture a group made, the plural forms answer
+all of them — in one list, because this engine keeps one span per group:
+`captures` gives the text, `spans` the offsets, `starts` and `ends` the ends of
+those offsets.
 
 ### Groups, and the one place a list cannot answer
 

@@ -72,19 +72,20 @@ test "Match re returns the pattern and expand substitutes groups" {
 }
 
 ///|
-test "Match captures and slices list a group's captured text" {
+test "Match captures lists a group's text and spans its place" {
   let m = @moonregex.search("(a+)b", "aaab").unwrap()
-  assert_eq(m.captures(1), [(0, 3)])
-  assert_eq(m.slices(1), ["aaa"])
-  assert_eq(m.slices(0), ["aaab"])
+  assert_eq(m.captures(1), ["aaa"])
+  assert_eq(m.captures(0), ["aaab"])
+  assert_eq(m.spans(1), [(0, 3)])
+  assert_eq(m.spans(0), [(0, 4)])
 }
 
 ///|
-test "Match capturesdict maps named groups to spans" {
+test "Match capturesdict maps named groups to their text" {
   let m = @moonregex.search("(?P<a>\\d+)-(?P<b>\\d+)", "12-34").unwrap()
   let d = m.capturesdict()
-  assert_eq(d["a"], [(0, 2)])
-  assert_eq(d["b"], [(3, 5)])
+  assert_eq(d["a"], ["12"])
+  assert_eq(d["b"], ["34"])
 }
 
 ///|

@@ -223,5 +223,5 @@ test "a group is reached by number, by name, and by indexing" {
   assert_eq(m[2], Some("10"))
   assert_eq(m.span("year"), (3, 7))
   assert_eq(m.start(2), 8)
-  assert_eq(m.captures("year"), [(3, 7)])
+  assert_eq(m.captures("year"), ["2026"])
 }
