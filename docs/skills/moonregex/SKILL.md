@@ -62,11 +62,19 @@ The dialect is a parameter, not a fork: Python (the default), `Ecma262` for a
 JSON Schema or OpenAPI `pattern`, and `Lexmatch` for a pattern written for the
 core library's `@string.Regex` or the lexer. The same pattern in the wrong
 grammar compiles and answers differently, which is why the choice is explicit.
+`Lexmatch` also reads `\d`, `\w`, `\s` and `(?<name>…)` the way Python does, so
+a pattern moves between the two grammars unchanged.
 
 ```moonbit
 fn schema_pattern(pattern : String, value : String) -> Bool raise {
   let p = @moonregex.compile(pattern, dialect=@moonregex.ecma262)
   p.full(value) is Some(_)
+}
+
+fn lexer_values(pattern : String, text : String) -> Array[String?] raise {
+  // The core grammar leaves `\d` out; here it means what Python means by it.
+  let p = @moonregex.compile(pattern, dialect=@moonregex.lexmatch_dialect)
+  p.findall(text, group=Name(n="value"))
 }
 ```
 
@@ -84,5 +92,9 @@ fn schema_pattern(pattern : String, value : String) -> Bool raise {
 - `partial=true` answers a match the text cut short, with `Match::partial` set;
   without it the same text is no match at all.
 - `\w` and `\d` are ASCII under `Ecma262` and Unicode under `Python`; `\A`, `\Z`
-  and `$`-before-a-final-newline exist only in `Python`.
+  and `$`-before-a-final-newline exist only in `Python`. Under `Lexmatch` they
+  are the Python ones.
+- A backreference takes its case from where it is written, not from the group it
+  names: `(?i)(?-i:(a))\1` compares caselessly, `(?i:(a))\1` does not. The
+  comparison folds over every script, so `(?i)(é)\1` matches `éÉ`.
 - A pattern is cached nowhere: `findall(pattern, text)` recompiles each call.

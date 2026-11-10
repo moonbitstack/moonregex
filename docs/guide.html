@@ -61,6 +61,7 @@
       <li><a href="#groups">Groups</a></li>
       <li><a href="#replace">Replacing and splitting</a></li>
       <li><a href="#flags">Flags</a></li>
+      <li><a href="#case">Case and scopes</a></li>
       <li><a href="#dialects">Three grammars</a></li>
       <li><a href="#unicode">Unicode</a></li>
       <li><a href="#core">The core engine</a></li>
@@ -176,7 +177,37 @@ assert_true(q.full(<span class="c-str">"HELLO WORLD"</span>) <span class="c-kw">
       pattern, and <code>ascii</code> narrows <code>\w</code>, <code>\d</code>,
       <code>\s</code> and <code>\b</code> to their ASCII reading.</p>
 
-    <h2 id="dialects"><span class="num">06</span>Three grammars</h2>
+    <h2 id="case"><span class="num">06</span>Case, and where it comes from</h2>
+    <p>Flags can change inside a pattern: <code>(?i:…)</code> turns
+      case-insensitivity on for one group, <code>(?-i:…)</code> turns it off
+      again. Two things then take their case from different places. A
+      <em>group</em> is read under the flags around the group. A
+      <em>backreference</em> is compared under the flags around the reference —
+      the place it is written — so the two need not agree, and when they do not,
+      the reference decides.</p>
+    <pre><code data-snippet="guide/case"><span class="c-com">// A group is read under the flags around it; a reference is compared under</span>
+<span class="c-com">// the flags around the reference. When the two differ, the reference wins.</span>
+<span class="c-kw">let</span> caseless = @moonregex.compile(<span class="c-str">"(?i)(?-i:(a))\\1"</span>)
+assert_eq(caseless.search(<span class="c-str">"aA"</span>).unwrap().content(), <span class="c-str">"aA"</span>)
+
+<span class="c-com">// The same pattern the other way round: the group is caseless, so it can</span>
+<span class="c-com">// take either letter, and the reference insists on the one it captured.</span>
+<span class="c-kw">let</span> exact = @moonregex.compile(<span class="c-str">"(?i:(a))\\1"</span>)
+assert_true(exact.search(<span class="c-str">"AA"</span>) <span class="c-kw">is</span> Some(_))
+assert_true(exact.search(<span class="c-str">"aA"</span>) <span class="c-kw">is</span> None)</code></pre>
+    <p>In <code>(?i)(?-i:(a))\1</code> the group must match the exact letter
+      while the reference accepts either case; in <code>(?i:(a))\1</code> it is
+      the other way round, and <code>aA</code> is no match. The comparison walks
+      the capture one code point at a time and folds each one, so it holds over
+      every script rather than ASCII alone:</p>
+    <pre><code data-snippet="guide/case-alphabet"><span class="c-com">// The comparison is per code point over every script, not ASCII alone.</span>
+assert_true(@moonregex.compile(<span class="c-str">"(?i)(é)\\1"</span>).full(<span class="c-str">"éÉ"</span>) <span class="c-kw">is</span> Some(_))
+assert_true(@moonregex.compile(<span class="c-str">"(?i)(k)\\1"</span>).full(<span class="c-str">"k\u{212A}"</span>) <span class="c-kw">is</span> Some(_))</code></pre>
+    <p>A reference to a group that captured nothing never matches: there is no
+      text to compare, which is why <code>(a)?\1</code> does not match an empty
+      string.</p>
+
+    <h2 id="dialects"><span class="num">07</span>Three grammars</h2>
     <p>The grammar is a parameter, not a fork:</p>
     <table>
       <thead><tr><th>Dialect</th><th>Written by</th><th>Example</th></tr></thead>
@@ -201,11 +232,28 @@ assert_true(p.full(<span class="c-str">"ABC"</span>) <span class="c-kw">is</span
         <tr><td><code>\A</code>, <code>\Z</code></td><td>yes</td><td>no — <code>^</code> and <code>$</code> only</td></tr>
       </tbody>
     </table>
+    <p><code>Lexmatch</code> is the core grammar plus the two things a lexer
+      usually wants and that grammar leaves out: <code>\d</code>,
+      <code>\w</code>, <code>\s</code> and their negations are read the Python
+      way, and <code>(?&lt;name&gt;…)</code> captures under a name. A pattern
+      written for either grammar keeps its meaning in the other, and one that
+      uses them still lowers onto the core engine — the classes are written out
+      as the ranges they stand for:</p>
+    <pre><code data-snippet="guide/lexmatch"><span class="c-kw">let</span> tag = @moonregex.compile(
+  <span class="c-str">"(?&lt;name&gt;\\w+)=(?&lt;value&gt;\\d+)"</span>,
+  dialect=@moonregex.lexmatch_dialect,
+)
+assert_eq(tag.search(<span class="c-str">"size=42"</span>).unwrap().group(<span class="c-str">"value"</span>), Some(<span class="c-str">"42"</span>))
+<span class="c-com">// `\d` is every decimal digit the UCD knows, not the ASCII ten.</span>
+assert_eq(tag.findall(<span class="c-str">"a=1 b=٢"</span>, group=Name(n=<span class="c-str">"value"</span>)), [
+  Some(<span class="c-str">"1"</span>),
+  Some(<span class="c-str">"٢"</span>),
+])</code></pre>
     <div class="note">A pattern from a JSON Schema or an OpenAPI document is
       ECMA-262 by definition. Reading it with the Python grammar mostly works and
       is wrong exactly where it matters.</div>
 
-    <h2 id="unicode"><span class="num">07</span>Unicode</h2>
+    <h2 id="unicode"><span class="num">08</span>Unicode</h2>
     <p><code>\p{…}</code> takes a general category, a script, a block or a binary
       property, under any of their spellings:</p>
     <pre><code data-snippet="guide/unicode"><span class="c-kw">let</span> words = @moonregex.findall(<span class="c-str">"\\p{Lu}\\p{Ll}+"</span>, <span class="c-str">"Paris and Αθήνα"</span>)
@@ -226,7 +274,7 @@ assert_eq(latin.findall(<span class="c-str">"abcé"</span>), [Some(<span class="
     <pre><code data-snippet="guide/grapheme"><span class="c-kw">let</span> p = @moonregex.compile(<span class="c-str">"\\X"</span>)
 <span class="c-kw">let</span> cluster = p.search(<span class="c-str">"e\u{301}x"</span>).unwrap().content()</code></pre>
 
-    <h2 id="core"><span class="num">08</span>The core engine</h2>
+    <h2 id="core"><span class="num">09</span>The core engine</h2>
     <p>MoonBit's core library has a regular-expression engine of its own, reached
       through <code>@string.Regex</code> and the <code>lexmatch</code> grammar. This
       library stands next to it rather than beside it:</p>
@@ -257,7 +305,7 @@ assert_true(core.execute(<span class="c-str">"2026-10"</span>) <span class="c-kw
       <code>None</code>: those run on this library's own engine, which is why the
       two agree rather than overlap.</p>
 
-    <h2 id="limits"><span class="num">09</span>Limits and streams</h2>
+    <h2 id="limits"><span class="num">10</span>Limits and streams</h2>
     <p>Backtracking can be made expensive. Every call carries a step ceiling —
       ten million by default — and raises rather than hanging:</p>
     <pre><code data-snippet="guide/limit"><span class="c-kw">let</span> stopped = <span class="c-kw">try</span> {
@@ -275,7 +323,7 @@ assert_true(core.execute(<span class="c-str">"2026-10"</span>) <span class="c-kw
 assert_eq(m.content(), <span class="c-str">"2026-"</span>)
 assert_true(m.partial())</code></pre>
 
-    <h2 id="globs"><span class="num">10</span>Globs</h2>
+    <h2 id="globs"><span class="num">11</span>Globs</h2>
     <p>Shell patterns are their own grammar, and turn into regular expressions
       here, so the Unicode handling and the dialects come for free:</p>
     <pre><code data-snippet="guide/globs">assert_true(@glob.fnmatch(<span class="c-str">"cat.txt"</span>, <span class="c-str">"*.txt"</span>))

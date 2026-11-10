@@ -132,6 +132,31 @@ switch and leaves the rest, and `@moonregex.flags` is all of them off.
 The common ones also have their inline spelling — `(?i)`, `(?m)`, `(?s)`,
 `(?x)`, `(?a)` and the scoped `(?i:…)` — which needs no flag argument at all.
 
+### Case, and where it comes from
+
+`(?i:…)` scopes a flag to one group, `(?-i:…)` takes it away again, so a
+pattern can be case-insensitive in one place and exact in another. A group is
+read under the flags around the group; a backreference is compared under the
+flags around the reference — the place it is written. The two may disagree, and
+the reference decides.
+
+```moonbit
+// The group is exact and the reference is not.
+let outer = @moonregex.compile("(?i)(?-i:(a))\\1")
+assert_eq(outer.search("aA").unwrap().content(), "aA")
+
+// The group is caseless and the reference is exact: `aA` is no match.
+let inner = @moonregex.compile("(?i:(a))\\1")
+assert_true(inner.full("AA") is Some(_))
+assert_true(inner.full("aA") is None)
+```
+
+The comparison runs one code point at a time and folds it, over every script
+rather than ASCII alone: `é` and `É` are one letter here, and so are `k` and the
+Kelvin sign `K`. It is a fold per code point, not a fold of the whole capture, so
+`ß` matches `ẞ` and not `ss`. A reference to a group that captured nothing is no
+match.
+
 ### Escape
 
 `escape` follows the grammar it is told to follow, because the three do not
@@ -163,11 +188,22 @@ assert_true(schema.full("ABC") is None)
 // lexmatch: a pattern already written for the core library.
 let posix = @moonregex.compile("[[:digit:]]+", dialect=@moonregex.lexmatch_dialect)
 assert_eq(posix.findall("a12b3"), [Some("12"), Some("3")])
+
+// It reads the shorthand classes and named captures too.
+let tag = @moonregex.compile("(?<k>\\w+)=(?<v>\\d+)", dialect=@moonregex.lexmatch_dialect)
+assert_eq(tag.search("size=42").unwrap().group("v"), Some("42"))
 ```
 
 Choose by where the pattern comes from. A pattern a person wrote for text
 processing is `Python`; a pattern from a schema, a form, or a JavaScript
 codebase is `Ecma262`; a pattern from a MoonBit lexer is `Lexmatch`.
+
+`Lexmatch` is the core grammar plus the two things a lexer usually wants and
+that grammar leaves out: `\d`, `\w`, `\s` and their negations are read the way
+Python reads them, and `(?<name>…)` captures under a name. A pattern therefore
+keeps its meaning when it moves between `Python` and `Lexmatch`, and one that
+uses them still lowers onto the core engine — the classes are written out as
+the ranges they stand for.
 
 The dialects differ where the standards differ: `\A` and `\Z` exist only in
 Python, `$` sits before a trailing newline only in Python, `\w` is ASCII in
@@ -266,6 +302,9 @@ instead:
 | Astral characters | offsets count code points | ECMA-262 counts UTF-16 code units |
 | Property names | Unicode loose matching in every dialect | ECMA-262 is case- and space-sensitive |
 | A name used twice | allowed in the ECMA dialect anywhere | `re` refuses it; ECMA-262 only across alternatives |
+| Caseless comparison | Unicode simple case folding, backreferences and literals alike | `re` lowercases, so `(?i)(σ)\1` does not match `σς` there; the `regex` package folds |
+| `fullcase`, and V1's folding | one code point at a time: `ß` matches `ẞ`, not `ss` | `regex` folds fully under V1, where `ß` matches `ss` |
+| `\d`, `\w`, `\s` under `Lexmatch` | read as Python reads them | the core grammar has the POSIX classes only |
 | `v`-mode nested classes | `[[a-z]--[aeiou]]` is not read as a class expression | ECMA-262 reads them |
 | Repeated captures | one span per group: `captures` and `spans` answer the last turn | `regex` lists every turn |
 

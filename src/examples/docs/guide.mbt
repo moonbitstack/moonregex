@@ -137,12 +137,54 @@ test "guide/inline-flags" {
 }
 
 ///|
+test "guide/case" {
+  // docs:begin case
+  // A group is read under the flags around it; a reference is compared under
+  // the flags around the reference. When the two differ, the reference wins.
+  let caseless = @moonregex.compile("(?i)(?-i:(a))\\1")
+  assert_eq(caseless.search("aA").unwrap().content(), "aA")
+
+  // The same pattern the other way round: the group is caseless, so it can
+  // take either letter, and the reference insists on the one it captured.
+  let exact = @moonregex.compile("(?i:(a))\\1")
+  assert_true(exact.search("AA") is Some(_))
+  assert_true(exact.search("aA") is None)
+  // docs:end
+}
+
+///|
+test "guide/case-alphabet" {
+  // docs:begin case-alphabet
+  // The comparison is per code point over every script, not ASCII alone.
+  assert_true(@moonregex.compile("(?i)(é)\\1").full("éÉ") is Some(_))
+  assert_true(@moonregex.compile("(?i)(k)\\1").full("k\u{212A}") is Some(_))
+  // docs:end
+}
+
+///|
 test "guide/ecma" {
   // docs:begin ecma
   let p = @moonregex.compile("^[a-z]+$", dialect=@moonregex.ecma262)
   assert_true(p.full("abc") is Some(_))
   assert_true(p.full("ABC") is None)
   // docs:end
+}
+
+///|
+test "guide/lexmatch" {
+  // docs:begin lexmatch
+  let tag = @moonregex.compile(
+    "(?<name>\\w+)=(?<value>\\d+)",
+    dialect=@moonregex.lexmatch_dialect,
+  )
+  assert_eq(tag.search("size=42").unwrap().group("value"), Some("42"))
+  // `\d` is every decimal digit the UCD knows, not the ASCII ten.
+  assert_eq(tag.findall("a=1 b=٢", group=Name(n="value")), [
+    Some("1"),
+    Some("٢"),
+  ])
+  // docs:end
+  assert_true(tag.lower() is Some(_))
 }
 
 ///|
