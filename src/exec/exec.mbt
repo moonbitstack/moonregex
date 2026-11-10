@@ -819,6 +819,16 @@ fn clone_saves(a : Array[Int32]) -> Array[Int32] {
 }
 
 ///|
+/// Whether two code points are one case of each other.
+///
+/// Simple case folding, the same relation a literal was closed under when the
+/// pattern was read, so a backreference and an ignorecase literal in the same
+/// place agree about what counts as the same character.
+fn same_case(a : Int32, b : Int32) -> Bool {
+  @prop.fold(a.unsafe_to_char()) == @prop.fold(b.unsafe_to_char())
+}
+
+///|
 fn to_code_points(s : String) -> Array[Int32] {
   let a : Array[Int32] = []
   for c in s {
@@ -1013,7 +1023,7 @@ fn Matcher::run(
         while i < here {
           let a = self.chars[sp + i]
           let b = self.chars[s + i]
-          if a != b && !(icase && (a - b == 32 || b - a == 32)) {
+          if a != b && !(icase && same_case(a, b)) {
             ok = false
             break
           }

@@ -109,6 +109,24 @@ CORPUS: list[tuple] = [
     ("(?P<x>a)(?P=x)", "", ["aa", "ab"]),
     ("(a+)\\1", "", ["aaaa", "aaa"]),
     ("(a)?b\\1", "", ["b", "aba"]),
+    # -- the case a backreference is compared under ------------------------
+    # A group is read under the flags around the group and a reference is
+    # compared under the flags around the reference; when the two differ the
+    # reference decides. The first pair names the rule, the rest cover it.
+    ("(?i)(?-i:(a))\\1", "", ["aA", "aa", "AA", "Aa"]),
+    ("(?i:(a))(?-i:\\1)", "", ["aA", "aa", "AA", "Aa"]),
+    ("(?i:(a)\\1)", "", ["aA", "AA"]),
+    ("(?i)(a)(?-i:(b))\\1\\2", "", ["abAB", "abab", "ABab"]),
+    ("(?i:(a)|b)\\1", "", ["aa", "AA", "aA"]),
+    ("(?i)(a*)b\\1", "", ["aabAA", "bB"]),
+    # Over the whole alphabet, not ASCII alone.
+    ("(?i)(é)\\1", "", ["éÉ", "ée"]),
+    ("(?i)(k)\\1", "", ["k\u212a", "kk"]),
+    # The final sigma and the long s fold to another letter than they lower to:
+    # `re` refuses these, the `regex` package accepts them, and so does this
+    # engine, which folds the way a literal in the same place folds.
+    ("(?i)(σ)\\1", "", ["σς"], "regex"),
+    ("(?i)(s)\\1", "", ["sſ"], "regex"),
     ("(?<year>\\d{4})-(?<month>\\d{2})", "", ["on 2026-10-28 ok"], "regex"),
     # -- lookaround ---------------------------------------------------------
     ("a(?=b)", "", ["ab", "ac"]),
