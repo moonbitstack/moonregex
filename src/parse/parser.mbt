@@ -839,14 +839,16 @@ fn Parser::group(
       }
     }
     if self.dialect is Lexmatch && ext != 'i' {
-      raise self.refuse(rest, "invalid group")
+      // The core grammar has one modifier and spells it `(?i:…)`; saying which
+      // one is missing is more use than refusing the group as unknown.
+      raise self.refuse(rest, "lexmatch spells only the i modifier: (?i:…)")
     }
     return self.scoped_flags(after)
   }
-  if (self.dialect is Python || self.dialect is Ecma262) && ext == '<' {
-    // `(?<name>…)`: ECMA-262's spelling of a named group and the regex
-    // superset's; Python's own `re` refuses it, so it is read here rather than
-    // under `?P`.
+  if ext == '<' {
+    // `(?<name>…)`: ECMA-262's spelling of a named group, the regex
+    // superset's, and lexmatch's. Python's own `re` refuses it, so the Python
+    // dialect reads it here rather than under `?P` — one name, one meaning.
     let (view, body) = self.named(after.exact_view(start=2))
     return (view, body)
   }
@@ -931,12 +933,13 @@ fn Parser::capture(
   match name {
     None => ()
     Some(name) =>
-      // ECMA-262 since 2025 allows the same name in different branches;
-      // Python's `re` refuses a name used twice anywhere.
+      // ECMA-262 since 2025 allows the same name in different branches; the
+      // other two grammars answer one name with one group, so a second one is
+      // refused where it is written.
       match self.groupindex.get(name) {
         None => self.groupindex[name] = [slot]
         Some(slots) => {
-          if self.dialect is Python {
+          if self.dialect is Python || self.dialect is Lexmatch {
             raise self.refuse(
               rest,
               "redefinition of group name '\{name}' as group \{slot}",
@@ -1790,12 +1793,12 @@ fn Parser::escape(
 
 ///|
 /// `\d`, `\D`, `\s`, `\S`, `\w`, `\W` — as the flags in force say they mean.
+///
+/// Lexmatch reads these the way Python does, not the way the core engine's
+/// POSIX classes spell them: a pattern moved between the two grammars keeps
+/// its meaning. The core engine gets them back as explicit ranges when the
+/// pattern is lowered onto it, so nothing is lost on the way.
 fn Parser::shorthand(self : Parser, c : Int32) -> @prop.CharSet {
-  // lexmatch refuses these outright; its grammar points at POSIX classes, so
-  // reaching here means the caller did not check.
-  if self.dialect is Lexmatch {
-    return @prop.CharSet::empty()
-  }
   // ECMA-262's `\w`, `\d` and `\s` are ASCII whatever the `u` flag says;
   // Unicode comes in through `\p{…}` alone.
   let ascii = self.flags.ascii || self.dialect is Ecma262
@@ -2442,12 +2445,7 @@ fn Parser::class_escape(
   let c = rest.at(1).to_int()
   let after = rest.exact_view(start=2)
   match c {
-    'd' | 'D' | 's' | 'S' | 'w' | 'W' =>
-      if self.dialect is Lexmatch {
-        raise self.refuse(rest, "use a POSIX character class instead")
-      } else {
-        (after, Many(set=self.shorthand(c)))
-      }
+    'd' | 'D' | 's' | 'S' | 'w' | 'W' => (after, Many(set=self.shorthand(c)))
     'p' | 'P' =>
       // ECMA-262 reads `\p{…}` inside a class only under `u` or `v`; without
       // them Annex B makes it an identity escape for the letter itself.

@@ -150,7 +150,15 @@ fn walk_spans(
 
 ///|
 /// Replay one generated line against the engine.
-fn replay(line : String, engine : String) -> Unit raise {
+///
+/// `dialect` is the grammar the pattern is read in: the vectors of
+/// `src/vectors_test.mbt` are Python's, and the lexmatch vectors replay the
+/// same answers through the other frontend.
+fn replay(
+  line : String,
+  engine : String,
+  dialect~ : @moonregex.Dialect = @moonregex.python,
+) -> Unit raise {
   let fields = split_field(line, '\t')
   if fields[0] == "err" {
     let pattern = unescape(fields[1])
@@ -161,7 +169,7 @@ fn replay(line : String, engine : String) -> Unit raise {
     // the number. `wanted` is kept in the data to read.
     let _wanted = int_of(fields[3])
     let refused = try {
-      let _ = @moonregex.compile(pattern, flags~)
+      let _ = @moonregex.compile(pattern, flags~, dialect~)
       false
     } catch {
       @moonregex.Refused::Pattern(..) => true
@@ -176,7 +184,7 @@ fn replay(line : String, engine : String) -> Unit raise {
   let flags = flags_of(fields[2])
   let text = unescape(fields[3])
   let groups = int_of(fields[4])
-  let p = @moonregex.compile(pattern, flags~)
+  let p = @moonregex.compile(pattern, flags~, dialect~)
   let label = "[\{engine}] /\{pattern}/ on \"\{text}\""
   if p.groups() != groups {
     fail("\{label}: \{p.groups()} groups, want \{groups}")
