@@ -203,6 +203,27 @@ assert_true(exact.search(<span class="c-str">"aA"</span>) <span class="c-kw">is<
     <pre><code data-snippet="guide/case-alphabet"><span class="c-com">// The comparison is per code point over every script, not ASCII alone.</span>
 assert_true(@moonregex.compile(<span class="c-str">"(?i)(é)\\1"</span>).full(<span class="c-str">"éÉ"</span>) <span class="c-kw">is</span> Some(_))
 assert_true(@moonregex.compile(<span class="c-str">"(?i)(k)\\1"</span>).full(<span class="c-str">"k\u{212A}"</span>) <span class="c-kw">is</span> Some(_))</code></pre>
+    <p><code>f</code> — <code>fullcase</code> — is the rest of the fold. A few
+      characters fold to more than one: <code>ß</code> to <code>ss</code>,
+      <code>ﬁ</code> to <code>fi</code>. With it, "the same text" is a comparison
+      of folded strings rather than of characters, so the two match each other in
+      either direction. <code>V1</code> carries the flag; the default behaviour
+      set asks for it with <code>(?fi)</code>. A class written one character at a
+      time folds the same way, and so does a backreference:</p>
+    <pre><code data-snippet="guide/case-folding"><span class="c-com">// `f` folds over more than one character: `ß` is `ss`, and `ss` is `ß`.</span>
+<span class="c-kw">let</span> sharp = @moonregex.compile(<span class="c-str">"(?fi)ß"</span>)
+assert_eq(sharp.full(<span class="c-str">"SS"</span>).unwrap().span(<span class="c-num">0</span>), (<span class="c-num">0</span>, <span class="c-num">2</span>))
+assert_eq(@moonregex.compile(<span class="c-str">"(?fi)ss"</span>).full(<span class="c-str">"ß"</span>).unwrap().span(<span class="c-num">0</span>), (<span class="c-num">0</span>, <span class="c-num">1</span>))
+
+<span class="c-com">// A class and a reference fold the same way.</span>
+assert_eq(@moonregex.compile(<span class="c-str">"(?fi)[ß]"</span>).full(<span class="c-str">"ss"</span>).unwrap().span(<span class="c-num">0</span>), (<span class="c-num">0</span>, <span class="c-num">2</span>))
+assert_eq(
+  @moonregex.compile(<span class="c-str">"(?fi)(ß)\\1"</span>).full(<span class="c-str">"ssSS"</span>).unwrap().span(<span class="c-num">0</span>),
+  (<span class="c-num">0</span>, <span class="c-num">4</span>),
+)</code></pre>
+    <p>Only characters written one at a time grow a longer reading: a range such
+      as <code>[a-ß]</code>, and a negated class, still answer one code point at
+      a time.</p>
     <p>A reference to a group that captured nothing never matches: there is no
       text to compare, which is why <code>(a)?\1</code> does not match an empty
       string.</p>

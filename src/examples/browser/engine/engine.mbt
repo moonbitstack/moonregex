@@ -54,6 +54,7 @@ fn flags_of(text : String) -> @parse.Flags raise @parse.Refused {
   let mut dotall = false
   let mut verbose = false
   let mut ascii = false
+  let mut fullcase = false
   for c in text {
     match c {
       'i' => ignorecase = true
@@ -61,6 +62,7 @@ fn flags_of(text : String) -> @parse.Flags raise @parse.Refused {
       's' => dotall = true
       'x' => verbose = true
       'a' => ascii = true
+      'f' => fullcase = true
       'u' | ' ' | ',' => ()
       _ =>
         // `column: 0` says the fault is in the flags, not in the pattern, so
@@ -68,7 +70,14 @@ fn flags_of(text : String) -> @parse.Flags raise @parse.Refused {
         raise @parse.Pattern(msg="unknown flag '\{c}'", at=0, line=1, column=0)
     }
   }
-  @parse.Flags::new(ignorecase~, multiline~, dotall~, verbose~, ascii~)
+  @parse.Flags::new(
+    ignorecase~,
+    multiline~,
+    dotall~,
+    verbose~,
+    ascii~,
+    fullcase~,
+  )
 }
 
 ///|

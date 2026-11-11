@@ -151,7 +151,7 @@
           <div class="num">05</div>
           <div>
             <h3>Unicode, from the UCD</h3>
-            <p><code>\p{…}</code> takes a category, script, block or binary property; <code>\X</code> matches one grapheme cluster; offsets count characters, not bytes. The tables come from <code>moonucd</code>.</p>
+            <p><code>\p{…}</code> takes a category, script, block or binary property; <code>\X</code> matches one grapheme cluster; offsets count characters, not bytes. Case folds across lengths, so <code>(?fi)ß</code> matches <code>SS</code>. The tables come from <code>moonucd</code>.</p>
             <span class="tag">\p{Script=Han} · \X</span>
           </div>
         </div>

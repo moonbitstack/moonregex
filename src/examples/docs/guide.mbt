@@ -162,6 +162,23 @@ test "guide/case-alphabet" {
 }
 
 ///|
+test "guide/case-folding" {
+  // docs:begin case-folding
+  // `f` folds over more than one character: `ß` is `ss`, and `ss` is `ß`.
+  let sharp = @moonregex.compile("(?fi)ß")
+  assert_eq(sharp.full("SS").unwrap().span(0), (0, 2))
+  assert_eq(@moonregex.compile("(?fi)ss").full("ß").unwrap().span(0), (0, 1))
+
+  // A class and a reference fold the same way.
+  assert_eq(@moonregex.compile("(?fi)[ß]").full("ss").unwrap().span(0), (0, 2))
+  assert_eq(
+    @moonregex.compile("(?fi)(ß)\\1").full("ssSS").unwrap().span(0),
+    (0, 4),
+  )
+  // docs:end
+}
+
+///|
 test "guide/ecma" {
   // docs:begin ecma
   let p = @moonregex.compile("^[a-z]+$", dialect=@moonregex.ecma262)

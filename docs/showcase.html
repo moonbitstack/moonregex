@@ -347,7 +347,7 @@
         </div>
         <label class="pg-flags-wrap" for="pgflags">
           flags
-          <input class="pg-flags" id="pgflags" value="" placeholder="im sxa" spellcheck="false" autocomplete="off" aria-label="flags" />
+          <input class="pg-flags" id="pgflags" value="" placeholder="imsxaf" spellcheck="false" autocomplete="off" aria-label="flags" />
         </label>
       </div>
 
@@ -917,6 +917,13 @@
         pattern: "moon \\w+",
         flags: "i",
         text: "Moon river, moon lake",
+        mode: "findall"
+      },
+      {
+        label: "ß and ss",
+        pattern: "straße",
+        flags: "fi",
+        text: "STRASSE, straße, Straße",
         mode: "findall"
       },
       {

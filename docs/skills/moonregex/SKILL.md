@@ -49,7 +49,7 @@ fn pairs(text : String) -> Array[String?] raise {
   // `findall` would raise Ambiguous(groups=2) here; name the group instead.
   let keys = p.findall(text, group=Num(n=1))
   for m in p.finditer(text) {
-    let value = m.group("value") // Some("1"); no default argument, ask for it
+    let value = m.group("value") // Some("1"); `default` fills one that took none
     println("\{m.span("key")} \{value}")
   }
   keys
@@ -97,4 +97,8 @@ fn lexer_values(pattern : String, text : String) -> Array[String?] raise {
 - A backreference takes its case from where it is written, not from the group it
   names: `(?i)(?-i:(a))\1` compares caselessly, `(?i:(a))\1` does not. The
   comparison folds over every script, so `(?i)(é)\1` matches `éÉ`.
+- `i` folds one code point against one. `f` — `fullcase`, on under `V1` and asked
+  for with `(?fi)` — folds across lengths: `(?fi)ß` matches `SS` and `ss`, and
+  `(?fi)ss` matches `ß`. A class written character by character folds the same
+  way; a range and a negated class stay one code point at a time.
 - A pattern is cached nowhere: `findall(pattern, text)` recompiles each call.

@@ -127,7 +127,8 @@ switch and leaves the rest, and `@moonregex.flags` is all of them off.
 
 `ignorecase`, `multiline`, `dotall`, `verbose`, `ascii`, `unicode`,
 `unicode_sets`, `fullcase`, `bestmatch`, `enhancematch`, `posix`, `reverse`,
-`word`, and `version` (`V0` / `V1`).
+`word`, and `version` (`V0` / `V1`). `fullcase` is on under `V1`, which is the
+behaviour set that defines it; `(?-f:…)` is how a pattern gives it up.
 
 The common ones also have their inline spelling — `(?i)`, `(?m)`, `(?s)`,
 `(?x)`, `(?a)` and the scoped `(?i:…)` — which needs no flag argument at all.
@@ -153,9 +154,36 @@ assert_true(inner.full("aA") is None)
 
 The comparison runs one code point at a time and folds it, over every script
 rather than ASCII alone: `é` and `É` are one letter here, and so are `k` and the
-Kelvin sign `K`. It is a fold per code point, not a fold of the whole capture, so
-`ß` matches `ẞ` and not `ss`. A reference to a group that captured nothing is no
-match.
+Kelvin sign `K`. A reference to a group that captured nothing is no match.
+
+### Folding across lengths
+
+`f` — `fullcase` — is the rest of the fold: a few characters have a folded form
+longer than themselves, and then "the same text" is a comparison of folded
+strings rather than of characters. `ß` folds to `ss`, `ﬁ` to `fi`, `ﬅ` to `st`.
+
+```moonbit
+let sharp = @moonregex.compile("(?fi)ß")
+assert_eq(sharp.full("SS").unwrap().span(0), (0, 2))
+assert_eq(sharp.full("ẞ").unwrap().span(0), (0, 1))
+
+// The other direction too: a run of letters matches the one character.
+assert_eq(@moonregex.compile("(?fi)ss").full("ß").unwrap().span(0), (0, 1))
+
+// A class, a reference and a quantifier all fold the same way.
+assert_eq(@moonregex.compile("(?fi)[ß]").full("ss").unwrap().span(0), (0, 2))
+assert_eq(@moonregex.compile("(?fi)(ß)\\1").full("ssSS").unwrap().span(0), (
+  0, 4,
+))
+```
+
+`V1` turns it on, as the behaviour set it belongs to; `(?fi)` asks for it in the
+default one. Without `i` it does nothing, and with `a` it does nothing either,
+because ASCII has no characters that fold to two.
+
+Only the characters written one at a time grow a longer reading: `[ß]` matches
+`ss`, while `[a-ß]` — a range — matches one code point at a time, and so does a
+negated class.
 
 ### Escape
 
@@ -303,7 +331,7 @@ instead:
 | Property names | Unicode loose matching in every dialect | ECMA-262 is case- and space-sensitive |
 | A name used twice | allowed in the ECMA dialect anywhere | `re` refuses it; ECMA-262 only across alternatives |
 | Caseless comparison | Unicode simple case folding, backreferences and literals alike | `re` lowercases, so `(?i)(σ)\1` does not match `σς` there; the `regex` package folds |
-| `fullcase`, and V1's folding | one code point at a time: `ß` matches `ẞ`, not `ss` | `regex` folds fully under V1, where `ß` matches `ss` |
+| U+0130's fold | `i` and a combining dot, compared whole: `(?fi)İ` matches `i̇` | `regex` ends the match inside the fold, so it answers only `i` |
 | `\d`, `\w`, `\s` under `Lexmatch` | read as Python reads them | the core grammar has the POSIX classes only |
 | `v`-mode nested classes | `[[a-z]--[aeiou]]` is not read as a class expression | ECMA-262 reads them |
 | Repeated captures | one span per group: `captures` and `spans` answer the last turn | `regex` lists every turn |
