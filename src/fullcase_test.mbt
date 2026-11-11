@@ -144,3 +144,23 @@ test "every code point that folds to more than one character" {
     assert_true(@moonregex.compile("(?fi)" + many).full(one) is Some(_))
   }
 }
+
+///|
+test "a folded run the text cuts short" {
+  // Partial matching treats the rest of the fold as text still to come, the
+  // way it treats any other character the subject has not reached yet.
+  let p = @moonregex.compile("(?fi)ß", partial=true)
+  let whole = p.prefix("ss").unwrap()
+  assert_true(whole.partial() is false)
+  assert_eq(whole.span(0), (0, 2))
+  assert_true(p.prefix("s").unwrap().partial())
+  // A repeat of a folded run still ends: an attempt that consumed nothing
+  // stops the repetition, as it does everywhere else.
+  assert_true(
+    @moonregex.compile("(?fi)ß*", partial=true).prefix("x") is Some(_),
+  )
+  // One word, folded whole: `ß` is two characters here and one there.
+  let street = @moonregex.compile("(?fi)straße")
+  assert_eq(street.full("STRASSE").unwrap().span(0), (0, 7))
+  assert_eq(street.full("straße").unwrap().span(0), (0, 6))
+}
