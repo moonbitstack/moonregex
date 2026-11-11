@@ -128,6 +128,16 @@ CORPUS: list[tuple] = [
     ("(?i)(σ)\\1", "", ["σς"], "regex"),
     ("(?i)(s)\\1", "", ["sſ"], "regex"),
     ("(?<year>\\d{4})-(?<month>\\d{2})", "", ["on 2026-10-28 ok"], "regex"),
+    # -- a negated class, and the order case folding happens in --------------
+    # The fold runs on the class as written and the complement comes after it,
+    # so `[^a]` still excludes `A`.
+    ("(?i)[^a]", "", ["a", "A", "b"]),
+    ("(?i)[^é]", "", ["É", "é", "e"]),
+    ("(?i)[^a-c]+", "", ["ABCx", "abc"]),
+    ("(?i)\\W", "", ["A", "_", "1"]),
+    ("(?i)[\\W]", "", ["A", "!"], "regex"),
+    ("(?i)\\P{Ll}", "", ["A", "1"], "regex"),
+    ("(?i)\\p{Lu}", "", ["a", "A"], "regex"),
     # -- lookaround ---------------------------------------------------------
     ("a(?=b)", "", ["ab", "ac"]),
     ("a(?!b)", "", ["ab", "ac"]),

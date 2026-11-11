@@ -277,3 +277,18 @@ test "fuzzy full measures the whole region" {
   // two errors exceed the budget, so the whole string cannot be matched
   assert_true(@moonregex.full("(?:hello){e<=1}", "helloxx", flags~) is None)
 }
+
+///|
+test "a negated class folds before it is negated" {
+  // `[^a]` is everything that is not `a`. `A` folds to `a`, so it is not `a`
+  // either — folding the complement instead would let it back in.
+  assert_true(@moonregex.full("(?i)[^a]", "a") is None)
+  assert_true(@moonregex.full("(?i)[^a]", "A") is None)
+  assert_true(@moonregex.full("(?i)[^a]", "b") is Some(_))
+  assert_true(@moonregex.full("(?i)[^é]", "É") is None)
+  // The same rule for the escapes that carry their own negation.
+  assert_true(@moonregex.full("(?i)\\W", "A") is None)
+  assert_true(@moonregex.full("(?i)\\W", "!") is Some(_))
+  assert_true(@moonregex.full("(?i)\\P{Ll}", "A") is None)
+  assert_true(@moonregex.full("(?i)\\p{Lu}", "a") is Some(_))
+}
