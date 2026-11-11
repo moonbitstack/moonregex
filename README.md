@@ -185,9 +185,10 @@ Only the characters written one at a time grow a longer reading: `[ß]` matches
 `ss`, while `[a-ß]` — a range — matches one code point at a time, and so does a
 negated class.
 
-One code point is folded differently from what the references do — `İ`, which
-Unicode folds to `i` and a combining dot and they fold to a lone `i`. The
-difference table below says what that changes and why it is the reading here.
+One code point is folded differently from what the references do: Unicode folds
+`İ` to `i` and a combining dot, the references fold it to a lone `i`. The
+difference table below says what each reading makes match, and why the Unicode
+one is the reading here.
 
 ### Escape
 
