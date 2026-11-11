@@ -112,6 +112,8 @@ fn flags_of(letters : String) -> @moonregex.Flags {
   let mut dotall = false
   let mut verbose = false
   let mut ascii = false
+  let mut fullcase = false
+  let mut version = @moonregex.version0_value
   for c in letters {
     if c == 'i' {
       ignorecase = true
@@ -123,9 +125,21 @@ fn flags_of(letters : String) -> @moonregex.Flags {
       verbose = true
     } else if c == 'a' {
       ascii = true
+    } else if c == 'f' {
+      fullcase = true
+    } else if c == 'V' {
+      version = @moonregex.version1_value
     }
   }
-  @moonregex.Flags::new(ignorecase~, multiline~, dotall~, verbose~, ascii~)
+  @moonregex.Flags::new(
+    ignorecase~,
+    multiline~,
+    dotall~,
+    verbose~,
+    ascii~,
+    fullcase~,
+    version~,
+  )
 }
 
 ///|

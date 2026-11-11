@@ -26,6 +26,7 @@ pub(all) enum AnchorKind {
 
 pub(all) enum Inst {
   Char(code~ : Int32)
+  Fold(codes~ : Array[Int32])
   Any(except_newline~ : Bool)
   Class(set~ : @prop.CharSet)
   Anchor(kind~ : AnchorKind)
@@ -34,7 +35,7 @@ pub(all) enum Inst {
   Jmp(x~ : Int32)
   Save(slot~ : Int32)
   Match
-  Backref(slot~ : Int32, icase~ : Bool)
+  Backref(slot~ : Int32, icase~ : Bool, fullcase~ : Bool)
   Keep
   Grapheme
   Atomic(id~ : Int32)

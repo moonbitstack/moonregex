@@ -151,6 +151,7 @@ pub fn Look::to_repr(Self) -> @debug.Repr
 pub enum Node {
   Empty
   Char(code~ : Int32)
+  Fold(fold~ : String)
   Any(dotall~ : Bool)
   Class(set~ : @prop.CharSet)
   Seq(items~ : Array[Node])
@@ -159,7 +160,7 @@ pub enum Node {
   Group(slot~ : Int32, node~ : Node)
   Atomic(node~ : Node)
   Lookaround(node~ : Node, look~ : Look)
-  Backref(slot~ : Int32, icase~ : Bool)
+  Backref(slot~ : Int32, icase~ : Bool, fullcase~ : Bool)
   Cond(probe~ : Cond, yes~ : Node, no~ : Node?)
   Anchor(anchor~ : Anchor)
   Keep

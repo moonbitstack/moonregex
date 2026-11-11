@@ -24,7 +24,13 @@ pub fn digit() -> CharSet
 
 pub fn fold(Char) -> Char
 
+pub fn fold_code(Int32) -> String
+
+pub fn fold_into(Int32, Array[Int32]) -> Unit
+
 pub fn fold_pairs() -> Array[(Int32, Int32)]
+
+pub fn fold_text(StringView) -> String
 
 pub fn property(StringView) -> CharSet?
 

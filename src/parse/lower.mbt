@@ -61,6 +61,15 @@ fn render_into(
         render_class(buf, [(0, 0x09), (0x0B, 0x10FFFF)])
       }
     Class(set~) => render_class(buf, set.ranges())
+    Fold(fold~) =>
+      // A folded run of one code point is a class of everything that folds to
+      // it. Two or more — `ß` compared as `ss` — has no spelling in a grammar
+      // that matches one code point at a time, so the pattern stays here.
+      match fold.iter().collect() {
+        [c] =>
+          render_class(buf, @prop.CharSet::single(c.to_int()).fold().ranges())
+        _ => false
+      }
     Seq(items~) => {
       let mut ok = true
       for item in items {

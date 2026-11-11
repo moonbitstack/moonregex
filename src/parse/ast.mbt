@@ -182,6 +182,12 @@ pub enum Node {
   Empty
   /// One literal code point.
   Char(code~ : Int32)
+  /// A literal run matched by full case folding: what it folds to, which may
+  /// be longer or shorter than the run itself. `ß` folds to `ss`, so this node
+  /// matches `SS` and `ss`, and a run of `s` and `s` matches `ß`. A run is one
+  /// node rather than one per character because the comparison is over the
+  /// folded text: `s` alone does not match `ß`.
+  Fold(fold~ : String)
   /// `.`: any character, newlines included when `dotall`.
   Any(dotall~ : Bool)
   /// A character class, negation and folding already applied.
@@ -201,7 +207,7 @@ pub enum Node {
   /// A lookaround.
   Lookaround(node~ : Node, look~ : Look)
   /// A backreference to what a group captured, case-folded when `icase`.
-  Backref(slot~ : Int32, icase~ : Bool)
+  Backref(slot~ : Int32, icase~ : Bool, fullcase~ : Bool)
   /// A conditional: test, then one branch or the other.
   Cond(probe~ : Cond, yes~ : Node, no~ : Node?)
   /// An assertion.
@@ -293,6 +299,7 @@ fn dump_node(node : Node, buf : StringBuilder) -> Unit {
   match node {
     Empty => buf.write_string("")
     Char(code~) => dump_char(code, buf)
+    Fold(fold~) => dump_fold(fold, buf)
     Any(dotall~) => buf.write_string(if dotall { "\\n" } else { "." })
     Class(set~) => dump_class(set, buf)
     Seq(items~) =>
@@ -532,6 +539,15 @@ fn dump_char(code : Int32, buf : StringBuilder) -> Unit {
 }
 
 ///|
+/// A folded run prints as the text it is compared against, so a dump of `ß`
+/// under full folding reads `ss`: that is what the node matches.
+fn dump_fold(fold : String, buf : StringBuilder) -> Unit {
+  for c in fold {
+    dump_char(c.to_int(), buf)
+  }
+}
+
+///|
 fn dump_class(set : @prop.CharSet, buf : StringBuilder) -> Unit {
   buf.write_string("[")
   for (lo, hi) in set.ranges() {
@@ -580,6 +596,7 @@ fn shift(node : Node, by : Int32) -> Node {
   match node {
     Empty
     | Char(_)
+    | Fold(_)
     | Any(_)
     | Class(_)
     | Anchor(_)
@@ -593,7 +610,8 @@ fn shift(node : Node, by : Int32) -> Node {
     Group(slot~, node~) => Group(slot=slot + by, node=shift(node, by))
     Atomic(node~) => Atomic(node=shift(node, by))
     Lookaround(node~, look~) => Lookaround(node=shift(node, by), look~)
-    Backref(slot~, icase~) => Backref(slot=slot + by, icase~)
+    Backref(slot~, icase~, fullcase~) =>
+      Backref(slot=slot + by, icase~, fullcase~)
     Cond(probe~, yes~, no~) =>
       Cond(
         probe=match probe {

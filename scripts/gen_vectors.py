@@ -36,7 +36,7 @@ REPL = "<M>"
 
 # Flags, by the letter the generated MoonBit uses. Each engine spells the
 # constants its own way, so the value is taken from the engine in hand.
-FLAG_NAMES = {"i": "I", "m": "M", "s": "S", "x": "X", "a": "A"}
+FLAG_NAMES = {"i": "I", "m": "M", "s": "S", "x": "X", "a": "A", "f": "F", "V": "V1"}
 
 # ---------------------------------------------------------------------------
 # The corpus
@@ -195,6 +195,35 @@ CORPUS: list[tuple] = [
     ("\\A", "", ["ab"]),
     ("\\Z", "", ["ab"]),
     ("$", "", ["ab\n"]),
+    # -- full case folding: the `f` flag, on by default under `V1` ----------
+    # A literal stands for its folded text, which is two characters for `ß`,
+    # so the two can match each other in either direction.
+    ("(?fi)ß", "", ["ss", "SS", "ß", "ẞ", "Ss"], "regex"),
+    ("(?fi)ss", "", ["ß", "SS", "ßß"], "regex"),
+    ("(?fi)sss", "", ["ß", "ßs"], "regex"),
+    ("(?fi)ßs", "", ["sss"], "regex"),
+    ("(?fi)ﬁ", "", ["fi", "FI", "ﬁ"], "regex"),
+    ("(?fi)st", "", ["ﬅ", "ST"], "regex"),
+    ("(?fi)aßb", "", ["assb", "aßb"], "regex"),
+    ("(?fi)ß+", "", ["ssss", "ss"], "regex"),
+    ("(?fi)(ß)", "", ["ss"], "regex"),
+    ("(?fi)(ß)\\1", "", ["ssSS", "ssß", "SSss", "ßß"], "regex"),
+    ("(?fi)(ss)\\1", "", ["ßß", "ßss"], "regex"),
+    ("(?fi)(?P<n>ß)(?P=n)", "", ["ssSS"], "regex"),
+    ("(?fi)[ß]", "", ["ss", "SS", "ẞ", "s"], "regex"),
+    ("(?fi)[ßs]", "", ["ss", "s"], "regex"),
+    ("(?fi)[ßﬁ]", "", ["ss", "fi"], "regex"),
+    ("(?fi)[^ß]", "", ["ss", "s", "ß", "ẞ"], "regex"),
+    ("(?fi)[a-ß]", "", ["ss", "ẞ"], "regex"),
+    ("(?fi)[\\w]", "", ["ß", "s"], "regex"),
+    ("(?fi)\\w+", "", ["ß", "SS"], "regex"),
+    ("(?fi)(?-f:ß)", "", ["ss", "ß"], "regex"),
+    ("(?V1)ß", "i", ["ss", "ẞ"], "regex"),
+    ("ß", "fi", ["ss", "SS"], "regex"),
+    ("ß", "f", ["ss"], "regex"),
+    ("ß", "i", ["ss", "ẞ"], "regex"),
+    ("ss", "fi", ["ß"], "regex"),
+    ("[ß]", "fi", ["ss"], "regex"),
     # -- patterns the grammar refuses ---------------------------------------
     ("(", "", []),
     ("a)", "", []),

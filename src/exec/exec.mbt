@@ -44,6 +44,10 @@ pub(all) enum RecurseCondKind {
 /// tree and the property tables speak.
 pub(all) enum Inst {
   Char(code~ : Int32)
+  /// A literal run compared by full case folding: the folded text, as code
+  /// points. The subject contributes its own fold, which may be one code point
+  /// or two, so the run consumes however many code points fold to this text.
+  Fold(codes~ : Array[Int32])
   Any(except_newline~ : Bool)
   Class(set~ : @prop.CharSet)
   Anchor(kind~ : AnchorKind)
@@ -54,8 +58,10 @@ pub(all) enum Inst {
   Jmp(x~ : Int32)
   Save(slot~ : Int32)
   Match
-  /// A backreference to the text a group captured.
-  Backref(slot~ : Int32, icase~ : Bool)
+  /// A backreference to the text a group captured, compared case-folded when
+  /// `icase`, and by full folding — where the captured text may fold to a
+  /// different number of code points than the subject takes — when `fullcase`.
+  Backref(slot~ : Int32, icase~ : Bool, fullcase~ : Bool)
   /// `\K`: the match starts here, not where the search did.
   Keep
   /// `\X`: one grapheme cluster.
@@ -208,6 +214,7 @@ fn Compile::emit(
   match node {
     @parse.Empty => ()
     @parse.Char(code=c) => code.push(Char(code=c))
+    @parse.Fold(fold~) => code.push(Fold(codes=to_code_points(fold)))
     @parse.Any(dotall~) => code.push(Any(except_newline=!dotall))
     @parse.Class(set~) => code.push(Class(set~))
     @parse.Seq(items~) =>
@@ -246,7 +253,8 @@ fn Compile::emit(
         @parse.Behind(positive~) => code.push(Lookbehind(id~, positive~))
       }
     }
-    @parse.Backref(slot~, icase~) => code.push(Backref(slot~, icase~))
+    @parse.Backref(slot~, icase~, fullcase~) =>
+      code.push(Backref(slot~, icase~, fullcase~))
     @parse.Cond(probe~, yes~, no~) => {
       let yes_id = self.extra_for(yes)
       let no_sub : Array[Inst] = []
@@ -805,6 +813,10 @@ priv struct Matcher {
   /// something the caller has not typed yet.
   mut partial : Bool
   past_end : Array[Int32]
+  /// The fold of the code point being read, reused: full folding asks for a
+  /// code point's fold beside a pattern's, and a fresh array per character
+  /// would make a folded run cost more than the match is worth.
+  scratch : Array[Int32]
 }
 
 ///|
@@ -835,6 +847,66 @@ fn to_code_points(s : String) -> Array[Int32] {
     a.push(c.to_int())
   }
   a
+}
+
+///|
+/// The full fold of the subject between two code-point offsets.
+fn Matcher::fold_slice(
+  self : Matcher,
+  from : Int32,
+  to : Int32,
+) -> Array[Int32] {
+  let out : Array[Int32] = []
+  let mut i = from
+  while i < to {
+    @prop.fold_into(self.chars[i], out)
+    i += 1
+  }
+  out
+}
+
+///|
+/// Match a folded text against the subject at `sp`, answering where it ended.
+///
+/// The subject is read one code point at a time and each contributes its own
+/// fold, so `ß` — which folds to `ss` — satisfies the text `ss`, and the two
+/// characters of `ss` satisfy the text `ß`. A fold is never split: the run ends
+/// on a code-point boundary, which is why `s` alone does not match `ß`.
+fn Matcher::match_fold(
+  self : Matcher,
+  target : Array[Int32],
+  sp : Int32,
+) -> Int32? {
+  let n = target.length()
+  let len = self.len
+  let mut at = sp
+  let mut i = 0
+  while i < n {
+    if at >= len {
+      // Nothing left to read: when the caller said the subject may continue,
+      // the rest of the fold is text still to come, and the position stands
+      // still — the span of a partial match is what arrived.
+      if self.partial {
+        self.past_end[0] = self.past_end[0] + 1
+        return Some(at)
+      }
+      return None
+    }
+    self.scratch.clear()
+    @prop.fold_into(self.chars[at], self.scratch)
+    let piece = self.scratch
+    if i + piece.length() > n {
+      return None
+    }
+    for j, c in piece {
+      if target[i + j] != c {
+        return None
+      }
+    }
+    i += piece.length()
+    at += 1
+  }
+  Some(at)
 }
 
 ///|
@@ -957,6 +1029,14 @@ fn Matcher::run(
         } else {
           return (false, sp, saves)
         }
+      Fold(codes~) =>
+        match self.match_fold(codes, sp) {
+          Some(next) => {
+            sp = next
+            pc = pc + 1
+          }
+          None => return (false, sp, saves)
+        }
       Any(except_newline~) =>
         if sp < len && (!except_newline || self.chars[sp] != '\n'.to_int()) {
           sp = sp + 1
@@ -1008,38 +1088,52 @@ fn Matcher::run(
         } else {
           return (true, sp, saves)
         }
-      Backref(slot~, icase~) => {
+      Backref(slot~, icase~, fullcase~) => {
         let s = saves[2 * slot]
         let e = saves[2 * slot + 1]
         if s < 0 {
           return (false, sp, saves)
         }
-        let n = e - s
-        // Only the part of the captured text that has arrived can be compared;
-        // the rest is still to come, which is what makes this a partial match.
-        let here = if sp + n > len { len - sp } else { n }
-        let mut i = 0
-        let mut ok = true
-        while i < here {
-          let a = self.chars[sp + i]
-          let b = self.chars[s + i]
-          if a != b && !(icase && same_case(a, b)) {
-            ok = false
-            break
+        if fullcase {
+          // The captured text and the subject are compared as folded text, so
+          // the two sides need not be the same number of code points: `ß` is
+          // two for `ss`.
+          match self.match_fold(self.fold_slice(s, e), sp) {
+            Some(next) => {
+              sp = next
+              pc = pc + 1
+            }
+            None => return (false, sp, saves)
           }
-          i = i + 1
-        }
-        if !ok {
-          return (false, sp, saves)
-        }
-        if sp + n > len {
-          if !self.partial {
+        } else {
+          let n = e - s
+          // Only the part of the captured text that has arrived can be
+          // compared; the rest is still to come, which is what makes this a
+          // partial match.
+          let here = if sp + n > len { len - sp } else { n }
+          let mut i = 0
+          let mut ok = true
+          while i < here {
+            let a = self.chars[sp + i]
+            let b = self.chars[s + i]
+            if a != b && !(icase && same_case(a, b)) {
+              ok = false
+              break
+            }
+            i = i + 1
+          }
+          if !ok {
             return (false, sp, saves)
           }
-          self.past_end[0] = self.past_end[0] + 1
+          if sp + n > len {
+            if !self.partial {
+              return (false, sp, saves)
+            }
+            self.past_end[0] = self.past_end[0] + 1
+          }
+          sp = sp + here
+          pc = pc + 1
         }
-        sp = sp + here
-        pc = pc + 1
       }
       Keep => {
         saves[0] = sp
@@ -1406,6 +1500,7 @@ pub fn Program::search(
     graphemes: None,
     partial,
     past_end: [0],
+    scratch: [],
   }
   let mut p = pos
   while p <= end {
@@ -1505,6 +1600,7 @@ pub fn Program::prefix(
     graphemes: None,
     partial,
     past_end: [0],
+    scratch: [],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {
@@ -1560,6 +1656,7 @@ pub fn Program::full(
     graphemes: None,
     partial,
     past_end: [0],
+    scratch: [],
   }
   let init = Array::make(2 * (self.ngroups + 1), -1)
   try {

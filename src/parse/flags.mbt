@@ -138,6 +138,9 @@ pub let dialect : Dialect = Python
 /// A flag that is only meaningful in one dialect is accepted everywhere and
 /// refused by the parser when the grammar cannot honour it — `verbose` under
 /// ECMA-262, for instance — so that the mistake is named where it happens.
+///
+/// `V1` turns `fullcase` on: the behaviour set is defined with it, and a
+/// pattern gives it up with `(?-f:…)` rather than with a constructor argument.
 pub fn Flags::new(
   ignorecase~ : Bool = false,
   multiline~ : Bool = false,
@@ -162,7 +165,7 @@ pub fn Flags::new(
     ascii,
     unicode,
     unicode_sets,
-    fullcase,
+    fullcase: fullcase || version is V1,
     bestmatch,
     enhancematch,
     posix,

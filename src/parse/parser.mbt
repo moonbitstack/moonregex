@@ -11,10 +11,22 @@
 // the position, so the caller is told which grammar was being read.
 
 ///|
-/// What one item in a character class contributed: a code point, or a set.
+/// What one item in a character class contributed: a code point, a set that
+/// the class closes under case along with everything else, or a set that is
+/// already closed and negated — `\W`, `\P{Ll}` — and must not be folded
+/// again, since folding puts back what the negation removed.
 priv enum ClassPart {
   One(code~ : Int32)
   Many(set~ : @prop.CharSet)
+  Fixed(set~ : @prop.CharSet)
+}
+
+///|
+/// One operand of a class expression: the items the class will fold at the
+/// end, and the ones that carry their own folding already.
+priv struct ClassOperand {
+  raw : @prop.CharSet
+  settled : @prop.CharSet
 }
 
 ///|
@@ -80,6 +92,13 @@ pub fn parse(
       column=1,
     )
   }
+  // `V1` carries full case folding as its default, so a caller who names the
+  // behaviour set and nothing else gets the folding `(?-f)` has to give up.
+  let flags = if flags.version is V1 && !flags.fullcase {
+    { ..flags, fullcase: true, }
+  } else {
+    flags
+  }
   let parser : Parser = {
     src: pattern,
     rest: pattern,
@@ -99,10 +118,17 @@ pub fn parse(
 ///|
 /// Read the whole pattern: global inline flags, one alternation, nothing left.
 fn Parser::read(self : Parser) -> Ast raise Refused {
-  let rest = if self.dialect is Python {
-    self.global_flags(self.rest)
-  } else {
-    self.rest
+  let mut rest = self.rest
+  if self.dialect is Python {
+    // Flags may be spelled over several groups, `(?V1)(?i)`: each one is read
+    // until the pattern stops opening with flags.
+    while true {
+      let next = self.global_flags(rest)
+      if next.length() == rest.length() {
+        break
+      }
+      rest = next
+    }
   }
   let (rest, root) = self.alternation(rest)
   if rest.length() > 0 {
@@ -165,6 +191,7 @@ fn Parser::sequence(
     items.push(item)
     view = self.skip_space(next)
   }
+  let items = merge_folds(items)
   (
     view,
     if items.length() == 0 {
@@ -682,13 +709,76 @@ fn Parser::atom(
   }
   // A literal code point.
   let (ch, view) = next_char(rest)
-  let code = ch.to_int()
-  let node = if self.flags.ignorecase {
+  (view, self.literal(ch.to_int()), false)
+}
+
+///|
+/// Whether full case folding is in force here: case-insensitive matching that
+/// folds over more than one character as well as one.
+///
+/// The `f` flag asks for it, `V1` turns it on by default, and ASCII mode turns
+/// it off — the superset does the same, since ASCII has no such pairs. The
+/// other two grammars have no full folding to offer.
+fn Parser::full_folding(self : Parser) -> Bool {
+  self.flags.ignorecase &&
+  self.flags.fullcase &&
+  !self.flags.ascii &&
+  self.dialect is Python
+}
+
+///|
+/// One literal code point as a node: a plain `Char`, a class closed under the
+/// simple fold when `i` is on, or a folded run when `f` is on too.
+fn Parser::literal(self : Parser, code : Int32) -> Node {
+  if self.full_folding() {
+    Fold(fold=@prop.fold_code(code))
+  } else if self.flags.ignorecase {
     Class(set=@prop.CharSet::single(code).fold())
   } else {
     Char(code~)
   }
-  (view, node, false)
+}
+
+///|
+/// A whole literal string as one node: one folded run under full folding, and
+/// the same nodes a reader of the pattern would have written otherwise.
+fn Parser::literal_text(self : Parser, text : StringView) -> Node {
+  if self.full_folding() {
+    return Fold(fold=@prop.fold_text(text))
+  }
+  let chars : Array[Node] = []
+  for c in text {
+    chars.push(self.literal(c.to_int()))
+  }
+  let chars = merge_folds(chars)
+  if chars.length() == 1 {
+    chars[0]
+  } else {
+    Seq(items=chars)
+  }
+}
+
+///|
+/// Join neighbouring folded runs into one.
+///
+/// The comparison is over the folded text, so `s` and `s` written side by side
+/// have to become `ss` before `ß` can match them; a run also has to stay one
+/// node because a single `s` does not match `ß`.
+fn merge_folds(items : Array[Node]) -> Array[Node] {
+  let out : Array[Node] = []
+  for item in items {
+    if out.length() > 0 {
+      match (out[out.length() - 1], item) {
+        (Fold(fold=left), Fold(fold=right)) => {
+          out[out.length() - 1] = Fold(fold=left + right)
+          continue
+        }
+        _ => ()
+      }
+    }
+    out.push(item)
+  }
+  out
 }
 
 ///|
@@ -719,7 +809,7 @@ fn next_char(rest : StringView) -> (Char, StringView) {
 ///
 /// `rest` points just past the `\Q`. Everything is taken literally until a `\E`
 /// closes it; if no `\E` appears, the rest of the pattern is quoted. Each code
-/// point is folded under `ignorecase` the way a plain literal would be.
+/// point is matched the way a plain literal would be.
 fn Parser::quote(self : Parser, rest : StringView) -> (StringView, Array[Node]) {
   let items : Array[Node] = []
   let mut view = rest
@@ -731,17 +821,10 @@ fn Parser::quote(self : Parser, rest : StringView) -> (StringView, Array[Node]) 
       break
     }
     let (ch, next) = next_char(view)
-    let code = ch.to_int()
-    items.push(
-      if self.flags.ignorecase {
-        Class(set=@prop.CharSet::single(code).fold())
-      } else {
-        Char(code~)
-      },
-    )
+    items.push(self.literal(ch.to_int()))
     view = next
   }
-  (view, items)
+  (view, merge_folds(items))
 }
 
 ///|
@@ -1008,7 +1091,10 @@ fn Parser::python_group(
       None => raise self.refuse(rest, "unknown group name '\{name}'")
       Some(slots) => slots[0]
     }
-    return (rest, Backref(slot~, icase=self.flags.ignorecase))
+    return (
+      rest,
+      Backref(slot~, icase=self.flags.ignorecase, fullcase=self.full_folding()),
+    )
   }
   if c == '>' {
     // `(?P>name)`: the `regex` superset's spelling of a named-group recursion.
@@ -1526,7 +1612,9 @@ fn Parser::set_inline(
       }
     "V1" =>
       if self.dialect is Python {
-        { ..flags, version: V1, }
+        // The behaviour set carries full case folding as its default; `(?-f)`
+        // inside a scope is how a pattern gives it up.
+        { ..flags, version: V1, fullcase: true, }
       } else {
         raise refuse("bad inline flags: the behaviour set is Python only")
       }
@@ -1603,8 +1691,7 @@ fn Parser::escape(
         true,
       )
     'd' | 'D' | 's' | 'S' | 'w' | 'W' => {
-      let set = self.shorthand(c)
-      let set = if self.flags.ignorecase { set.fold() } else { set }
+      let set = self.folding_set(self.shorthand(c), is_upper(c))
       return (after, Class(set~), false)
     }
     _ => ()
@@ -1613,8 +1700,8 @@ fn Parser::escape(
     // `\p{…}` is ECMA-262's own property escape, but only under `u` or `v`;
     // without them Annex B makes `\p` an identity escape — a literal `p`.
     if self.flags.unicode || self.flags.unicode_sets {
-      let (after, set) = self.property(after, c == 'P')
-      return (after, Class(set~), false)
+      let (after, set, negate) = self.property(after, c == 'P')
+      return (after, Class(set=self.folding_set(set, negate)), false)
     }
     let ch = c.unsafe_to_char()
     return (after, Char(code=ch.to_int()), false)
@@ -1653,9 +1740,8 @@ fn Parser::escape(
       'R' => return (after, Class(set=vertical_space(self.flags.ascii)), false)
       'X' => return (after, Grapheme, false)
       'p' | 'P' => {
-        let (after, set) = self.property(after, c == 'P')
-        let set = if self.flags.ignorecase { set.fold() } else { set }
-        return (after, Class(set~), false)
+        let (after, set, negate) = self.property(after, c == 'P')
+        return (after, Class(set=self.folding_set(set, negate)), false)
       }
       'L' => {
         let (after, node) = self.named_list(after)
@@ -1705,7 +1791,15 @@ fn Parser::escape(
               }
           }
         }
-        return (after, Backref(slot~, icase=self.flags.ignorecase), false)
+        return (
+          after,
+          Backref(
+            slot~,
+            icase=self.flags.ignorecase,
+            fullcase=self.full_folding(),
+          ),
+          false,
+        )
       }
       'N' =>
         if after.length() > 0 && after.at(0).to_int() == '{' {
@@ -1721,14 +1815,7 @@ fn Parser::escape(
                 rest,
                 "unknown Unicode character name '\{name.to_owned()}'",
               )
-            Some(code) => {
-              let node = if self.flags.ignorecase {
-                Class(set=@prop.CharSet::single(code).fold())
-              } else {
-                Char(code~)
-              }
-              return (view, node, false)
-            }
+            Some(code) => return (view, self.literal(code), false)
           }
         } else {
           // `\N`: any character except a newline — the superset's spelling.
@@ -1754,7 +1841,11 @@ fn Parser::escape(
       Some(slots) =>
         return (
           after,
-          Backref(slot=slots[0], icase=self.flags.ignorecase),
+          Backref(
+            slot=slots[0],
+            icase=self.flags.ignorecase,
+            fullcase=self.full_folding(),
+          ),
           false,
         )
     }
@@ -1774,7 +1865,15 @@ fn Parser::escape(
     match parse_int(digits) {
       Some(n) =>
         if n >= 1 && n <= self.groups {
-          return (view, Backref(slot=n, icase=self.flags.ignorecase), false)
+          return (
+            view,
+            Backref(
+              slot=n,
+              icase=self.flags.ignorecase,
+              fullcase=self.full_folding(),
+            ),
+            false,
+          )
         } else {
           ()
         }
@@ -1783,12 +1882,7 @@ fn Parser::escape(
   }
   // A character escape: hex, octal, unicode, control, or the literal itself.
   let (after, code) = self.char_escape(rest, c, after)
-  let node = if self.flags.ignorecase {
-    Class(set=@prop.CharSet::single(code).fold())
-  } else {
-    Char(code~)
-  }
-  (after, node, false)
+  (after, self.literal(code), false)
 }
 
 ///|
@@ -1800,17 +1894,21 @@ fn Parser::escape(
 /// pattern is lowered onto it, so nothing is lost on the way.
 fn Parser::shorthand(self : Parser, c : Int32) -> @prop.CharSet {
   // ECMA-262's `\w`, `\d` and `\s` are ASCII whatever the `u` flag says;
-  // Unicode comes in through `\p{…}` alone.
+  // Unicode comes in through `\p{…}` alone. The uppercase escapes are the
+  // same set, and the caller negates it after folding.
   let ascii = self.flags.ascii || self.dialect is Ecma262
   match c {
-    'd' => if ascii { @prop.ascii_digit } else { @prop.digit() }
-    'D' => (if ascii { @prop.ascii_digit } else { @prop.digit() }).complement()
-    's' => if ascii { @prop.ascii_space } else { @prop.space() }
-    'S' => (if ascii { @prop.ascii_space } else { @prop.space() }).complement()
-    'w' => if ascii { @prop.ascii_word } else { @prop.word() }
-    'W' => (if ascii { @prop.ascii_word } else { @prop.word() }).complement()
+    'd' | 'D' => if ascii { @prop.ascii_digit } else { @prop.digit() }
+    's' | 'S' => if ascii { @prop.ascii_space } else { @prop.space() }
+    'w' | 'W' => if ascii { @prop.ascii_word } else { @prop.word() }
     _ => @prop.CharSet::empty()
   }
+}
+
+///|
+/// Whether an escape letter is the negated spelling of its class.
+fn is_upper(c : Int32) -> Bool {
+  c >= 'A'.to_int() && c <= 'Z'.to_int()
 }
 
 ///|
@@ -1858,13 +1956,17 @@ fn not_newline() -> @prop.CharSet {
 }
 
 ///|
-/// `\p{…}` and `\P{…}`: a property, negated for `\P` and for a `^` inside the
-/// braces.
+/// `\p{…}` and `\P{…}`: the property's own set, and whether the escape was
+/// negated — by `\P` or by a `^` inside the braces.
+///
+/// The negation is answered rather than applied, because the fold has to happen
+/// before it: `[^a]` is everything that is not `a`, and `A` folds to `a`, so
+/// folding the complement would let `A` back in.
 fn Parser::property(
   self : Parser,
   rest : StringView,
   negate : Bool,
-) -> (StringView, @prop.CharSet) raise Refused {
+) -> (StringView, @prop.CharSet, Bool) raise Refused {
   if rest.length() == 0 || rest.at(0).to_int() != '{' {
     raise self.refuse(rest, "missing { after \\p")
   }
@@ -1881,11 +1983,25 @@ fn Parser::property(
   }
   match @prop.property(view) {
     None => raise self.refuse(rest, "unknown property '\{view.to_owned()}'")
-    Some(set) => {
-      let set = if negate { set.complement() } else { set }
-      let set = if self.flags.ignorecase { set.fold() } else { set }
-      (after, set)
-    }
+    Some(set) => (after, set, negate)
+  }
+}
+
+///|
+/// A set closed under the case folding in force, then negated when asked.
+///
+/// The order is the whole point: folding a complement adds back the characters
+/// whose fold was excluded.
+fn Parser::folding_set(
+  self : Parser,
+  set : @prop.CharSet,
+  negate : Bool,
+) -> @prop.CharSet {
+  let folded = if self.flags.ignorecase { set.fold() } else { set }
+  if negate {
+    folded.complement()
+  } else {
+    folded
   }
 }
 
@@ -1902,18 +2018,9 @@ fn Parser::named_list(
       self.named_lists[name] = items
       let branches : Array[Node] = []
       for item in items {
-        // Each item is matched literally, character by character.
-        let chars : Array[Node] = []
-        for ch in item {
-          chars.push(Char(code=ch.to_int()))
-        }
-        branches.push(
-          if chars.length() == 1 {
-            chars[0]
-          } else {
-            Seq(items=chars)
-          },
-        )
+        // Each item is matched literally, character by character — or as one
+        // folded run, when the case folding folds over two characters.
+        branches.push(self.literal_text(item))
       }
       let node = if branches.length() == 1 {
         branches[0]
@@ -2184,9 +2291,15 @@ fn Parser::klass(
   // A `]` first is a literal in Python; ECMA-262 reads `[]` as the empty
   // class, and lexmatch refuses it.
   let first_is_literal = self.dialect is Python
-  let operands : Array[@prop.CharSet] = []
+  let operands : Array[ClassOperand] = []
   let ops : Array[String] = []
+  // The code points written one at a time, not as range ends: under full
+  // folding each of those stands for its folded text as well, which is how
+  // `[ß]` matches `ss`. A range names a span of characters, not characters,
+  // and does not grow these.
+  let single_chars : Array[Int32] = []
   let mut cs = @prop.CharSet::empty()
+  let mut settled = @prop.CharSet::empty()
   let mut first = true
   let going = true
   while going {
@@ -2236,9 +2349,10 @@ fn Parser::klass(
       }
       match op {
         Some(op) => {
-          operands.push(cs)
+          operands.push({ raw: cs, settled, })
           ops.push(op)
           cs = @prop.CharSet::empty()
+          settled = @prop.CharSet::empty()
           view = view.exact_view(start=2)
           continue
         }
@@ -2264,6 +2378,7 @@ fn Parser::klass(
         }
         cs = cs.union(set)
       }
+      Fixed(set~) => settled = settled.union(set)
       One(code~) => {
         // A `-` between two single characters is a range; at the end of the
         // class it is a literal dash.
@@ -2294,20 +2409,33 @@ fn Parser::klass(
               } else {
                 raise self.refuse(view, "bad character range")
               }
+            Fixed(set~) =>
+              // A negated escape is not a range end either: `[a-\W]` names
+              // three things in Annex B and nothing anywhere else.
+              if self.dialect is Ecma262 &&
+                !(self.flags.unicode || self.flags.unicode_sets) {
+                cs = cs
+                  .union(@prop.CharSet::single(lo))
+                  .union(@prop.CharSet::single('-'.to_int()))
+                settled = settled.union(set)
+              } else {
+                raise self.refuse(view, "bad character range")
+              }
           }
         } else {
           cs = cs.union(@prop.CharSet::single(lo))
+          single_chars.push(lo)
         }
       }
     }
   }
   // The operands fold left to right, as the set algebra specifies.
-  operands.push(cs)
-  let mut acc = operands[0]
+  operands.push({ raw: cs, settled, })
+  let mut acc = self.fold_operand(operands[0])
   let mut i = 1
   while i < operands.length() {
     let op = ops[i - 1]
-    let next = operands[i]
+    let next = self.fold_operand(operands[i])
     acc = if op == "--" {
       acc.difference(next)
     } else if op == "&&" {
@@ -2319,9 +2447,48 @@ fn Parser::klass(
     }
     i += 1
   }
+  // Negation comes last, and nothing is folded after it.
   let set = if negate { acc.complement() } else { acc }
-  let set = if self.flags.ignorecase { set.fold() } else { set }
-  (view, Class(set~))
+  let node = if self.full_folding() && !negate {
+    class_with_folds(set, single_chars)
+  } else {
+    Class(set~)
+  }
+  (view, node)
+}
+
+///|
+/// One operand with the case folding applied: the items the class folds, and
+/// the ones that arrived folded already.
+fn Parser::fold_operand(self : Parser, operand : ClassOperand) -> @prop.CharSet {
+  let raw = if self.flags.ignorecase { operand.raw.fold() } else { operand.raw }
+  raw.union(operand.settled)
+}
+
+///|
+/// A class under full folding, with the folded text of the characters written
+/// one at a time as further alternatives.
+///
+/// `[ß]` is `ß` or `ss`: the class still answers the one-code-point case, and
+/// the folded text answers the longer one. The class comes first, so a text
+/// that both can match takes one code point, which is the reading the superset
+/// gives `[ßs]` on `ss`.
+fn class_with_folds(set : @prop.CharSet, single_chars : Array[Int32]) -> Node {
+  let alternatives : Array[Node] = [Class(set~)]
+  let seen : Array[String] = []
+  for code in single_chars {
+    let folded = @prop.fold_code(code)
+    if folded.length() < 2 || seen.contains(folded) {
+      continue
+    }
+    seen.push(folded)
+    alternatives.push(Fold(fold=folded))
+  }
+  if alternatives.length() == 1 {
+    alternatives[0]
+  } else {
+    Alt(items=alternatives)
+  }
 }
 
 ///|
@@ -2445,7 +2612,12 @@ fn Parser::class_escape(
   let c = rest.at(1).to_int()
   let after = rest.exact_view(start=2)
   match c {
-    'd' | 'D' | 's' | 'S' | 'w' | 'W' => (after, Many(set=self.shorthand(c)))
+    'd' | 'D' | 's' | 'S' | 'w' | 'W' =>
+      if is_upper(c) {
+        (after, Fixed(set=self.folding_set(self.shorthand(c), true)))
+      } else {
+        (after, Many(set=self.shorthand(c)))
+      }
     'p' | 'P' =>
       // ECMA-262 reads `\p{…}` inside a class only under `u` or `v`; without
       // them Annex B makes it an identity escape for the letter itself.
@@ -2454,8 +2626,12 @@ fn Parser::class_escape(
           self.dialect is Ecma262 &&
           (self.flags.unicode || self.flags.unicode_sets)
         ) {
-        let (after, set) = self.property(after, c == 'P')
-        (after, Many(set~))
+        let (after, set, negate) = self.property(after, c == 'P')
+        if negate {
+          (after, Fixed(set=self.folding_set(set, true)))
+        } else {
+          (after, Many(set~))
+        }
       } else {
         (after, One(code=c))
       }

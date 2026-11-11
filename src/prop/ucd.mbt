@@ -313,6 +313,48 @@ pub fn fold(c : Char) -> Char {
 }
 
 ///|
+/// The full fold of a run of text: `ß` becomes `ss`, `ﬁ` becomes `fi`, and a
+/// case-insensitive comparison of two strings is one comparison of these.
+///
+/// This is what the `f` flag buys over the simple fold: a literal is no longer
+/// one code point against one code point, because a single character may stand
+/// for two and two for one.
+pub fn fold_text(text : StringView) -> String {
+  @moonucd.fold(text)
+}
+
+///|
+/// The full fold of one code point, as text.
+pub fn fold_code(code : Int32) -> String {
+  @moonucd.fold(code.unsafe_to_char().to_string())
+}
+
+///|
+/// The fold of each code point the matcher has read, kept once it is worked
+/// out: a subject revisits its characters, and folding one is a table lookup
+/// and a string.
+let fold_cache : Map[Int32, String] = Map([])
+
+///|
+/// Append the full fold of `code` to `out`.
+///
+/// The cache is what keeps a folded comparison cheap enough to sit in the
+/// matcher: the alternative is building a string per character per attempt.
+pub fn fold_into(code : Int32, out : Array[Int32]) -> Unit {
+  let folded = match fold_cache.get(code) {
+    Some(folded) => folded
+    None => {
+      let folded = @moonucd.fold(code.unsafe_to_char().to_string())
+      fold_cache[code] = folded
+      folded
+    }
+  }
+  for c in folded {
+    out.push(c.to_int())
+  }
+}
+
+///|
 /// The pair list, kept once it is built: a pattern closes many classes under
 /// case, and every one of them reads the same pairs.
 let fold_pair_cache : Array[(Int32, Int32)] = []
