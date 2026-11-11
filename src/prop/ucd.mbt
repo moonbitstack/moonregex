@@ -319,12 +319,23 @@ pub fn fold(c : Char) -> Char {
 /// This is what the `f` flag buys over the simple fold: a literal is no longer
 /// one code point against one code point, because a single character may stand
 /// for two and two for one.
+///
+/// U+0130 is the one code point where the answer here is not what the
+/// references answer. CaseFolding.txt gives it a full mapping to `i` and a
+/// combining dot; Python's `re` and the `regex` package both fold it to a plain
+/// `i` instead. Those are different texts — `İ` is one character and `i̇` is
+/// two, and a lone `i` is neither — so a pattern holding `İ` matches `i̇` here
+/// and does not match `i`. The reading is deliberate: folding is a relation
+/// between texts, and the Unicode data is what says which texts are the same.
 pub fn fold_text(text : StringView) -> String {
   @moonucd.fold(text)
 }
 
 ///|
 /// The full fold of one code point, as text.
+///
+/// Two of them come back as more than one character — `ß` and `İ` — and the
+/// second is the one `re` folds differently; `fold_text` says why.
 pub fn fold_code(code : Int32) -> String {
   @moonucd.fold(code.unsafe_to_char().to_string())
 }

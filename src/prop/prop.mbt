@@ -195,6 +195,12 @@ pub fn CharSet::complement(self : CharSet) -> CharSet {
 /// the input, so the executor stays a plain membership test. Only single code
 /// point folds exist here, so `ß` does not grow an `ss` — matching it against
 /// `SS` is out of scope, exactly as it is in Python's `re`.
+///
+/// A code point with no simple mapping is its own orbit, and U+0130 is one:
+/// CaseFolding.txt gives it a full mapping only, so `(?i)İ` matches `İ` and
+/// nothing else. `re` lowercases it to a plain `i`, which is a different text;
+/// the library does not, because `İ`, `i` and `i` followed by a combining dot
+/// are three texts and only the last two are the same one.
 pub fn CharSet::fold(self : CharSet) -> CharSet {
   let extra : Array[(Int32, Int32)] = []
   for (src, dst) in fold_pairs() {

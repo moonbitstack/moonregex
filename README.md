@@ -185,6 +185,10 @@ Only the characters written one at a time grow a longer reading: `[ß]` matches
 `ss`, while `[a-ß]` — a range — matches one code point at a time, and so does a
 negated class.
 
+One code point is folded differently from what the references do — `İ`, which
+Unicode folds to `i` and a combining dot and they fold to a lone `i`. The
+difference table below says what that changes and why it is the reading here.
+
 ### Escape
 
 `escape` follows the grammar it is told to follow, because the three do not
@@ -331,7 +335,7 @@ instead:
 | Property names | Unicode loose matching in every dialect | ECMA-262 is case- and space-sensitive |
 | A name used twice | allowed in the ECMA dialect anywhere | `re` refuses it; ECMA-262 only across alternatives |
 | Caseless comparison | Unicode simple case folding, backreferences and literals alike | `re` lowercases, so `(?i)(σ)\1` does not match `σς` there; the `regex` package folds |
-| U+0130's fold | `i` and a combining dot, compared whole: `(?fi)İ` matches `i̇` | `regex` ends the match inside the fold, so it answers only `i` |
+| U+0130's fold | `i` and a combining dot: `(?fi)İ` matches `i̇`, and `(?i)İ` matches `İ` alone | `re` and the `regex` package fold it to a plain `i`, which is a different text: there `(?i)İ` matches `i`, and `(?fi)İ` answers only the `i` of `i̇` |
 | `\d`, `\w`, `\s` under `Lexmatch` | read as Python reads them | the core grammar has the POSIX classes only |
 | `v`-mode nested classes | `[[a-z]--[aeiou]]` is not read as a class expression | ECMA-262 reads them |
 | Repeated captures | one span per group: `captures` and `spans` answer the last turn | `regex` lists every turn |

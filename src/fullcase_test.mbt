@@ -130,11 +130,13 @@ test "every code point that folds to more than one character" {
     assert_true(@moonregex.compile("(?fi)" + one).full(many) is Some(_))
     assert_true(@moonregex.compile("(?fi)" + many).full(one) is Some(_))
   }
-  // `regex` ends a match inside the fold of U+0130, so `(?fi)İ` answers just
-  // `i` of `i` + a combining dot. Canonical caseless matching — which is what
-  // this library implements, and what the README's difference table says —
-  // compares the two folds whole, so the pair is pinned here rather than by a
-  // vector shared with the reference.
+  // U+0130 is the one code point where this library and the references read
+  // the data differently, and it is pinned here rather than by a vector the
+  // two share. CaseFolding.txt folds it to `i` and a combining dot; `re` and
+  // the `regex` package both fold it to a plain `i`. `İ`, `i` and `i` plus a
+  // dot are three texts, and folding says which are the same one — `i̇` and
+  // `İ` are, `i` is not. So `(?fi)İ` answers the two code points of `i̇` here,
+  // while `regex` answers only its first one.
   assert_eq(fullcase_divergences.length(), 1)
   for pair in fullcase_divergences {
     let (code, fold) = pair
@@ -142,6 +144,12 @@ test "every code point that folds to more than one character" {
     let many = unescape(fold)
     assert_true(@moonregex.compile("(?fi)" + one).full(many) is Some(_))
     assert_true(@moonregex.compile("(?fi)" + many).full(one) is Some(_))
+    // And the one-code-point path agrees with itself: `İ` is its own orbit,
+    // so it does not match a lone `i` — which is where `re`, lowercasing it,
+    // says otherwise.
+    assert_true(@moonregex.compile("(?fi)" + one).full("i") is None)
+    assert_true(@moonregex.compile("(?i)" + one).full("i") is None)
+    assert_true(@moonregex.compile("(?i)" + one).full(one) is Some(_))
   }
 }
 
