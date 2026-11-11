@@ -87,12 +87,12 @@ pub fn[K : GroupKey] Match::span(
 }
 
 ///|
-/// The substring the group captured, or `default` (preset `None`) if it took no
-/// part — Python's `Match.group`.
+/// The substring the group captured, or `default` if it took no part —
+/// Python's `Match.group`.
 pub fn[K : GroupKey] Match::group(
   self : Match,
   group : K,
-  default~ : String? = None,
+  default? : String,
 ) -> String? raise @parse.Refused {
   let s = self.start(group)
   let e = self.end(group)
@@ -290,7 +290,7 @@ pub fn Match::marks(self : Match) -> Array[String] {
 ///|
 /// All capturing groups (1..n) as strings, `None` for those that did not take
 /// part — Python's `Match.groups`.
-pub fn Match::groups(self : Match, default~ : String? = None) -> Array[String?] {
+pub fn Match::groups(self : Match, default? : String) -> Array[String?] {
   let ng = self.pattern.groups()
   let out : Array[String?] = []
   let mut g = 1
@@ -309,10 +309,7 @@ pub fn Match::groups(self : Match, default~ : String? = None) -> Array[String?] 
 ///|
 /// Named groups to their captured strings, `default` filling those that took no
 /// part — Python's `Match.groupdict`.
-pub fn Match::groupdict(
-  self : Match,
-  default~ : String? = None,
-) -> Map[String, String] {
+pub fn Match::groupdict(self : Match, default? : String) -> Map[String, String] {
   let index = self.pattern.groupindex()
   let out : Map[String, String] = Map([])
   for k in index.keys() {

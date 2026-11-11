@@ -139,9 +139,9 @@ pub fn[K : GroupKey] Match::ends(Self, K) -> Array[Int32] raise @parse.Refused
 pub fn Match::expand(Self, String) -> String raise @parse.Refused
 pub fn Match::fuzzy_changes(Self) -> (Array[(Int32, Int32)], Array[(Int32, Int32)], Array[(Int32, Int32)])
 pub fn Match::fuzzy_counts(Self) -> (Int32, Int32, Int32)
-pub fn[K : GroupKey] Match::group(Self, K, default? : String?) -> String? raise @parse.Refused
-pub fn Match::groupdict(Self, default? : String?) -> Map[String, String]
-pub fn Match::groups(Self, default? : String?) -> Array[String?]
+pub fn[K : GroupKey] Match::group(Self, K, default? : String) -> String? raise @parse.Refused
+pub fn Match::groupdict(Self, default? : String) -> Map[String, String]
+pub fn Match::groups(Self, default? : String) -> Array[String?]
 #alias("_[_]")
 pub fn[K : GroupKey] Match::item(Self, K) -> String? raise @parse.Refused
 pub fn Match::lastgroup(Self) -> String?
