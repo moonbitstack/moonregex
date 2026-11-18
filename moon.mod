@@ -1,6 +1,6 @@
 name = "moonbitstack/moonregex"
 
-version = "0.2.0"
+version = "0.2.1"
 
 readme = "README.md"
 
@@ -30,5 +30,5 @@ description = "Regular expressions for MoonBit."
 source = "src"
 
 import {
-  "moonbitstack/moonucd@0.1.4",
+  "moonbitstack/moonucd@0.2.1",
 }
