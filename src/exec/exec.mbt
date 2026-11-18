@@ -92,7 +92,7 @@ pub(all) enum Inst {
     ins~ : Int32,
     del~ : Int32,
     sub~ : Int32,
-    err~ : Int32
+    err~ : Int32,
   )
   /// `(*ACCEPT)`: end the whole match here, successfully. The engine raises an
   /// `Accept` refusal that the top-level search/match/full catch and turn
